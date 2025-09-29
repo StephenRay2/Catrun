@@ -17,7 +17,7 @@ shift_multiplier = 1
 dungeon_depth = 0
 font = pygame.font.SysFont(None, 24)
 scroll = 0
-player_speed = 300
+player_speed = 350
 dungeon_traversal_speed = .1
 
 
@@ -89,39 +89,39 @@ background_image = pygame.transform.scale(background_image, (width, height))
 BACKGROUND_SIZE = background_image.get_width()
 
 tiles = []
-for i in range(3):
+for i in range(-1, 6):
     tiles.append((i * BACKGROUND_SIZE, bg_grass))
-for i in range(3, 10):
+for i in range(6, 20):
     tiles.append((i * BACKGROUND_SIZE, bg_dirt))
-for i in range(10, 20):
+for i in range(20, 40):
     tiles.append((i * BACKGROUND_SIZE, bg_compact))
-for i in range(20, 30):
+for i in range(40, 60):
     tiles.append((i * BACKGROUND_SIZE, bg_sand))
-for i in range(30, 43):
+for i in range(60, 86):
     tiles.append((i * BACKGROUND_SIZE, bg_savannah))
-for i in range(43, 58):
+for i in range(86, 116):
     tiles.append((i * BACKGROUND_SIZE, bg_riverrock))
-for i in range(58, 72):
+for i in range(116, 144):
     tiles.append((i * BACKGROUND_SIZE, bg_bigrock))
-for i in range(72, 75):
+for i in range(144, 150):
     tiles.append((i * BACKGROUND_SIZE, bg_grass))
-for i in range(75, 90):
+for i in range(150, 180):
     tiles.append((i * BACKGROUND_SIZE, bg_duskstone))
-for i in range(90, 108):
+for i in range(180, 216):
     tiles.append((i * BACKGROUND_SIZE, bg_lavastone))
-for i in range(108, 120):
+for i in range(216, 240):
     tiles.append((i * BACKGROUND_SIZE, bg_wasteland))
-for i in range(120, 128):
+for i in range(240, 256):
     tiles.append((i * BACKGROUND_SIZE, bg_dirt))
-for i in range(128, 145):
+for i in range(256, 290):
     tiles.append((i * BACKGROUND_SIZE, bg_snow))
-for i in range(145, 170):
+for i in range(290, 340):
     tiles.append((i * BACKGROUND_SIZE, bg_blackstone))
-for i in range(170, 190):
+for i in range(340, 380):
     tiles.append((i * BACKGROUND_SIZE, bg_redrock))
-for i in range(190, 195):
+for i in range(380, 390):
     tiles.append((i * BACKGROUND_SIZE, bg_grass))
-for i in range(195, 200):
+for i in range(390, 401):
     tiles.append((i * BACKGROUND_SIZE, bg_redrock))
 
 
@@ -129,11 +129,76 @@ for i in range(195, 200):
 cam_x = 0
 
 
+allowed_rock_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_lavastone, bg_wasteland, bg_blackstone, bg_redrock]
+
+
+
+rock_weights = {
+    bg_grass: 3,
+    bg_dirt: 2,
+    bg_compact: 1,
+    bg_savannah: 1,
+    bg_riverrock: 4,
+    bg_bigrock: 4,
+    bg_duskstone: 1,
+    bg_lavastone: 1,
+    bg_wasteland: 1,
+    bg_blackstone: 1,
+    bg_redrock: 1
+}
+
+weighted_rock_tiles = []
+for tile_x, tile_image in tiles:
+    weight = rock_weights.get(tile_image, 1)
+    weighted_rock_tiles.extend([(tile_x, tile_image)] * weight)
+
 rocks = []
-for _ in range(20):  # make 20 rocks
-    x = random.randint(0, 1280 * 5)  # example world width
-    y = random.randint(0, 720)
+num_rocks = 2000
+for _ in range(num_rocks):
+    tile_x, tile_image = random.choice(weighted_rock_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
     rocks.append(Rock(x, y))
+
+rock_border_locations = [(0, i * 48) for i in range(18)] + [(512000, i * 48) for i in range(18)]
+
+for i, pos in enumerate(rock_border_locations):
+    x, y = pos
+    chosen_image = random.choice(rock_images)
+    rock = Rock(x, y)
+    rock.image = pygame.image.load(chosen_image).convert_alpha()
+    rock.image = pygame.transform.scale(rock.image, (64, 64))
+    rock.rect = rock.image.get_rect(topleft=(x, y))
+    rocks.append(rock)
+
+allowed_tree_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_wasteland]
+
+tree_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_tree_tiles]
+
+tree_weights = {
+    bg_grass: 30,
+    bg_dirt: 20,
+    bg_compact: 10,
+    bg_savannah: 10,
+    bg_wasteland: 1,
+
+}
+
+weighted_tree_tiles = []
+for tile_x, tile_image in tiles:
+    weight = tree_weights.get(tile_image, 1)
+    weighted_tree_tiles.extend([(tile_x, tile_image)] * weight)
+
+
+trees = []
+num_trees = 2000
+
+for _ in range(num_trees):
+    tile_x, tile_image = random.choice(tree_spawn_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    trees.append(Tree(x, y))
+
 
 while running:
     
@@ -152,6 +217,9 @@ while running:
 
     for rock in rocks:
         rock.draw(screen, cam_x)
+
+    for tree in trees:
+        tree.draw(screen, cam_x)
 
 
     keys = pygame.key.get_pressed()
@@ -255,7 +323,7 @@ while running:
     if keys[pygame.K_ESCAPE]:
         running = False
     if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
-        shift_multiplier = 1.4
+        shift_multiplier = 1.5
     else:
         shift_multiplier = 1
 
@@ -266,6 +334,13 @@ while running:
     temp_surface.fill((0, 0, 0, 100))
     screen.blit(temp_surface, (depth_rect.x, depth_rect.y))
     screen.blit(depth_text, (depth_rect.x + 5, depth_rect.y + 5))
+
+
+    if keys[pygame.K_e]:
+        target_depth = 5000
+        dungeon_depth = target_depth
+        cam_x = 500000
+        player_pos.x = width / 2
 
 
     pygame.display.flip()
