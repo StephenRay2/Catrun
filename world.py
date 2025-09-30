@@ -5,36 +5,25 @@ rock_images = ["/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/gras
 
 tree_images = ["/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/AppleTree.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/BareAppleTree.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/DuskwoodTree.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/FirTree.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/OakTree.png"]
 
-class Rock():
+class Solid(pygame.sprite.Sprite):
+    def __init__(self, image, x, y, size):
+        super().__init__()
+        self.image = pygame.transform.scale(
+            pygame.image.load(image).convert_alpha(), size
+        )
+        self.rect = self.image.get_rect(topleft=(x, y))
+
+    def draw(self, screen, cam_x):
+        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
+
+
+class Rock(Solid):
     def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        
-        
-        chosen_image = random.choice(rock_images)
-        self.image = pygame.image.load(chosen_image).convert_alpha()
-        self.image = pygame.transform.scale(self.image, (64, 64))
-        self.rect = self.image.get_rect(topleft = (x, y))
+        img = random.choice(rock_images)
+        super().__init__(img, x, y, (64, 64))
 
 
-    def draw(self, screen, cam_x, cam_y=0):
-        screen_x = self.x - cam_x
-        screen_y = self.y - cam_y
-        screen.blit(self.image, (screen_x, screen_y))
-
-
-class Tree():
+class Tree(Solid):
     def __init__(self, x, y):
-        self.x = x
-        self.y = y
-
-
-        chosen_image = random.choice(tree_images)
-        self.image = pygame.image.load(chosen_image).convert_alpha()
-        self.image = pygame.transform.scale(self.image, (64, 128))
-        self.rect = self.image.get_rect(topleft = (x, y))
-
-    def draw(self, screen, cam_x, cam_y=0):
-        screen_x = self.x - cam_x
-        screen_y = self.y - cam_y
-        screen.blit(self.image, (screen_x, screen_y))
+        img = random.choice(tree_images)
+        super().__init__(img, x, y, (64, 128))

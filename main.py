@@ -2,6 +2,7 @@ import pygame
 import sys
 import time, random, math
 from world import *
+from mobs import *
 
 pygame.init()
 screen = pygame.display.set_mode((1280, 720), pygame.FULLSCREEN)
@@ -127,8 +128,9 @@ for i in range(390, 401):
 
 
 cam_x = 0
+cam_y = 0
 
-
+player = Player(width/2, height/2, "Corynn")
 allowed_rock_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_lavastone, bg_wasteland, bg_blackstone, bg_redrock]
 
 
@@ -189,7 +191,7 @@ for tile_x, tile_image in tiles:
     weight = tree_weights.get(tile_image, 1)
     weighted_tree_tiles.extend([(tile_x, tile_image)] * weight)
 
-
+tree = Tree(x,y)
 trees = []
 num_trees = 2000
 
@@ -198,6 +200,18 @@ for _ in range(num_trees):
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
     trees.append(Tree(x, y))
+
+all_sprites = pygame.sprite.Group()
+solids = pygame.sprite.Group()
+player = Player(640, 360, "Corynn")
+all_sprites.add(player)
+solids.add(player)
+
+for _ in range(15):
+    r = Rock(random.randint(0, 2000), random.randint(0, 2000))
+    t = Tree(random.randint(0, 2000), random.randint(0, 2000))
+    all_sprites.add(r, t)
+    solids.add(r, t)
 
 
 while running:
@@ -214,12 +228,24 @@ while running:
 
 
     screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size/2))
+    player.rect.center = (player_pos.x, player_pos.y)
 
     for rock in rocks:
         rock.draw(screen, cam_x)
 
     for tree in trees:
         tree.draw(screen, cam_x)
+
+
+    left_player_check = pygame.Rect(player.rect.left - 1, player.rect.top, 1, player.rect.height)
+    right_player_check = pygame.Rect(player.rect.right, player.rect.top, 1, player.rect.height)
+    top_player_check = pygame.Rect(player.rect.left, player.rect.top - 1, player.rect.width, 1)
+    bottom_player_check = pygame.Rect(player.rect.left, player.rect.bottom, player.rect.width, 1)
+
+    left_collision = any(left_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + 20, obj.rect.width - 20, obj.rect.height - 40)) for obj in list(rocks) + list(trees))
+    right_collision = any(right_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + 20, obj.rect.width - 20, obj.rect.height - 40)) for obj in list(rocks) + list(trees))
+    up_collision = any(top_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + 20, obj.rect.width - 20, obj.rect.height - 40)) for obj in list(rocks) + list(trees))
+    down_collision = any(bottom_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + 20, obj.rect.width - 20, obj.rect.height - 40)) for obj in list(rocks) + list(trees))
 
 
     keys = pygame.key.get_pressed()
@@ -234,33 +260,41 @@ while running:
             player_current_image = player_stand_right
     
     if keys[pygame.K_w] and (player_pos.y - (size/2)) >= 0:
-        player_pos.y -= player_speed * dt * shift_multiplier
+        if not up_collision:
+            player_pos.y -= player_speed * dt * shift_multiplier
     
     
     if keys[pygame.K_s] and (player_pos.y + (size/2)) <= height:
-        player_pos.y += player_speed * dt * shift_multiplier
+        if not down_collision:
+            player_pos.y += player_speed * dt * shift_multiplier
 
     
     if keys[pygame.K_a] and 0 < dungeon_depth < 50000:
-        cam_x -= player_speed * dt * shift_multiplier
-        dungeon_depth = max(0, dungeon_depth - dungeon_traversal_speed * shift_multiplier)
+        if not left_collision:
+            cam_x -= player_speed * dt * shift_multiplier
+            dungeon_depth = max(0, dungeon_depth - dungeon_traversal_speed * shift_multiplier)
     elif keys[pygame.K_a] and dungeon_depth <= 0:
-        player_pos.x -= player_speed * dt * shift_multiplier
-        dungeon_depth -= dungeon_traversal_speed * shift_multiplier
+        if not left_collision:
+            player_pos.x -= player_speed * dt * shift_multiplier
+            dungeon_depth -= dungeon_traversal_speed * shift_multiplier
     elif keys[pygame.K_a] and dungeon_depth >= 50000:
-        player_pos.x -= player_speed * dt * shift_multiplier
-        dungeon_depth -= dungeon_traversal_speed * shift_multiplier
+        if not left_collision:
+            player_pos.x -= player_speed * dt * shift_multiplier
+            dungeon_depth -= dungeon_traversal_speed * shift_multiplier
 
     
     if keys[pygame.K_d] and 0 < dungeon_depth < 50000:
-        cam_x += player_speed * dt * shift_multiplier
-        dungeon_depth += dungeon_traversal_speed * shift_multiplier
+        if not right_collision:
+            cam_x += player_speed * dt * shift_multiplier
+            dungeon_depth += dungeon_traversal_speed * shift_multiplier
     elif keys[pygame.K_d] and dungeon_depth <= 0:
-        player_pos.x += player_speed * dt * shift_multiplier
-        dungeon_depth += dungeon_traversal_speed * shift_multiplier
+        if not right_collision:
+            player_pos.x += player_speed * dt * shift_multiplier
+            dungeon_depth += dungeon_traversal_speed * shift_multiplier
     elif keys[pygame.K_d] and dungeon_depth >= 50000:
-        player_pos.x += player_speed * dt * shift_multiplier
-        dungeon_depth += dungeon_traversal_speed * shift_multiplier
+        if not right_collision:
+            player_pos.x += player_speed * dt * shift_multiplier
+            dungeon_depth += dungeon_traversal_speed * shift_multiplier
 
 
     if keys[pygame.K_d]:
