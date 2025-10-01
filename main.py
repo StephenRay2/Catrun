@@ -134,7 +134,6 @@ player = Player(width/2, height/2, "Corynn")
 allowed_rock_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_lavastone, bg_wasteland, bg_blackstone, bg_redrock]
 
 
-
 rock_weights = {
     bg_grass: 3,
     bg_dirt: 2,
@@ -174,7 +173,7 @@ for i, pos in enumerate(rock_border_locations):
     rock.rect = rock.image.get_rect(topleft=(x, y))
     rocks.append(rock)
 
-allowed_tree_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_wasteland]
+allowed_tree_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah]
 
 tree_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_tree_tiles]
 
@@ -182,8 +181,16 @@ tree_weights = {
     bg_grass: 30,
     bg_dirt: 20,
     bg_compact: 10,
+    bg_sand: 0,
     bg_savannah: 10,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 0,
+    bg_lavastone: 0,
+    bg_snow: 0,
     bg_wasteland: 1,
+    bg_blackstone: 0,
+    bg_redrock: 0
 
 }
 
@@ -202,6 +209,76 @@ for _ in range(num_trees):
     y = random.randint(0, height - 64)
     trees.append(Tree(x, y))
 
+allowed_berry_bush_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah]
+
+berry_bush_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_tree_tiles]
+
+berry_bush_weights = {
+    bg_grass: 30,
+    bg_dirt: 20,
+    bg_compact: 10,
+    bg_sand: 0,
+    bg_savannah: 10,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 0,
+    bg_lavastone: 0,
+    bg_snow: 0,
+    bg_wasteland: 1,
+    bg_blackstone: 0,
+    bg_redrock: 0
+
+}
+
+weighted_berry_bush_tiles = []
+for tile_x, tile_image in tiles:
+    weight = berry_bush_weights.get(tile_image, 1)
+    weighted_berry_bush_tiles.extend([(tile_x, tile_image)] * weight)
+
+berry_bushes = []
+num_bushes = 800
+for _ in range(num_bushes):
+    tile_x, tile_image = random.choice(weighted_berry_bush_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    berry_bush_type = random.choice(berry_bush_types)
+    berry_bushes.append(BerryBush(x, y, berry_bush_type))
+
+allowed_boulder_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_lavastone, bg_wasteland, bg_blackstone, bg_redrock]
+
+
+boulder_weights = {
+    bg_grass: 2,
+    bg_dirt: 4,
+    bg_compact: 1,
+    bg_savannah: 1,
+    bg_riverrock: 4,
+    bg_bigrock: 4,
+    bg_duskstone: 3,
+    bg_lavastone: 1,
+    bg_snow: 0,
+    bg_wasteland: 3,
+    bg_blackstone: 2,
+    bg_redrock: 2
+}
+
+weighted_boulder_tiles = []
+for tile_x, tile_image in tiles:
+    weight = boulder_weights.get(tile_image, 1)
+    weighted_boulder_tiles.extend([(tile_x, tile_image)] * weight)
+
+boulders = []
+num_boulders = 300
+for _ in range(num_boulders):
+    tile_x, tile_image = random.choice(weighted_boulder_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    boulders.append(Boulder(x, y))
+
+
+collection_message = None
+collection_timer = 0
+collection_message_num = 0
 
 while running:
     
@@ -209,13 +286,15 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
-
+    
     for tile_x, tile_image in tiles:
         screen_x = tile_x - cam_x
         if -BACKGROUND_SIZE < screen_x < width:
             screen.blit(tile_image, (screen_x, floor_y))
 
-    all_objects = rocks + trees
+    keys = pygame.key.get_pressed()
+
+    all_objects = rocks + trees + boulders + berry_bushes
     visible_objects = [obj for obj in all_objects 
                        if obj.rect.x - cam_x > -100 and obj.rect.x - cam_x < width + 100]
     visible_objects.sort(key=lambda obj: obj.rect.y + obj.rect.height)
@@ -234,11 +313,38 @@ while running:
 
     player.rect.center = (player_pos.x, player_pos.y)
         
-            
 
     nearby_objects = [obj for obj in all_objects 
                       if abs(obj.rect.x - (player_pos.x + cam_x)) < 200 
                       and abs(obj.rect.y - player_pos.y) < 200]
+    
+    
+    for bush in berry_bushes:
+        if player.rect.colliderect(
+            pygame.Rect(bush.rect.x - cam_x, bush.rect.y, bush.rect.width, bush.rect.height)
+        ) and keys[pygame.K_e]:
+            berries = bush.collect()
+            if berries:
+                berry_collect_text = font.render(f"Collected {len(berries)} {bush.berry}", True, (20, 255, 20))
+                message_rect = pygame.Rect(20, 500, berry_collect_text.get_width(), berry_collect_text.get_height())
+                temp_surface = pygame.Surface((message_rect.width + 10, message_rect.height + 10), pygame.SRCALPHA)
+                temp_surface.fill((0, 0, 0, 100))
+                collection_message = (berry_collect_text, temp_surface, message_rect)
+                collection_timer = 3.0
+                collection_message_num += 1
+    
+    
+    collection_messages = []
+    if collection_message_num > 0:
+        temp_surface = pygame.Surface((message_rect.width + 10, message_rect.height + 30), pygame.SRCALPHA)
+
+    if collection_timer > 0:
+        collection_timer -= dt
+        if collection_message:
+            text, bg, rect = collection_message
+            screen.blit(bg, (rect.x, rect.y))
+            screen.blit(text, (rect.x + 5, rect.y + 5))
+        collection_message_num -= 1
 
     left_player_check = pygame.Rect(player.rect.left - 1, player.rect.top + 5, 1, player.rect.height - 12)
     right_player_check = pygame.Rect(player.rect.right, player.rect.top + 5, 1, player.rect.height - 12)
@@ -266,7 +372,7 @@ while running:
         left_collision = False
         right_collision = False
 
-    keys = pygame.key.get_pressed()
+    
     if not (keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]):
         if last_direction == "down":
             player_current_image = player_stand_image
@@ -388,7 +494,7 @@ while running:
     screen.blit(depth_text, (depth_rect.x + 5, depth_rect.y + 5))
 
 
-    if keys[pygame.K_e]:
+    if keys[pygame.K_i]:
         target_depth = 10000
         dungeon_depth = target_depth
         cam_x = 500000
@@ -397,6 +503,9 @@ while running:
 
     pygame.display.flip()
     dt = clock.tick(60) / 1000
+
+    for bush in berry_bushes:
+        bush.update(dt)
 
     
 
