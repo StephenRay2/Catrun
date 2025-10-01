@@ -27,3 +27,8 @@ class Tree(Solid):
     def __init__(self, x, y):
         img = random.choice(tree_images)
         super().__init__(img, x, y, (64, 128))
+        self.image_rect = self.rect.copy()
+        self.rect = pygame.Rect(self.rect.x, self.rect.y + 64, 64, 64)
+    
+    def draw(self, screen, cam_x):
+        screen.blit(self.image, (self.image_rect.x - cam_x, self.image_rect.y))

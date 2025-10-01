@@ -144,6 +144,7 @@ rock_weights = {
     bg_bigrock: 4,
     bg_duskstone: 1,
     bg_lavastone: 1,
+    bg_snow: 0,
     bg_wasteland: 1,
     bg_blackstone: 1,
     bg_redrock: 1
@@ -162,7 +163,7 @@ for _ in range(num_rocks):
     y = random.randint(0, height - 64)
     rocks.append(Rock(x, y))
 
-rock_border_locations = [(0, i * 48) for i in range(18)] + [(512000, i * 48) for i in range(18)]
+rock_border_locations = [(0, i * 28) for i in range(28)] + [(512000, i * 28) for i in range(28)]
 
 for i, pos in enumerate(rock_border_locations):
     x, y = pos
@@ -201,18 +202,6 @@ for _ in range(num_trees):
     y = random.randint(0, height - 64)
     trees.append(Tree(x, y))
 
-all_sprites = pygame.sprite.Group()
-solids = pygame.sprite.Group()
-player = Player(640, 360, "Corynn")
-all_sprites.add(player)
-solids.add(player)
-
-for _ in range(15):
-    r = Rock(random.randint(0, 2000), random.randint(0, 2000))
-    t = Tree(random.randint(0, 2000), random.randint(0, 2000))
-    all_sprites.add(r, t)
-    solids.add(r, t)
-
 
 while running:
     
@@ -226,27 +215,56 @@ while running:
         if -BACKGROUND_SIZE < screen_x < width:
             screen.blit(tile_image, (screen_x, floor_y))
 
+    all_objects = rocks + trees
+    visible_objects = [obj for obj in all_objects 
+                       if obj.rect.x - cam_x > -100 and obj.rect.x - cam_x < width + 100]
+    visible_objects.sort(key=lambda obj: obj.rect.y + obj.rect.height)
 
-    screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size/2))
+    player_drawn = False
+
+    for obj in visible_objects:
+        object_mid_y = obj.rect.y + obj.rect.height / 2
+        if not player_drawn and player.rect.centery <= object_mid_y:
+            screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size/2))
+            player_drawn = True
+        obj.draw(screen, cam_x)
+
+    if not player_drawn:
+        screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size/2))
+
     player.rect.center = (player_pos.x, player_pos.y)
+        
+            
 
-    for rock in rocks:
-        rock.draw(screen, cam_x)
+    nearby_objects = [obj for obj in all_objects 
+                      if abs(obj.rect.x - (player_pos.x + cam_x)) < 200 
+                      and abs(obj.rect.y - player_pos.y) < 200]
 
-    for tree in trees:
-        tree.draw(screen, cam_x)
+    left_player_check = pygame.Rect(player.rect.left - 1, player.rect.top + 5, 1, player.rect.height - 12)
+    right_player_check = pygame.Rect(player.rect.right, player.rect.top + 5, 1, player.rect.height - 12)
+    top_player_check = pygame.Rect(player.rect.left + 5, player.rect.top - 1, player.rect.width - 12, 1)
+    bottom_player_check = pygame.Rect(player.rect.left + 5, player.rect.bottom, player.rect.width - 12, 1)
 
+    left_collision = any(left_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + (obj.rect.height * .2), obj.rect.width - 20, obj.rect.height - 50)) for obj in nearby_objects)
+    right_collision = any(right_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + (obj.rect.height * .2), obj.rect.width - 20, obj.rect.height - 50)) for obj in nearby_objects)
+    up_collision = any(top_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + (obj.rect.height * .2), obj.rect.width - 20, obj.rect.height - 50)) for obj in nearby_objects)
+    down_collision = any(bottom_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + (obj.rect.height * .2), obj.rect.width - 20, obj.rect.height - 50)) for obj in nearby_objects)
 
-    left_player_check = pygame.Rect(player.rect.left - 1, player.rect.top, 1, player.rect.height)
-    right_player_check = pygame.Rect(player.rect.right, player.rect.top, 1, player.rect.height)
-    top_player_check = pygame.Rect(player.rect.left, player.rect.top - 1, player.rect.width, 1)
-    bottom_player_check = pygame.Rect(player.rect.left, player.rect.bottom, player.rect.width, 1)
+    if left_collision == True:
+        up_collision = False
+        down_collision = False
+    
+    if right_collision == True:
+        up_collision = False
+        down_collision = False
+    
+    if up_collision == True:
+        left_collision = False
+        right_collision = False
 
-    left_collision = any(left_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + 20, obj.rect.width - 20, obj.rect.height - 40)) for obj in list(rocks) + list(trees))
-    right_collision = any(right_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + 20, obj.rect.width - 20, obj.rect.height - 40)) for obj in list(rocks) + list(trees))
-    up_collision = any(top_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + 20, obj.rect.width - 20, obj.rect.height - 40)) for obj in list(rocks) + list(trees))
-    down_collision = any(bottom_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + 20, obj.rect.width - 20, obj.rect.height - 40)) for obj in list(rocks) + list(trees))
-
+    if down_collision == True:
+        left_collision = False
+        right_collision = False
 
     keys = pygame.key.get_pressed()
     if not (keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]):
@@ -371,7 +389,7 @@ while running:
 
 
     if keys[pygame.K_e]:
-        target_depth = 5000
+        target_depth = 10000
         dungeon_depth = target_depth
         cam_x = 500000
         player_pos.x = width / 2
@@ -383,4 +401,3 @@ while running:
     
 
 pygame.quit()
-
