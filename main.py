@@ -3,6 +3,7 @@ import sys
 import time, random, math
 from world import *
 from mobs import *
+from buttons import *
 
 pygame.init()
 screen = pygame.display.set_mode((1280, 720), pygame.FULLSCREEN)
@@ -20,7 +21,6 @@ font = pygame.font.SysFont(None, 24)
 scroll = 0
 player_speed = 350
 dungeon_traversal_speed = .1
-
 
 
 ############ PLAYER IMAGES #################
@@ -201,7 +201,7 @@ for tile_x, tile_image in tiles:
 
 tree = Tree(x,y)
 trees = []
-num_trees = 2000
+num_trees = 1600
 
 for _ in range(num_trees):
     tile_x, tile_image = random.choice(tree_spawn_tiles)
@@ -236,7 +236,7 @@ for tile_x, tile_image in tiles:
     weighted_berry_bush_tiles.extend([(tile_x, tile_image)] * weight)
 
 berry_bushes = []
-num_bushes = 800
+num_bushes = 400
 for _ in range(num_bushes):
     tile_x, tile_image = random.choice(weighted_berry_bush_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
@@ -278,7 +278,24 @@ for _ in range(num_boulders):
 
 collection_message = None
 collection_timer = 0
+collection_messages = []
 collection_message_num = 0
+
+paused = False
+
+
+quit_image = pygame.image.load("assets/sprites/buttons/quit_button.png").convert_alpha()
+resume_image = pygame.image.load("assets/sprites/buttons/resume_button.png").convert_alpha()
+
+resume_button = Button(width//2 - resume_image.get_width()//2, height//2 - 50, resume_image)
+quit_button   = Button(width//2 - quit_image.get_width()//2, height//2 + 50, quit_image)
+
+pause_menu_rect = pygame.Rect(0, 0, width, height)
+temp_pause_surface = pygame.Surface((pause_menu_rect.width, pause_menu_rect.height), pygame.SRCALPHA)
+temp_pause_surface.fill((0, 0, 0, 100))
+
+
+######################### GAME LOOP ################################
 
 while running:
     
@@ -286,7 +303,16 @@ while running:
         if event.type == pygame.QUIT:
             running = False
 
-    
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            paused = not paused
+
+        if paused:
+            if resume_button.is_clicked(event):
+                paused = False
+            if quit_button.is_clicked(event):
+                running = False
+
+        
     for tile_x, tile_image in tiles:
         screen_x = tile_x - cam_x
         if -BACKGROUND_SIZE < screen_x < width:
@@ -296,7 +322,7 @@ while running:
 
     all_objects = rocks + trees + boulders + berry_bushes
     visible_objects = [obj for obj in all_objects 
-                       if obj.rect.x - cam_x > -100 and obj.rect.x - cam_x < width + 100]
+                    if obj.rect.x - cam_x > -100 and obj.rect.x - cam_x < width + 100]
     visible_objects.sort(key=lambda obj: obj.rect.y + obj.rect.height)
 
     player_drawn = False
@@ -315,177 +341,195 @@ while running:
         
 
     nearby_objects = [obj for obj in all_objects 
-                      if abs(obj.rect.x - (player_pos.x + cam_x)) < 200 
-                      and abs(obj.rect.y - player_pos.y) < 200]
+                    if abs(obj.rect.x - (player_pos.x + cam_x)) < 200 
+                    and abs(obj.rect.y - player_pos.y) < 200]
     
-    
-    for bush in berry_bushes:
-        if player.rect.colliderect(
-            pygame.Rect(bush.rect.x - cam_x, bush.rect.y, bush.rect.width, bush.rect.height)
-        ) and keys[pygame.K_e]:
-            berries = bush.collect()
-            if berries:
-                berry_collect_text = font.render(f"Collected {len(berries)} {bush.berry}", True, (20, 255, 20))
-                message_rect = pygame.Rect(20, 500, berry_collect_text.get_width(), berry_collect_text.get_height())
-                temp_surface = pygame.Surface((message_rect.width + 10, message_rect.height + 10), pygame.SRCALPHA)
-                temp_surface.fill((0, 0, 0, 100))
-                collection_message = (berry_collect_text, temp_surface, message_rect)
-                collection_timer = 3.0
-                collection_message_num += 1
-    
-    
-    collection_messages = []
-    if collection_message_num > 0:
-        temp_surface = pygame.Surface((message_rect.width + 10, message_rect.height + 30), pygame.SRCALPHA)
 
-    if collection_timer > 0:
-        collection_timer -= dt
-        if collection_message:
-            text, bg, rect = collection_message
+
+    if not paused:
+
+        for bush in berry_bushes:
+            if player.rect.colliderect(
+                pygame.Rect(bush.rect.x - cam_x, bush.rect.y, bush.rect.width, bush.rect.height)
+            ) and keys[pygame.K_e]:
+                berries = bush.collect()
+                if berries:
+                    berry_collect_text = font.render(f"Collected {len(berries)} {bush.berry}", True, (20, 255, 20))
+                    
+                    collection_messages.insert(0, [
+                        berry_collect_text,
+                        pygame.Surface((berry_collect_text.get_width() + 10, berry_collect_text.get_height() + 10), pygame.SRCALPHA),
+                        pygame.Rect(20, 500, berry_collect_text.get_width(), berry_collect_text.get_height()),
+                        3.0,
+                        1.0
+                    ])
+                    collection_messages[0][1].fill((0, 0, 0, 100))
+
+
+        if collection_timer > 0:
+            collection_timer -= dt
+            if collection_message:
+                text, bg, rect = collection_message
+                screen.blit(bg, (rect.x, rect.y))
+                screen.blit(text, (rect.x + 5, rect.y + 5))
+            collection_message_num -= 1
+
+        for index, message in enumerate(collection_messages[:]):
+            text, bg, rect, timer, total_time = message
+            
+            spacing = 27
+            rect.y = 500 + spacing * index
+            
+            alpha = int(255 * (timer / total_time))
+            text.set_alpha(alpha)
+            bg.set_alpha(alpha)
+            
+            if message[3] < 2:
+                text.set_alpha(alpha)
+                bg.set_alpha(alpha)
+
+
             screen.blit(bg, (rect.x, rect.y))
             screen.blit(text, (rect.x + 5, rect.y + 5))
-        collection_message_num -= 1
-
-    left_player_check = pygame.Rect(player.rect.left - 1, player.rect.top + 5, 1, player.rect.height - 12)
-    right_player_check = pygame.Rect(player.rect.right, player.rect.top + 5, 1, player.rect.height - 12)
-    top_player_check = pygame.Rect(player.rect.left + 5, player.rect.top - 1, player.rect.width - 12, 1)
-    bottom_player_check = pygame.Rect(player.rect.left + 5, player.rect.bottom, player.rect.width - 12, 1)
-
-    left_collision = any(left_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + (obj.rect.height * .2), obj.rect.width - 20, obj.rect.height - 50)) for obj in nearby_objects)
-    right_collision = any(right_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + (obj.rect.height * .2), obj.rect.width - 20, obj.rect.height - 50)) for obj in nearby_objects)
-    up_collision = any(top_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + (obj.rect.height * .2), obj.rect.width - 20, obj.rect.height - 50)) for obj in nearby_objects)
-    down_collision = any(bottom_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + (obj.rect.height * .2), obj.rect.width - 20, obj.rect.height - 50)) for obj in nearby_objects)
-
-    if left_collision == True:
-        up_collision = False
-        down_collision = False
-    
-    if right_collision == True:
-        up_collision = False
-        down_collision = False
-    
-    if up_collision == True:
-        left_collision = False
-        right_collision = False
-
-    if down_collision == True:
-        left_collision = False
-        right_collision = False
-
-    
-    if not (keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]):
-        if last_direction == "down":
-            player_current_image = player_stand_image
-        elif last_direction == "up":
-            player_current_image = player_stand_image_back
-        elif last_direction == "left":
-            player_current_image = player_stand_left
-        elif last_direction == "right":
-            player_current_image = player_stand_right
-    
-    if keys[pygame.K_w] and (player_pos.y - (size/2)) >= 0:
-        if not up_collision:
-            player_pos.y -= player_speed * dt * shift_multiplier
-    
-    
-    if keys[pygame.K_s] and (player_pos.y + (size/2)) <= height:
-        if not down_collision:
-            player_pos.y += player_speed * dt * shift_multiplier
-
-    
-    if keys[pygame.K_a] and 0 < dungeon_depth < 50000:
-        if not left_collision:
-            cam_x -= player_speed * dt * shift_multiplier
-            dungeon_depth = max(0, dungeon_depth - dungeon_traversal_speed * shift_multiplier)
-    elif keys[pygame.K_a] and dungeon_depth <= 0:
-        if not left_collision:
-            player_pos.x -= player_speed * dt * shift_multiplier
-            dungeon_depth -= dungeon_traversal_speed * shift_multiplier
-    elif keys[pygame.K_a] and dungeon_depth >= 50000:
-        if not left_collision:
-            player_pos.x -= player_speed * dt * shift_multiplier
-            dungeon_depth -= dungeon_traversal_speed * shift_multiplier
-
-    
-    if keys[pygame.K_d] and 0 < dungeon_depth < 50000:
-        if not right_collision:
-            cam_x += player_speed * dt * shift_multiplier
-            dungeon_depth += dungeon_traversal_speed * shift_multiplier
-    elif keys[pygame.K_d] and dungeon_depth <= 0:
-        if not right_collision:
-            player_pos.x += player_speed * dt * shift_multiplier
-            dungeon_depth += dungeon_traversal_speed * shift_multiplier
-    elif keys[pygame.K_d] and dungeon_depth >= 50000:
-        if not right_collision:
-            player_pos.x += player_speed * dt * shift_multiplier
-            dungeon_depth += dungeon_traversal_speed * shift_multiplier
+            message[3] -= dt
+            if message[3] <= 0:
+                collection_messages.remove(message)
 
 
-    if keys[pygame.K_d]:
-        last_direction = "right"
-        player_animation_timer += dt
-        if keys[pygame.K_LSHIFT]:
-            if player_animation_timer > .04:
-                player_frame_index = (player_frame_index + 1) % len(player_walk_right_images)
-                player_current_image = player_walk_right_images[player_frame_index]
-                player_animation_timer = 0
+
+        left_player_check = pygame.Rect(player.rect.left - 1, player.rect.top + 5, 1, player.rect.height - 12)
+        right_player_check = pygame.Rect(player.rect.right, player.rect.top + 5, 1, player.rect.height - 12)
+        top_player_check = pygame.Rect(player.rect.left + 5, player.rect.top - 1, player.rect.width - 12, 1)
+        bottom_player_check = pygame.Rect(player.rect.left + 5, player.rect.bottom, player.rect.width - 12, 1)
+
+        left_collision = any(left_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + (obj.rect.height * .2), obj.rect.width - 20, obj.rect.height - 50)) for obj in nearby_objects)
+        right_collision = any(right_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + (obj.rect.height * .2), obj.rect.width - 20, obj.rect.height - 50)) for obj in nearby_objects)
+        up_collision = any(top_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + (obj.rect.height * .2), obj.rect.width - 20, obj.rect.height - 50)) for obj in nearby_objects)
+        down_collision = any(bottom_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + (obj.rect.height * .2), obj.rect.width - 20, obj.rect.height - 50)) for obj in nearby_objects)
+
+        
+        if not (keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]):
+            if last_direction == "down":
+                player_current_image = player_stand_image
+            elif last_direction == "up":
+                player_current_image = player_stand_image_back
+            elif last_direction == "left":
+                player_current_image = player_stand_left
+            elif last_direction == "right":
+                player_current_image = player_stand_right
+        
+        if keys[pygame.K_w] and (player_pos.y - (size/2)) >= 0:
+            if not up_collision:
+                player_pos.y -= player_speed * dt * shift_multiplier
+        
+        
+        if keys[pygame.K_s] and (player_pos.y + (size/2)) <= height:
+            if not down_collision:
+                player_pos.y += player_speed * dt * shift_multiplier
+
+        
+        if keys[pygame.K_a] and 0 < dungeon_depth < 50000:
+            if not left_collision:
+                cam_x -= player_speed * dt * shift_multiplier
+                dungeon_depth = max(0, dungeon_depth - dungeon_traversal_speed * shift_multiplier)
+        elif keys[pygame.K_a] and dungeon_depth <= 0:
+            if not left_collision:
+                player_pos.x -= player_speed * dt * shift_multiplier
+                dungeon_depth -= dungeon_traversal_speed * shift_multiplier
+        elif keys[pygame.K_a] and dungeon_depth >= 50000:
+            if not left_collision:
+                player_pos.x -= player_speed * dt * shift_multiplier
+                dungeon_depth -= dungeon_traversal_speed * shift_multiplier
+
+        
+        if keys[pygame.K_d] and 0 < dungeon_depth < 50000:
+            if not right_collision:
+                cam_x += player_speed * dt * shift_multiplier
+                dungeon_depth += dungeon_traversal_speed * shift_multiplier
+        elif keys[pygame.K_d] and dungeon_depth <= 0:
+            if not right_collision:
+                player_pos.x += player_speed * dt * shift_multiplier
+                dungeon_depth += dungeon_traversal_speed * shift_multiplier
+        elif keys[pygame.K_d] and dungeon_depth >= 50000:
+            if not right_collision:
+                player_pos.x += player_speed * dt * shift_multiplier
+                dungeon_depth += dungeon_traversal_speed * shift_multiplier
+
+
+        if keys[pygame.K_d]:
+            last_direction = "right"
+            player_animation_timer += dt
+            if keys[pygame.K_LSHIFT]:
+                if player_animation_timer > .04:
+                    player_frame_index = (player_frame_index + 1) % len(player_walk_right_images)
+                    player_current_image = player_walk_right_images[player_frame_index]
+                    player_animation_timer = 0
+            else:
+                if player_animation_timer > .07:
+                    player_frame_index = (player_frame_index + 1) % len(player_walk_right_images)
+                    player_current_image = player_walk_right_images[player_frame_index]
+                    player_animation_timer = 0
+
+        elif keys[pygame.K_a]:
+            last_direction = "left"
+            player_animation_timer += dt
+            if keys[pygame.K_LSHIFT]:
+                if player_animation_timer > .04:
+                    player_frame_index = (player_frame_index + 1) % len(player_walk_left_images)
+                    player_current_image = player_walk_left_images[player_frame_index]
+                    player_animation_timer = 0
+            else:
+                if player_animation_timer > .07:
+                    player_frame_index = (player_frame_index + 1) % len(player_walk_left_images)
+                    player_current_image = player_walk_left_images[player_frame_index]
+                    player_animation_timer = 0
+
+        elif keys[pygame.K_w]:
+            last_direction = "up"
+            player_animation_timer += dt
+            if keys[pygame.K_LSHIFT]:
+                if player_animation_timer > .04:
+                    player_frame_index = (player_frame_index + 1) % len(player_walk_up_images)
+                    player_current_image = player_walk_up_images[player_frame_index]
+                    player_animation_timer = 0
+            else:
+                if player_animation_timer > .07:
+                    player_frame_index = (player_frame_index + 1) % len(player_walk_up_images)
+                    player_current_image = player_walk_up_images[player_frame_index]
+                    player_animation_timer = 0
+
+        elif keys[pygame.K_s]:
+            last_direction = "down"
+            player_animation_timer += dt
+            if keys[pygame.K_LSHIFT]:
+                if player_animation_timer > .04:
+                    player_frame_index = (player_frame_index + 1) % len(player_walk_down_images)
+                    player_current_image = player_walk_down_images[player_frame_index]
+                    player_animation_timer = 0
+            else:
+                if player_animation_timer > .07:
+                    player_frame_index = (player_frame_index + 1) % len(player_walk_down_images)
+                    player_current_image = player_walk_down_images[player_frame_index]
+                    player_animation_timer = 0
+
+
+        if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+            shift_multiplier = 1.5
         else:
-            if player_animation_timer > .07:
-                player_frame_index = (player_frame_index + 1) % len(player_walk_right_images)
-                player_current_image = player_walk_right_images[player_frame_index]
-                player_animation_timer = 0
+            shift_multiplier = 1
 
-    elif keys[pygame.K_a]:
-        last_direction = "left"
-        player_animation_timer += dt
-        if keys[pygame.K_LSHIFT]:
-            if player_animation_timer > .04:
-                player_frame_index = (player_frame_index + 1) % len(player_walk_left_images)
-                player_current_image = player_walk_left_images[player_frame_index]
-                player_animation_timer = 0
-        else:
-            if player_animation_timer > .07:
-                player_frame_index = (player_frame_index + 1) % len(player_walk_left_images)
-                player_current_image = player_walk_left_images[player_frame_index]
-                player_animation_timer = 0
-
-    elif keys[pygame.K_w]:
-        last_direction = "up"
-        player_animation_timer += dt
-        if keys[pygame.K_LSHIFT]:
-            if player_animation_timer > .04:
-                player_frame_index = (player_frame_index + 1) % len(player_walk_up_images)
-                player_current_image = player_walk_up_images[player_frame_index]
-                player_animation_timer = 0
-        else:
-            if player_animation_timer > .07:
-                player_frame_index = (player_frame_index + 1) % len(player_walk_up_images)
-                player_current_image = player_walk_up_images[player_frame_index]
-                player_animation_timer = 0
-
-    elif keys[pygame.K_s]:
-        last_direction = "down"
-        player_animation_timer += dt
-        if keys[pygame.K_LSHIFT]:
-            if player_animation_timer > .04:
-                player_frame_index = (player_frame_index + 1) % len(player_walk_down_images)
-                player_current_image = player_walk_down_images[player_frame_index]
-                player_animation_timer = 0
-        else:
-            if player_animation_timer > .07:
-                player_frame_index = (player_frame_index + 1) % len(player_walk_down_images)
-                player_current_image = player_walk_down_images[player_frame_index]
-                player_animation_timer = 0
-
-
-    if keys[pygame.K_ESCAPE]:
-        running = False
-    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
-        shift_multiplier = 1.5
-    else:
-        shift_multiplier = 1
-
+        for bush in berry_bushes:
+            bush.update(dt)
     
+
+############# END NOT PAUSED #################
+
+
+    if paused:
+        screen.blit(temp_pause_surface, pause_menu_rect.topleft)
+        resume_button.draw(screen)
+        quit_button.draw(screen)
+
     depth_text = font.render(f"Dungeon Depth: {dungeon_depth:.1f}", True, (255, 255, 255))
     depth_rect = pygame.Rect(20, 20, depth_text.get_width(), depth_text.get_height())
     temp_surface = pygame.Surface((depth_rect.width + 10, depth_rect.height + 10), pygame.SRCALPHA)
@@ -500,12 +544,16 @@ while running:
         cam_x = 500000
         player_pos.x = width / 2
 
+    if keys[pygame.K_o]:
+        target_depth = 5000
+        dungeon_depth = target_depth
+        cam_x = 250000
+        player_pos.x = width / 2
 
     pygame.display.flip()
     dt = clock.tick(60) / 1000
 
-    for bush in berry_bushes:
-        bush.update(dt)
+    
 
     
 

@@ -75,7 +75,7 @@ class BerryBush(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(topleft=(x, y))
 
         self.berry = bush_type["berry"]
-        self.amount = random.randint(1, 4)
+        self.amount = random.randint(3, 9)
 
         self.regrow_time = 200 #(seconds)
         self.timer = 0
