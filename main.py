@@ -4,6 +4,7 @@ import time, random, math
 from world import *
 from mobs import *
 from buttons import *
+from inventory import *
 
 pygame.init()
 screen = pygame.display.set_mode((1280, 720), pygame.FULLSCREEN)
@@ -131,8 +132,10 @@ cam_x = 0
 cam_y = 0
 
 player = Player(width/2, height/2, "Corynn")
+
 allowed_rock_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_lavastone, bg_wasteland, bg_blackstone, bg_redrock]
 
+rock_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_rock_tiles]
 
 rock_weights = {
     bg_grass: 3,
@@ -211,7 +214,7 @@ for _ in range(num_trees):
 
 allowed_berry_bush_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah]
 
-berry_bush_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_tree_tiles]
+berry_bush_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_berry_bush_tiles]
 
 berry_bush_weights = {
     bg_grass: 30,
@@ -245,7 +248,7 @@ for _ in range(num_bushes):
     berry_bushes.append(BerryBush(x, y, berry_bush_type))
 
 allowed_boulder_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_lavastone, bg_wasteland, bg_blackstone, bg_redrock]
-
+boulder_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_boulder_tiles]
 
 boulder_weights = {
     bg_grass: 2,
@@ -275,6 +278,40 @@ for _ in range(num_boulders):
     y = random.randint(0, height - 64)
     boulders.append(Boulder(x, y))
 
+allowed_cat_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_duskstone, bg_lavastone, bg_snow, bg_wasteland, bg_blackstone, bg_redrock]
+
+cat_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_cat_tiles]
+
+cat_spawn_weights = {
+    bg_grass: 2,
+    bg_dirt: 1,
+    bg_compact: 1,
+    bg_sand: 1,
+    bg_savannah: 2,
+    bg_riverrock: 1,
+    bg_bigrock: 1,
+    bg_duskstone: 1,
+    bg_lavastone: 1,
+    bg_snow: 1,
+    bg_wasteland: 1,
+    bg_blackstone: 1,
+    bg_redrock: 0
+
+}
+
+weighted_cat_tiles = []
+for tile_x, tile_image in tiles:
+    weight = cat_spawn_weights.get(tile_image, 1)
+    weighted_cat_tiles.extend([(tile_x, tile_image)] * weight)
+
+cats = []
+num_cats = 400
+for _ in range(num_cats):
+    tile_x, tile_image = random.choice(weighted_cat_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    cats.append(Cat(x, y, "Cat"))
+
 
 collection_message = None
 collection_timer = 0
@@ -282,13 +319,22 @@ collection_messages = []
 collection_message_num = 0
 
 paused = False
+inventory_in_use = False
 
+hotbar_image = pygame.image.load("assets/sprites/buttons/hotbar.png").convert_alpha()
+hotbar_image = pygame.transform.scale(hotbar_image, (800, 74))
 
 quit_image = pygame.image.load("assets/sprites/buttons/quit_button.png").convert_alpha()
 resume_image = pygame.image.load("assets/sprites/buttons/resume_button.png").convert_alpha()
 
-resume_button = Button(width//2 - resume_image.get_width()//2, height//2 - 50, resume_image)
+quit_image = pygame.transform.scale(quit_image, (400, 150))
+resume_image = pygame.transform.scale(resume_image, (600, 150))
+
+resume_button = Button(width//2 - resume_image.get_width()//2, height//2 - 225, resume_image)
 quit_button   = Button(width//2 - quit_image.get_width()//2, height//2 + 50, quit_image)
+
+pause_menu_image = pygame.image.load("assets/sprites/buttons/pause_menu.png").convert_alpha()
+pause_menu_image = pygame.transform.scale(pause_menu_image, (800, 650))
 
 pause_menu_rect = pygame.Rect(0, 0, width, height)
 temp_pause_surface = pygame.Surface((pause_menu_rect.width, pause_menu_rect.height), pygame.SRCALPHA)
@@ -306,6 +352,9 @@ while running:
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             paused = not paused
 
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_q:
+            inventory_in_use = not inventory_in_use
+
         if paused:
             if resume_button.is_clicked(event):
                 paused = False
@@ -320,7 +369,7 @@ while running:
 
     keys = pygame.key.get_pressed()
 
-    all_objects = rocks + trees + boulders + berry_bushes
+    all_objects = rocks + trees + boulders + berry_bushes + cats
     visible_objects = [obj for obj in all_objects 
                     if obj.rect.x - cam_x > -100 and obj.rect.x - cam_x < width + 100]
     visible_objects.sort(key=lambda obj: obj.rect.y + obj.rect.height)
@@ -339,10 +388,11 @@ while running:
 
     player.rect.center = (player_pos.x, player_pos.y)
         
-
     nearby_objects = [obj for obj in all_objects 
                     if abs(obj.rect.x - (player_pos.x + cam_x)) < 200 
                     and abs(obj.rect.y - player_pos.y) < 200]
+    
+    screen.blit(hotbar_image, (width//2 - hotbar_image.get_width()//2, height - 100))
     
 
 
@@ -407,126 +457,137 @@ while running:
         up_collision = any(top_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + (obj.rect.height * .2), obj.rect.width - 20, obj.rect.height - 50)) for obj in nearby_objects)
         down_collision = any(bottom_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + (obj.rect.height * .2), obj.rect.width - 20, obj.rect.height - 50)) for obj in nearby_objects)
 
-        
-        if not (keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]):
-            if last_direction == "down":
-                player_current_image = player_stand_image
-            elif last_direction == "up":
-                player_current_image = player_stand_image_back
-            elif last_direction == "left":
-                player_current_image = player_stand_left
-            elif last_direction == "right":
-                player_current_image = player_stand_right
-        
-        if keys[pygame.K_w] and (player_pos.y - (size/2)) >= 0:
-            if not up_collision:
-                player_pos.y -= player_speed * dt * shift_multiplier
-        
-        
-        if keys[pygame.K_s] and (player_pos.y + (size/2)) <= height:
-            if not down_collision:
-                player_pos.y += player_speed * dt * shift_multiplier
-
-        
-        if keys[pygame.K_a] and 0 < dungeon_depth < 50000:
-            if not left_collision:
-                cam_x -= player_speed * dt * shift_multiplier
-                dungeon_depth = max(0, dungeon_depth - dungeon_traversal_speed * shift_multiplier)
-        elif keys[pygame.K_a] and dungeon_depth <= 0:
-            if not left_collision:
-                player_pos.x -= player_speed * dt * shift_multiplier
-                dungeon_depth -= dungeon_traversal_speed * shift_multiplier
-        elif keys[pygame.K_a] and dungeon_depth >= 50000:
-            if not left_collision:
-                player_pos.x -= player_speed * dt * shift_multiplier
-                dungeon_depth -= dungeon_traversal_speed * shift_multiplier
-
-        
-        if keys[pygame.K_d] and 0 < dungeon_depth < 50000:
-            if not right_collision:
-                cam_x += player_speed * dt * shift_multiplier
-                dungeon_depth += dungeon_traversal_speed * shift_multiplier
-        elif keys[pygame.K_d] and dungeon_depth <= 0:
-            if not right_collision:
-                player_pos.x += player_speed * dt * shift_multiplier
-                dungeon_depth += dungeon_traversal_speed * shift_multiplier
-        elif keys[pygame.K_d] and dungeon_depth >= 50000:
-            if not right_collision:
-                player_pos.x += player_speed * dt * shift_multiplier
-                dungeon_depth += dungeon_traversal_speed * shift_multiplier
-
-
-        if keys[pygame.K_d]:
-            last_direction = "right"
-            player_animation_timer += dt
-            if keys[pygame.K_LSHIFT]:
-                if player_animation_timer > .04:
-                    player_frame_index = (player_frame_index + 1) % len(player_walk_right_images)
-                    player_current_image = player_walk_right_images[player_frame_index]
-                    player_animation_timer = 0
-            else:
-                if player_animation_timer > .07:
-                    player_frame_index = (player_frame_index + 1) % len(player_walk_right_images)
-                    player_current_image = player_walk_right_images[player_frame_index]
-                    player_animation_timer = 0
-
-        elif keys[pygame.K_a]:
-            last_direction = "left"
-            player_animation_timer += dt
-            if keys[pygame.K_LSHIFT]:
-                if player_animation_timer > .04:
-                    player_frame_index = (player_frame_index + 1) % len(player_walk_left_images)
-                    player_current_image = player_walk_left_images[player_frame_index]
-                    player_animation_timer = 0
-            else:
-                if player_animation_timer > .07:
-                    player_frame_index = (player_frame_index + 1) % len(player_walk_left_images)
-                    player_current_image = player_walk_left_images[player_frame_index]
-                    player_animation_timer = 0
-
-        elif keys[pygame.K_w]:
-            last_direction = "up"
-            player_animation_timer += dt
-            if keys[pygame.K_LSHIFT]:
-                if player_animation_timer > .04:
-                    player_frame_index = (player_frame_index + 1) % len(player_walk_up_images)
-                    player_current_image = player_walk_up_images[player_frame_index]
-                    player_animation_timer = 0
-            else:
-                if player_animation_timer > .07:
-                    player_frame_index = (player_frame_index + 1) % len(player_walk_up_images)
-                    player_current_image = player_walk_up_images[player_frame_index]
-                    player_animation_timer = 0
-
-        elif keys[pygame.K_s]:
-            last_direction = "down"
-            player_animation_timer += dt
-            if keys[pygame.K_LSHIFT]:
-                if player_animation_timer > .04:
-                    player_frame_index = (player_frame_index + 1) % len(player_walk_down_images)
-                    player_current_image = player_walk_down_images[player_frame_index]
-                    player_animation_timer = 0
-            else:
-                if player_animation_timer > .07:
-                    player_frame_index = (player_frame_index + 1) % len(player_walk_down_images)
-                    player_current_image = player_walk_down_images[player_frame_index]
-                    player_animation_timer = 0
-
-
-        if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
-            shift_multiplier = 1.5
-        else:
-            shift_multiplier = 1
-
         for bush in berry_bushes:
             bush.update(dt)
-    
 
+        for cat in cats:
+            cat.update(dt)
+
+################# NOT INVENTORY IN USE #################
+
+        if not inventory_in_use:
+            if not (keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]):
+                if last_direction == "down":
+                    player_current_image = player_stand_image
+                elif last_direction == "up":
+                    player_current_image = player_stand_image_back
+                elif last_direction == "left":
+                    player_current_image = player_stand_left
+                elif last_direction == "right":
+                    player_current_image = player_stand_right
+            
+            if keys[pygame.K_w] and (player_pos.y - (size/2)) >= 0:
+                if not up_collision:
+                    player_pos.y -= player_speed * dt * shift_multiplier
+            
+            
+            if keys[pygame.K_s] and (player_pos.y + (size/2)) <= height:
+                if not down_collision:
+                    player_pos.y += player_speed * dt * shift_multiplier
+
+            
+            if keys[pygame.K_a] and 0 < dungeon_depth < 50000:
+                if not left_collision:
+                    cam_x -= player_speed * dt * shift_multiplier
+                    dungeon_depth = max(0, dungeon_depth - dungeon_traversal_speed * shift_multiplier)
+            elif keys[pygame.K_a] and dungeon_depth <= 0:
+                if not left_collision:
+                    player_pos.x -= player_speed * dt * shift_multiplier
+                    dungeon_depth -= dungeon_traversal_speed * shift_multiplier
+            elif keys[pygame.K_a] and dungeon_depth >= 50000:
+                if not left_collision:
+                    player_pos.x -= player_speed * dt * shift_multiplier
+                    dungeon_depth -= dungeon_traversal_speed * shift_multiplier
+
+            
+            if keys[pygame.K_d] and 0 < dungeon_depth < 50000:
+                if not right_collision:
+                    cam_x += player_speed * dt * shift_multiplier
+                    dungeon_depth += dungeon_traversal_speed * shift_multiplier
+            elif keys[pygame.K_d] and dungeon_depth <= 0:
+                if not right_collision:
+                    player_pos.x += player_speed * dt * shift_multiplier
+                    dungeon_depth += dungeon_traversal_speed * shift_multiplier
+            elif keys[pygame.K_d] and dungeon_depth >= 50000:
+                if not right_collision:
+                    player_pos.x += player_speed * dt * shift_multiplier
+                    dungeon_depth += dungeon_traversal_speed * shift_multiplier
+
+
+            if keys[pygame.K_d]:
+                last_direction = "right"
+                player_animation_timer += dt
+                if keys[pygame.K_LSHIFT]:
+                    if player_animation_timer > .04:
+                        player_frame_index = (player_frame_index + 1) % len(player_walk_right_images)
+                        player_current_image = player_walk_right_images[player_frame_index]
+                        player_animation_timer = 0
+                else:
+                    if player_animation_timer > .07:
+                        player_frame_index = (player_frame_index + 1) % len(player_walk_right_images)
+                        player_current_image = player_walk_right_images[player_frame_index]
+                        player_animation_timer = 0
+
+            elif keys[pygame.K_a]:
+                last_direction = "left"
+                player_animation_timer += dt
+                if keys[pygame.K_LSHIFT]:
+                    if player_animation_timer > .04:
+                        player_frame_index = (player_frame_index + 1) % len(player_walk_left_images)
+                        player_current_image = player_walk_left_images[player_frame_index]
+                        player_animation_timer = 0
+                else:
+                    if player_animation_timer > .07:
+                        player_frame_index = (player_frame_index + 1) % len(player_walk_left_images)
+                        player_current_image = player_walk_left_images[player_frame_index]
+                        player_animation_timer = 0
+
+            elif keys[pygame.K_w]:
+                last_direction = "up"
+                player_animation_timer += dt
+                if keys[pygame.K_LSHIFT]:
+                    if player_animation_timer > .04:
+                        player_frame_index = (player_frame_index + 1) % len(player_walk_up_images)
+                        player_current_image = player_walk_up_images[player_frame_index]
+                        player_animation_timer = 0
+                else:
+                    if player_animation_timer > .07:
+                        player_frame_index = (player_frame_index + 1) % len(player_walk_up_images)
+                        player_current_image = player_walk_up_images[player_frame_index]
+                        player_animation_timer = 0
+
+            elif keys[pygame.K_s]:
+                last_direction = "down"
+                player_animation_timer += dt
+                if keys[pygame.K_LSHIFT]:
+                    if player_animation_timer > .04:
+                        player_frame_index = (player_frame_index + 1) % len(player_walk_down_images)
+                        player_current_image = player_walk_down_images[player_frame_index]
+                        player_animation_timer = 0
+                else:
+                    if player_animation_timer > .07:
+                        player_frame_index = (player_frame_index + 1) % len(player_walk_down_images)
+                        player_current_image = player_walk_down_images[player_frame_index]
+                        player_animation_timer = 0
+
+
+            if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+                shift_multiplier = 1.5
+            else:
+                shift_multiplier = 1
+
+        
+    
+############# END NOT INVENTORY IN USE #################
 ############# END NOT PAUSED #################
 
+    if inventory_in_use:
+        screen.blit(temp_pause_surface, pause_menu_rect.topleft)
+        screen.blit(hotbar_image, (width//2 - hotbar_image.get_width()//2, height - 100))
 
     if paused:
         screen.blit(temp_pause_surface, pause_menu_rect.topleft)
+        screen.blit(pause_menu_image, (((width - pause_menu_image.get_width())//2), ((height - pause_menu_image.get_height())//2)))
         resume_button.draw(screen)
         quit_button.draw(screen)
 
