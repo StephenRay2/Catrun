@@ -278,7 +278,40 @@ for _ in range(num_boulders):
     y = random.randint(0, height - 64)
     boulders.append(Boulder(x, y))
 
-allowed_cat_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_duskstone, bg_lavastone, bg_snow, bg_wasteland, bg_blackstone, bg_redrock]
+allowed_squirrel_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_snow, bg_wasteland]
+
+squirrel_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_squirrel_tiles]
+
+squirrel_spawn_weights = {
+    bg_grass: 2,
+    bg_dirt: 1,
+    bg_compact: 1,
+    bg_savannah: 2,
+    bg_riverrock: 1,
+    bg_bigrock: 1,
+    bg_duskstone: 1,
+    bg_lavastone: 1,
+    bg_snow: 1,
+    bg_wasteland: 1,
+    bg_blackstone: 1,
+    bg_redrock: 0
+
+}
+
+weighted_squirrel_tiles = []
+for tile_x, tile_image in tiles:
+    weight = squirrel_spawn_weights.get(tile_image, 1)
+    weighted_squirrel_tiles.extend([(tile_x, tile_image)] * weight)
+
+squirrels = []
+num_squirrels = 400
+for _ in range(num_squirrels):
+    tile_x, tile_image = random.choice(weighted_squirrel_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    squirrels.append(Squirrel(x, y, "Squirrel"))
+
+allowed_cat_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_sand, bg_duskstone, bg_lavastone, bg_snow, bg_wasteland, bg_blackstone, bg_redrock]
 
 cat_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_cat_tiles]
 
@@ -369,9 +402,12 @@ while running:
 
     keys = pygame.key.get_pressed()
 
-    all_objects = rocks + trees + boulders + berry_bushes + cats
-    visible_objects = [obj for obj in all_objects 
-                    if obj.rect.x - cam_x > -100 and obj.rect.x - cam_x < width + 100]
+    all_objects = rocks + trees + boulders + berry_bushes
+    mobs = cats + squirrels
+
+    visible_objects = [obj for obj in all_objects if obj.rect.x - cam_x > -100 and obj.rect.x - cam_x < width + 100]
+    visible_mobs = [mob for mob in mobs if mob.rect.x - cam_x > -100 and mob.rect.x - cam_x < width + 100]
+    visible_objects.extend(visible_mobs)
     visible_objects.sort(key=lambda obj: obj.rect.y + obj.rect.height)
 
     player_drawn = False
@@ -389,8 +425,11 @@ while running:
     player.rect.center = (player_pos.x, player_pos.y)
         
     nearby_objects = [obj for obj in all_objects 
-                    if abs(obj.rect.x - (player_pos.x + cam_x)) < 200 
-                    and abs(obj.rect.y - player_pos.y) < 200]
+                if abs(obj.rect.x - (player_pos.x + cam_x)) < 200 
+                and abs(obj.rect.y - player_pos.y) < 200]
+    nearby_mobs = [mob for mob in mobs
+                if abs(mob.rect.x - (player_pos.x + cam_x)) < 200 
+                and abs(mob.rect.y - player_pos.y) < 200]
     
     screen.blit(hotbar_image, (width//2 - hotbar_image.get_width()//2, height - 100))
     
@@ -452,16 +491,36 @@ while running:
         top_player_check = pygame.Rect(player.rect.left + 5, player.rect.top - 1, player.rect.width - 12, 1)
         bottom_player_check = pygame.Rect(player.rect.left + 5, player.rect.bottom, player.rect.width - 12, 1)
 
-        left_collision = any(left_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + (obj.rect.height * .2), obj.rect.width - 20, obj.rect.height - 50)) for obj in nearby_objects)
-        right_collision = any(right_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + (obj.rect.height * .2), obj.rect.width - 20, obj.rect.height - 50)) for obj in nearby_objects)
-        up_collision = any(top_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + (obj.rect.height * .2), obj.rect.width - 20, obj.rect.height - 50)) for obj in nearby_objects)
-        down_collision = any(bottom_player_check.colliderect(pygame.Rect(obj.rect.x - cam_x + 10, obj.rect.y + (obj.rect.height * .2), obj.rect.width - 20, obj.rect.height - 50)) for obj in nearby_objects)
+        for mob in mobs:
+            mob.collision_rect = mob.rect.inflate(-15, -15)
+
+        all_nearby = nearby_objects + nearby_mobs
+
+        left_collision = any(
+            left_player_check.colliderect(obj.get_collision_rect(cam_x))
+            for obj in all_nearby
+        )
+
+        right_collision = any(
+            right_player_check.colliderect(obj.get_collision_rect(cam_x))
+            for obj in all_nearby
+        )
+
+        up_collision = any(
+            top_player_check.colliderect(obj.get_collision_rect(cam_x))
+            for obj in all_nearby
+        )
+
+        down_collision = any(
+            bottom_player_check.colliderect(obj.get_collision_rect(cam_x))
+            for obj in all_nearby
+        )
 
         for bush in berry_bushes:
             bush.update(dt)
 
-        for cat in cats:
-            cat.update(dt)
+        for mob in mobs:
+            mob.update(dt)
 
 ################# NOT INVENTORY IN USE #################
 

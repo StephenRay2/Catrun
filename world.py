@@ -32,6 +32,15 @@ class Solid(pygame.sprite.Sprite):
 
     def draw(self, screen, cam_x):
         screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
+    
+    def get_collision_rect(self, cam_x):
+        """Get the collision rect for this object, accounting for camera offset"""
+        return pygame.Rect(
+            self.rect.x - cam_x + 10,
+            self.rect.y + (self.rect.height * .2),
+            self.rect.width - 20,
+            self.rect.height - 50
+        )
 
 
 class Rock(Solid):
@@ -101,5 +110,12 @@ class BerryBush(pygame.sprite.Sprite):
 
     def draw(self, screen, cam_x):
         screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
-
-
+    
+    def get_collision_rect(self, cam_x):
+        """Get the collision rect for this object, accounting for camera offset"""
+        return pygame.Rect(
+            self.rect.x - cam_x + 10,
+            self.rect.y + (self.rect.height * .2),
+            self.rect.width - 20,
+            self.rect.height - 50
+        )
