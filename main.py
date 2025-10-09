@@ -519,8 +519,34 @@ while running:
         for bush in berry_bushes:
             bush.update(dt)
 
+        # Replace the mob update section in your main game loop with this:
+
         for mob in mobs:
-            mob.update(dt)
+            # Get objects near THIS specific mob
+            mob_nearby_objects = [obj for obj in nearby_objects 
+                                if abs(obj.rect.x - mob.rect.x) < 100 
+                                and abs(obj.rect.y - mob.rect.y) < 100]
+            
+            # Calculate player's world position
+            player_world_x = player_pos.x + cam_x
+            player_world_y = player_pos.y
+            
+            # Add player to the objects list if nearby - but create a temporary rect in world space
+            if abs(player_world_x - mob.rect.x) < 200 and abs(player_world_y - mob.rect.y) < 200:
+                # Create a temporary object that has a rect in world coordinates
+                class TempPlayerCollision:
+                    def __init__(self, x, y, width, height):
+                        self.rect = pygame.Rect(x - width//2, y - height//2, width, height)
+                
+                temp_player = TempPlayerCollision(player_world_x, player_world_y, player.rect.width, player.rect.height)
+                mob_nearby_objects.append(temp_player)
+            
+            mob_nearby_mobs = [m for m in nearby_mobs 
+                            if m is not mob 
+                            and abs(m.rect.x - mob.rect.x) < 100 
+                            and abs(m.rect.y - mob.rect.y) < 100]
+            
+            mob.update(dt, None, mob_nearby_objects, mob_nearby_mobs)
 
 ################# NOT INVENTORY IN USE #################
 
