@@ -202,15 +202,14 @@ for tile_x, tile_image in tiles:
     weight = tree_weights.get(tile_image, 1)
     weighted_tree_tiles.extend([(tile_x, tile_image)] * weight)
 
-tree = Tree(x,y)
 trees = []
-num_trees = 1600
-
+num_trees = 400
 for _ in range(num_trees):
-    tile_x, tile_image = random.choice(tree_spawn_tiles)
+    tile_x, tile_image = random.choice(weighted_tree_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    trees.append(Tree(x, y))
+    tree_type = random.choice(tree_types)
+    trees.append(Tree(x, y, tree_type))
 
 allowed_berry_bush_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah]
 
@@ -283,17 +282,17 @@ allowed_squirrel_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverro
 squirrel_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_squirrel_tiles]
 
 squirrel_spawn_weights = {
-    bg_grass: 2,
-    bg_dirt: 1,
-    bg_compact: 1,
+    bg_grass: 3,
+    bg_dirt: 2,
+    bg_compact: 2,
     bg_savannah: 2,
-    bg_riverrock: 1,
-    bg_bigrock: 1,
-    bg_duskstone: 1,
-    bg_lavastone: 1,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 0,
+    bg_lavastone: 0,
     bg_snow: 1,
     bg_wasteland: 1,
-    bg_blackstone: 1,
+    bg_blackstone: 0,
     bg_redrock: 0
 
 }
@@ -338,7 +337,7 @@ for tile_x, tile_image in tiles:
     weighted_cat_tiles.extend([(tile_x, tile_image)] * weight)
 
 cats = []
-num_cats = 400
+num_cats = 1000
 for _ in range(num_cats):
     tile_x, tile_image = random.choice(weighted_cat_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
@@ -454,6 +453,23 @@ while running:
                     ])
                     collection_messages[0][1].fill((0, 0, 0, 100))
 
+        for tree in trees:
+            if player.rect.colliderect(
+                pygame.Rect(tree.rect.x - cam_x, tree.rect.y, tree.rect.width, tree.rect.height)
+            ) and keys[pygame.K_e]:
+                fruit = tree.collect()
+                if fruit:
+                    fruit_collect_text = font.render(f"Collected {len(fruit)} {tree.fruit}", True, (20, 255, 20))
+                    
+                    collection_messages.insert(0, [
+                        fruit_collect_text,
+                        pygame.Surface((fruit_collect_text.get_width() + 10, fruit_collect_text.get_height() + 10), pygame.SRCALPHA),
+                        pygame.Rect(20, 500, fruit_collect_text.get_width(), fruit_collect_text.get_height()),
+                        3.0,
+                        1.0
+                    ])
+                    collection_messages[0][1].fill((0, 0, 0, 100))
+
 
         if collection_timer > 0:
             collection_timer -= dt
@@ -518,25 +534,20 @@ while running:
 
         for bush in berry_bushes:
             bush.update(dt)
+        
+        for tree in trees:
+            tree.update(dt)
 
-        # Replace the mob update section in your main game loop with this:
 
         for mob in mobs:
-            # Get objects near THIS specific mob
             mob_nearby_objects = [obj for obj in nearby_objects 
                                 if abs(obj.rect.x - mob.rect.x) < 100 
                                 and abs(obj.rect.y - mob.rect.y) < 100]
             
-            # Calculate player's world position
             player_world_x = player_pos.x + cam_x
             player_world_y = player_pos.y
             
-            # Add player to the objects list if nearby - but create a temporary rect in world space
             if abs(player_world_x - mob.rect.x) < 200 and abs(player_world_y - mob.rect.y) < 200:
-                # Create a temporary object that has a rect in world coordinates
-                class TempPlayerCollision:
-                    def __init__(self, x, y, width, height):
-                        self.rect = pygame.Rect(x - width//2, y - height//2, width, height)
                 
                 temp_player = TempPlayerCollision(player_world_x, player_world_y, player.rect.width, player.rect.height)
                 mob_nearby_objects.append(temp_player)

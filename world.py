@@ -6,7 +6,13 @@ clock = pygame.time.Clock
 
 rock_images = ["/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock1.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock2.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock3.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock4.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock6.png"]
 
-tree_images = ["/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/AppleTree.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/BareAppleTree.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/DuskwoodTree.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/FirTree.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/OakTree.png"]
+
+tree_types = [
+    {"type": "Apple Tree", "image": "assets/sprites/biomes/grassland/AppleTree.png", "bare_image": "assets/sprites/biomes/grassland/BareAppleTree.png", "fruit": "Apples", "wood": "Apple Wood"},
+    {"type": "Duskwood Tree", "image": "assets/sprites/biomes/grassland/DuskwoodTree.png", "bare_image": None, "fruit": None, "wood": "Dusk wood"},
+    {"type": "Fir Tree", "image": "assets/sprites/biomes/grassland/FirTree.png", "bare_image": None, "fruit": None, "wood": "Fir Wood"},
+    {"type": "Oak Tree", "image": "assets/sprites/biomes/grassland/OakTree.png", "bare_image": None, "fruit": None, "wood": "Oak Wood"}
+]
 
 boulder_images = ["assets/sprites/biomes/grassland/Boulder1.png", "assets/sprites/biomes/grassland/Boulder2.png", "assets/sprites/biomes/grassland/Boulder3.png", "assets/sprites/biomes/grassland/Boulder4.png", "assets/sprites/biomes/grassland/Boulder5.png", "assets/sprites/biomes/grassland/Boulder6.png", "assets/sprites/biomes/grassland/Boulder7.png", ]
 
@@ -49,15 +55,6 @@ class Rock(Solid):
         super().__init__(img, x, y, (64, 64))
 
 
-class Tree(Solid):
-    def __init__(self, x, y):
-        img = random.choice(tree_images)
-        super().__init__(img, x, y, (64, 128))
-        self.image_rect = self.rect.copy()
-        self.rect = pygame.Rect(self.rect.x, self.rect.y + 64, 64, 64)
-    
-    def draw(self, screen, cam_x):
-        screen.blit(self.image, (self.image_rect.x - cam_x, self.image_rect.y))
 
 class Boulder(Solid):
     def __init__(self, x, y):
@@ -104,7 +101,7 @@ class BerryBush(pygame.sprite.Sprite):
         if self.is_empty:
             self.timer += dt
             if self.timer >= self.regrow_time:
-                self.amount = random.randint(1, 4)
+                self.amount = random.randint(3, 9)
                 self.image = self.full_image
                 self.is_empty = False
 
@@ -112,7 +109,63 @@ class BerryBush(pygame.sprite.Sprite):
         screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
     
     def get_collision_rect(self, cam_x):
-        """Get the collision rect for this object, accounting for camera offset"""
+        return pygame.Rect(
+            self.rect.x - cam_x + 10,
+            self.rect.y + (self.rect.height * .2),
+            self.rect.width - 20,
+            self.rect.height - 50
+        )
+    
+
+class Tree(pygame.sprite.Sprite):
+    def __init__(self, x, y, tree_type):
+        super().__init__()
+        self.type = tree_type
+        self.full_image = pygame.transform.scale(
+            pygame.image.load(tree_type["image"]).convert_alpha(), (64, 128)
+        )
+        
+        if tree_type["bare_image"] is not None:
+            self.bare_image = pygame.transform.scale(
+                pygame.image.load(tree_type["bare_image"]).convert_alpha(), (64, 128)
+            )
+        else:
+            self.bare_image = self.full_image
+        
+        self.image = self.full_image
+        self.rect = self.image.get_rect(topleft=(x, y))
+        self.image_rect = self.rect.copy()
+        self.rect = pygame.Rect(self.rect.x, self.rect.y + 64, 64, 64)
+
+        self.fruit = tree_type["fruit"]
+        self.amount = random.randint(5, 15) if self.fruit else 0
+
+        self.regrow_time = 400 #(seconds)
+        self.timer = 0
+        self.is_empty = False
+
+    def collect(self):
+        if not self.is_empty and self.amount > 0:
+            fruit_count = self.amount
+            self.amount = 0
+            self.image = self.bare_image
+            self.is_empty = True
+            self.timer = 0
+            return [self.fruit] * fruit_count
+        return []
+
+    def update(self, dt):
+        if self.is_empty:
+            self.timer += dt
+            if self.timer >= self.regrow_time:
+                self.amount = random.randint(5, 15)
+                self.image = self.full_image
+                self.is_empty = False
+
+    def draw(self, screen, cam_x):
+        screen.blit(self.image, (self.image_rect.x - cam_x, self.image_rect.y))
+    
+    def get_collision_rect(self, cam_x):
         return pygame.Rect(
             self.rect.x - cam_x + 10,
             self.rect.y + (self.rect.height * .2),
