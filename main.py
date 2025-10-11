@@ -373,6 +373,8 @@ temp_pause_surface = pygame.Surface((pause_menu_rect.width, pause_menu_rect.heig
 temp_pause_surface.fill((0, 0, 0, 100))
 
 
+
+
 ######################### GAME LOOP ################################
 
 while running:
@@ -392,6 +394,38 @@ while running:
                 paused = False
             if quit_button.is_clicked(event):
                 running = False
+        
+        if not paused and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for obj in visible_objects:
+                if hasattr(obj, 'harvest') and hasattr(obj, 'destroyed') and not obj.destroyed:
+                    facing_object = False
+                    
+                    horizontal_dist = abs(obj.rect.centerx - player_world_x)
+                    vertical_dist = abs(obj.rect.centery - player_world_y)
+                    
+                    if last_direction == "right" and obj.rect.centerx > player_world_x and horizontal_dist < 80 and vertical_dist < 40:
+                        facing_object = True
+                    elif last_direction == "left" and obj.rect.centerx < player_world_x and horizontal_dist < 80 and vertical_dist < 40:
+                        facing_object = True
+                    elif last_direction == "up" and obj.rect.centery < player_world_y and vertical_dist < 80 and horizontal_dist < 40:
+                        facing_object = True
+                    elif last_direction == "down" and obj.rect.centery > player_world_y and vertical_dist < 80 and horizontal_dist < 40:
+                        facing_object = True
+                    
+                    if facing_object:
+                        resource = obj.harvest(player)
+                        if resource:
+                            resource_collect_text = font.render(f"Collected {len(resource)} {obj.resource}", True, (20, 255, 20))
+                            collection_messages.insert(0, [
+                                resource_collect_text,
+                                pygame.Surface((resource_collect_text.get_width() + 10, resource_collect_text.get_height() + 10), pygame.SRCALPHA),
+                                pygame.Rect(20, 500, resource_collect_text.get_width(), resource_collect_text.get_height()),
+                                3.0,
+                                1.0
+                            ])
+                            collection_messages[0][1].fill((0, 0, 0, 100))
+                            if obj.destroyed:
+                                visible_objects.remove(obj)
 
         
     for tile_x, tile_image in tiles:
@@ -672,8 +706,8 @@ while running:
             else:
                 shift_multiplier = 1
 
-        
-    
+
+
 ############# END NOT INVENTORY IN USE #################
 ############# END NOT PAUSED #################
 

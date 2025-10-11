@@ -20,6 +20,8 @@ class Player(pygame.sprite.Sprite):
     def __init__(self, x, y, name):
         super().__init__()
         self.name = name
+        self.x = x
+        self.y = y
         self.image = pygame.Surface((48, 48))
         self.image.fill((0, 200, 0))
         self.rect = self.image.get_rect(center=(x, y)).inflate(-10, -20)
@@ -32,9 +34,9 @@ class Player(pygame.sprite.Sprite):
         self.hunger = 100
         self.max_warmth = 100
         self.warmth = 100
-        self.attack = 100
-        self.speed = 100
-        self.defense = 100
+        self.attack = 1
+        self.speed = 1
+        self.defense = 1
         self.level = 1
         self.experience = 0
 
