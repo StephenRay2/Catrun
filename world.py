@@ -27,8 +27,8 @@ berry_bush_types = [
     {"image": "assets/sprites/biomes/grassland/VioBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareVioBerryBush.png", "berry": "Vio Berries", "resource": "stick"},
 ]
 
-collect_experience = 4
-harvest_experience = 4
+collect_experience = 1
+harvest_experience = 1.5
 
 
 class Solid(pygame.sprite.Sprite):
@@ -143,7 +143,7 @@ class BerryBush(pygame.sprite.Sprite):
     
     def harvest(self, player=None):
         if not self.destroyed:
-            resource_collected = random.randint(3, 7)
+            resource_collected = random.randint(3, 700)
             self.destroyed = True
             player.experience += collect_experience * resource_collected
             player.exp_total += collect_experience * resource_collected

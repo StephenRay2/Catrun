@@ -40,19 +40,22 @@ class Inventory():
         self.slot_size = 64
         self.rows = 8
         self.columns = 8
-        self.gap_size = 5
+        self.gap_size = 4
         self.padding_size = 5
-        self.inventory_width = ((self.slot_size * self.columns) + (self.gap_size * (self.columns - 1)) + (self.padding_size * 2))
-        self.inventory_height = ((self.slot_size * self.rows) + (self.gap_size * (self.rows - 1)) + (self.padding_size * 2))
+        self.inventory_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/inventory_screen.png").convert_alpha(), (1100, 600))
 
     def draw_inventory(self, screen):
-        inventory_surface = pygame.Surface((self.inventory_width, self.inventory_height), pygame.SRCALPHA)
-        pygame.draw.rect(inventory_surface, (0, 0, 0, 100), inventory_surface.get_rect())
-        screen.blit(inventory_surface, ((screen.get_width()/2 - self.inventory_width/2), (screen.get_height()/2 - self.inventory_height/2)))
-
+        
+        x_pos = screen.get_width() / 2 - self.inventory_image.get_width() / 2
+        y_pos = screen.get_height() / 2 - self.inventory_image.get_height() / 2
+        inventory_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
+        pygame.draw.rect(inventory_surface, (0, 0, 0, 150), screen.get_rect())
+        screen.blit(inventory_surface, (0, 0))
+        screen.blit(self.inventory_image, (x_pos, y_pos - 20))
+        
     def draw_items(self, screen):
-        start_x = screen.get_width() / 2 - self.inventory_width / 2 + self.padding_size
-        start_y = screen.get_height() / 2 - self.inventory_height / 2 + self.padding_size
+        start_x = (screen.get_width() / 2 - self.inventory_image.get_width() / 2) + 17
+        start_y = (screen.get_height() / 2 - self.inventory_image.get_height() / 2) + 44
         used_slots = 0
         displayed_items = {}
         font = pygame.font.SysFont(None, 24)
@@ -68,14 +71,19 @@ class Inventory():
                         row = used_slots // self.columns
                         col = used_slots % self.columns
                         x = start_x + col * (self.slot_size + self.gap_size)
-                        y = start_y + row * (self.slot_size + self.gap_size)
+                        y = start_y + row * (self.slot_size + self.gap_size - 3)
                         
                         screen.blit(item["image"], (x, y))
                         
                         stack_num = min(remaining, item["stack_size"])
                         if stack_num > 1:
                             stack_text = font.render(str(stack_num), True, (255, 255, 255))
-                            screen.blit(stack_text, (x + 45, y + 45))
+                            if stack_num == 100:
+                                screen.blit(stack_text, (x + 38, y + 44))
+                            elif 99 > stack_num > 9:
+                                screen.blit(stack_text, (x + 42, y + 44))
+                            else:
+                                screen.blit(stack_text, (x + 47, y + 44))
                         
                         used_slots += 1
                         displayed_items[item_name] = stacks_drawn + 1

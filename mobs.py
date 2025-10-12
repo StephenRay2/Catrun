@@ -48,7 +48,7 @@ class Player(pygame.sprite.Sprite):
         self.level = 1
         self.experience = 0
         self.exp_total = 0
-        self.next_level_exp = 100 + (self.exp_total * 1.2)
+        self.next_level_exp = 100
         self.level_up_timer = 0
 
         self.inventory = []
@@ -68,8 +68,19 @@ class Player(pygame.sprite.Sprite):
     def level_up(self, screen):
             self.level += 1
             self.exp_total += self.next_level_exp
-            self.next_level_exp = int(100 + (self.exp_total * 0.2))
+            if self.level <= 10:
+                self.next_level_exp = int(100 + (self.exp_total * 0.3))
+            elif self.level <= 30:
+                self.next_level_exp = int(200 + (self.exp_total * 0.122))
+            elif self.level <= 50:
+                self.next_level_exp = int(500 + (self.exp_total * 0.045))
+            elif self.level <= 70:
+                self.next_level_exp = int(1000 + (self.exp_total * 0.01))
+            elif self.level <= 100:
+                self.next_level_exp = int(1500 + (self.exp_total * 0.007))
             self.level_up_timer = 10
+
+        
 
     def show_level_up_message(self, screen):
         level_up_text = large_font.render(

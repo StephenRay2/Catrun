@@ -25,7 +25,6 @@ scroll = 0
 player_speed = 350
 dungeon_traversal_speed = .1
 inventory = Inventory(64)
-
 ############ PLAYER IMAGES #################
 
 player_stand_image = pygame.image.load("assets/sprites/player/CharacterCorynnFrontStanding.png")
@@ -35,16 +34,30 @@ player_stand_right = pygame.image.load("assets/sprites/player/CharacterCorynnRig
 player_walk_down_images = [pygame.image.load("assets/sprites/player/CorynnWalkDown1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown6.png").convert_alpha()]
 player_walk_up_images = [pygame.image.load("assets/sprites/player/CorynnWalkUp1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp6.png").convert_alpha()]
 player_walk_left_images = [pygame.image.load("assets/sprites/player/CorynnWalkLeft1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft6.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft7.png").convert_alpha()]
-
+player_stand_attack_down_images = [pygame.image.load("assets/sprites/player/CorynnFrontStandAttack1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnFrontStandAttack2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnFrontStandAttack3.png").convert_alpha()]
+player_stand_attack_up_images = [pygame.image.load("assets/sprites/player/CorynnBackStandAttack1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnBackStandAttack2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnBackStandAttack3.png").convert_alpha()]
+player_stand_attack_left_images = [pygame.image.load("assets/sprites/player/CorynnLeftStandAttack1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnLeftStandAttack2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnLeftStandAttack3.png").convert_alpha()]
+player_walk_down_attack_images = [pygame.image.load("assets/sprites/player/CorynnWalkDownAttack1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDownAttack2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDownAttack3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDownAttack4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDownAttack5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDownAttack6.png").convert_alpha()]
+player_walk_up_attack_images = [pygame.image.load("assets/sprites/player/CorynnWalkUpAttack1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUpAttack2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUpAttack3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUpAttack4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUpAttack5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUpAttack6.png").convert_alpha()]
+player_walk_left_attack_images = [pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack6.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack7.png").convert_alpha()] 
 
 player_stand_image = pygame.transform.scale(player_stand_image, (size, size))
-player_stand_image_back = pygame.transform.scale(player_stand_image_back, (size, size))
+player_stand_up = pygame.transform.scale(player_stand_image_back, (size, size))
 player_stand_left = pygame.transform.scale(player_stand_left, (size, size))
 player_stand_right = pygame.transform.scale(player_stand_right, (size, size))
 player_walk_down_images = [pygame.transform.scale(img, (size, size)) for img in player_walk_down_images]
 player_walk_up_images = [pygame.transform.scale(img, (size, size)) for img in player_walk_up_images]
 player_walk_left_images = [pygame.transform.scale(img, (size, size)) for img in player_walk_left_images]
 player_walk_right_images = [pygame.transform.flip(img, True, False) for img in player_walk_left_images]
+player_stand_attack_down_images = [pygame.transform.scale(img, (size, size)) for img in player_stand_attack_down_images]
+player_stand_attack_up_images  = [pygame.transform.scale(img, (size, size)) for img in player_stand_attack_up_images]
+player_stand_attack_left_images  = [pygame.transform.scale(img, (size, size)) for img in player_stand_attack_left_images]
+player_stand_attack_right_images = [pygame.transform.flip(img, True, False) for img in player_stand_attack_left_images]
+player_walk_down_attack_images = [pygame.transform.scale(img, (size, size)) for img in player_walk_down_attack_images]
+player_walk_up_attack_images = [pygame.transform.scale(img, (size, size)) for img in player_walk_up_attack_images]
+player_walk_left_attack_images = [pygame.transform.scale(img, (size, size)) for img in player_walk_left_attack_images]
+player_walk_right_attack_images = [pygame.transform.flip(img, True, False) for img in player_walk_left_attack_images]
+
 
 player_frame_index = 0
 player_animation_timer = 0
@@ -619,13 +632,41 @@ while running:
         if not inventory_in_use:
             if not (keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]):
                 if last_direction == "down":
-                    player_current_image = player_stand_image
+                    if pygame.mouse.get_pressed()[0]:
+                        player_animation_timer += dt
+                        if player_animation_timer > .07:
+                            player_frame_index = (player_frame_index + 1) % len(player_stand_attack_down_images)
+                            player_current_image = player_stand_attack_down_images[player_frame_index]
+                            player_animation_timer = 0
+                    else:
+                        player_current_image = player_stand_image
                 elif last_direction == "up":
-                    player_current_image = player_stand_image_back
+                    if pygame.mouse.get_pressed()[0]:
+                        player_animation_timer += dt
+                        if player_animation_timer > .07:
+                            player_frame_index = (player_frame_index + 1) % len(player_stand_attack_up_images)
+                            player_current_image = player_stand_attack_up_images[player_frame_index]
+                            player_animation_timer = 0
+                    else:
+                        player_current_image = player_stand_up
                 elif last_direction == "left":
-                    player_current_image = player_stand_left
+                    if pygame.mouse.get_pressed()[0]:
+                        player_animation_timer += dt
+                        if player_animation_timer > .07:
+                            player_frame_index = (player_frame_index + 1) % len(player_stand_attack_left_images)
+                            player_current_image = player_stand_attack_left_images[player_frame_index]
+                            player_animation_timer = 0
+                    else:
+                        player_current_image = player_stand_left
                 elif last_direction == "right":
-                    player_current_image = player_stand_right
+                    if pygame.mouse.get_pressed()[0]:
+                        player_animation_timer += dt
+                        if player_animation_timer > .07:
+                            player_frame_index = (player_frame_index + 1) % len(player_stand_attack_right_images)
+                            player_current_image = player_stand_attack_right_images[player_frame_index]
+                            player_animation_timer = 0
+                    else:
+                        player_current_image = player_stand_right
             
             if keys[pygame.K_w] and (player_pos.y - (size/2)) >= 0:
                 if not up_collision:
@@ -664,8 +705,22 @@ while running:
                     player_pos.x += player_speed * dt * shift_multiplier
                     dungeon_depth += dungeon_traversal_speed * shift_multiplier
 
+            if keys[pygame.K_d] and pygame.mouse.get_pressed()[0]:
+                last_direction = "right"
+                player_animation_timer += dt
+                if keys[pygame.K_LSHIFT]:
+                    if player_animation_timer > .04:
+                        player_frame_index = (player_frame_index + 1) % len(player_walk_right_attack_images)
+                        player_current_image = player_walk_right_attack_images[player_frame_index]
+                        player_animation_timer = 0
 
-            if keys[pygame.K_d]:
+                else:
+                    if player_animation_timer > .07:
+                        player_frame_index = (player_frame_index + 1) % len(player_walk_right_attack_images)
+                        player_current_image = player_walk_right_attack_images[player_frame_index]
+                        player_animation_timer = 0
+
+            elif keys[pygame.K_d]:
                 last_direction = "right"
                 player_animation_timer += dt
                 if keys[pygame.K_LSHIFT]:
@@ -678,6 +733,22 @@ while running:
                         player_frame_index = (player_frame_index + 1) % len(player_walk_right_images)
                         player_current_image = player_walk_right_images[player_frame_index]
                         player_animation_timer = 0
+            
+
+            elif keys[pygame.K_a] and pygame.mouse.get_pressed()[0]:
+                last_direction = "left"
+                player_animation_timer += dt
+                if keys[pygame.K_LSHIFT]:
+                    if player_animation_timer > .04:
+                        player_frame_index = (player_frame_index + 1) % len(player_walk_left_attack_images)
+                        player_current_image = player_walk_left_attack_images[player_frame_index]
+                        player_animation_timer = 0
+
+                else:
+                    if player_animation_timer > .07:
+                        player_frame_index = (player_frame_index + 1) % len(player_walk_left_attack_images)
+                        player_current_image = player_walk_left_attack_images[player_frame_index]
+                        player_animation_timer = 0
 
             elif keys[pygame.K_a]:
                 last_direction = "left"
@@ -687,10 +758,27 @@ while running:
                         player_frame_index = (player_frame_index + 1) % len(player_walk_left_images)
                         player_current_image = player_walk_left_images[player_frame_index]
                         player_animation_timer = 0
+
                 else:
                     if player_animation_timer > .07:
                         player_frame_index = (player_frame_index + 1) % len(player_walk_left_images)
                         player_current_image = player_walk_left_images[player_frame_index]
+                        player_animation_timer = 0
+
+
+            elif keys[pygame.K_w] and pygame.mouse.get_pressed()[0]:
+                last_direction = "up"
+                player_animation_timer += dt
+                if keys[pygame.K_LSHIFT]:
+                    if player_animation_timer > .04:
+                        player_frame_index = (player_frame_index + 1) % len(player_walk_up_attack_images)
+                        player_current_image = player_walk_up_attack_images[player_frame_index]
+                        player_animation_timer = 0
+
+                else:
+                    if player_animation_timer > .07:
+                        player_frame_index = (player_frame_index + 1) % len(player_walk_up_attack_images)
+                        player_current_image = player_walk_up_attack_images[player_frame_index]
                         player_animation_timer = 0
 
             elif keys[pygame.K_w]:
@@ -706,6 +794,23 @@ while running:
                         player_frame_index = (player_frame_index + 1) % len(player_walk_up_images)
                         player_current_image = player_walk_up_images[player_frame_index]
                         player_animation_timer = 0
+            
+            
+
+            elif keys[pygame.K_s] and pygame.mouse.get_pressed()[0]:
+                last_direction = "down"
+                player_animation_timer += dt
+                if keys[pygame.K_LSHIFT]:
+                    if player_animation_timer > .04:
+                        player_frame_index = (player_frame_index + 1) % len(player_walk_down_attack_images)
+                        player_current_image = player_walk_down_attack_images[player_frame_index]
+                        player_animation_timer = 0
+
+                else:
+                    if player_animation_timer > .07:
+                        player_frame_index = (player_frame_index + 1) % len(player_walk_down_attack_images)
+                        player_current_image = player_walk_down_attack_images[player_frame_index]
+                        player_animation_timer = 0
 
             elif keys[pygame.K_s]:
                 last_direction = "down"
@@ -720,6 +825,8 @@ while running:
                         player_frame_index = (player_frame_index + 1) % len(player_walk_down_images)
                         player_current_image = player_walk_down_images[player_frame_index]
                         player_animation_timer = 0
+
+            
 
 
             if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
