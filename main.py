@@ -4,13 +4,14 @@ import time, random, math
 from world import *
 from mobs import *
 from buttons import *
-from inventory import *
+
 
 pygame.init()
 screen = pygame.display.set_mode((1280, 720), pygame.FULLSCREEN)
 width = screen.get_width()
 height = screen.get_height()
 clock = pygame.time.Clock()
+from inventory import *
 running = True
 dt = 0
 size = 64
@@ -22,7 +23,7 @@ font = pygame.font.SysFont(None, 24)
 scroll = 0
 player_speed = 350
 dungeon_traversal_speed = .1
-
+inventory = Inventory(48)
 
 ############ PLAYER IMAGES #################
 
@@ -372,8 +373,9 @@ pause_menu_rect = pygame.Rect(0, 0, width, height)
 temp_pause_surface = pygame.Surface((pause_menu_rect.width, pause_menu_rect.height), pygame.SRCALPHA)
 temp_pause_surface.fill((0, 0, 0, 100))
 
-
-
+harvest_cooldown = 0
+harvest_delay = 300
+inventory_resources = []
 
 ######################### GAME LOOP ################################
 
@@ -394,8 +396,12 @@ while running:
                 paused = False
             if quit_button.is_clicked(event):
                 running = False
+
+    current_time = pygame.time.get_ticks()
         
-        if not paused and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+    if not paused and pygame.mouse.get_pressed()[0]:
+        if current_time - harvest_cooldown > harvest_delay:
+            harvest_cooldown = current_time
             for obj in visible_objects:
                 if hasattr(obj, 'harvest') and hasattr(obj, 'destroyed') and not obj.destroyed:
                     facing_object = False
@@ -403,18 +409,19 @@ while running:
                     horizontal_dist = abs(obj.rect.centerx - player_world_x)
                     vertical_dist = abs(obj.rect.centery - player_world_y)
                     
-                    if last_direction == "right" and obj.rect.centerx > player_world_x and horizontal_dist < 80 and vertical_dist < 40:
+                    if last_direction == "right" and obj.rect.centerx > player_world_x and horizontal_dist < 50 and vertical_dist < 40:
                         facing_object = True
-                    elif last_direction == "left" and obj.rect.centerx < player_world_x and horizontal_dist < 80 and vertical_dist < 40:
+                    elif last_direction == "left" and obj.rect.centerx < player_world_x and horizontal_dist < 50 and vertical_dist < 40:
                         facing_object = True
-                    elif last_direction == "up" and obj.rect.centery < player_world_y and vertical_dist < 80 and horizontal_dist < 40:
+                    elif last_direction == "up" and obj.rect.centery < player_world_y and vertical_dist < 50 and horizontal_dist < 40:
                         facing_object = True
-                    elif last_direction == "down" and obj.rect.centery > player_world_y and vertical_dist < 80 and horizontal_dist < 40:
+                    elif last_direction == "down" and obj.rect.centery > player_world_y and vertical_dist < 50 and horizontal_dist < 40:
                         facing_object = True
                     
                     if facing_object:
                         resource = obj.harvest(player)
                         if resource:
+                            inventory_resources.extend(resource)
                             resource_collect_text = font.render(f"Collected {len(resource)} {obj.resource}", True, (20, 255, 20))
                             collection_messages.insert(0, [
                                 resource_collect_text,
@@ -426,6 +433,11 @@ while running:
                             collection_messages[0][1].fill((0, 0, 0, 100))
                             if obj.destroyed:
                                 visible_objects.remove(obj)
+            
+    rocks = [r for r in rocks if not r.destroyed]
+    trees = [t for t in trees if not t.destroyed]
+    boulders = [b for b in boulders if not b.destroyed]
+    berry_bushes = [bush for bush in berry_bushes if not bush.destroyed]
 
         
     for tile_x, tile_image in tiles:
@@ -475,7 +487,9 @@ while running:
                 pygame.Rect(bush.rect.x - cam_x, bush.rect.y, bush.rect.width, bush.rect.height)
             ) and keys[pygame.K_e]:
                 berries = bush.collect()
+                
                 if berries:
+                    inventory_resources.extend(berries)
                     berry_collect_text = font.render(f"Collected {len(berries)} {bush.berry}", True, (20, 255, 20))
                     
                     collection_messages.insert(0, [
@@ -492,9 +506,10 @@ while running:
                 pygame.Rect(tree.rect.x - cam_x, tree.rect.y, tree.rect.width, tree.rect.height)
             ) and keys[pygame.K_e]:
                 fruit = tree.collect()
+                
                 if fruit:
                     fruit_collect_text = font.render(f"Collected {len(fruit)} {tree.fruit}", True, (20, 255, 20))
-                    
+                    inventory_resources.extend(fruit)
                     collection_messages.insert(0, [
                         fruit_collect_text,
                         pygame.Surface((fruit_collect_text.get_width() + 10, fruit_collect_text.get_height() + 10), pygame.SRCALPHA),
@@ -503,7 +518,9 @@ while running:
                         1.0
                     ])
                     collection_messages[0][1].fill((0, 0, 0, 100))
-
+        
+        inventory.add(inventory_resources)
+        inventory_resources = []
 
         if collection_timer > 0:
             collection_timer -= dt
@@ -706,12 +723,16 @@ while running:
             else:
                 shift_multiplier = 1
 
-
+    
 
 ############# END NOT INVENTORY IN USE #################
 ############# END NOT PAUSED #################
 
+
     if inventory_in_use:
+
+        inventory.draw_inventory(screen)
+        inventory.draw_items(screen)
         screen.blit(temp_pause_surface, pause_menu_rect.topleft)
         screen.blit(hotbar_image, (width//2 - hotbar_image.get_width()//2, height - 100))
 

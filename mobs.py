@@ -48,6 +48,11 @@ class Player(pygame.sprite.Sprite):
     def feed_cat(self, cat):
         pass
 
+    def health_bar(self, max_health, health):
+        max_health = self.max_health
+        health = self.health
+        
+
 
 class Mob(pygame.sprite.Sprite):
     def __init__(self, x, y, name):

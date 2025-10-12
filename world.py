@@ -10,7 +10,7 @@ rock_images = ["/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/gras
 
 tree_types = [
     {"type": "Apple Tree", "image": "assets/sprites/biomes/grassland/AppleTree.png", "bare_image": "assets/sprites/biomes/grassland/BareAppleTree.png", "fruit": "Apples", "wood": "Apple Wood"},
-    {"type": "Duskwood Tree", "image": "assets/sprites/biomes/grassland/DuskwoodTree.png", "bare_image": None, "fruit": None, "wood": "Dusk wood"},
+    {"type": "Duskwood Tree", "image": "assets/sprites/biomes/grassland/DuskwoodTree.png", "bare_image": None, "fruit": None, "wood": "Dusk Wood"},
     {"type": "Fir Tree", "image": "assets/sprites/biomes/grassland/FirTree.png", "bare_image": None, "fruit": None, "wood": "Fir Wood"},
     {"type": "Oak Tree", "image": "assets/sprites/biomes/grassland/OakTree.png", "bare_image": None, "fruit": None, "wood": "Oak Wood"}
 ]
@@ -18,13 +18,13 @@ tree_types = [
 boulder_images = ["assets/sprites/biomes/grassland/Boulder1.png", "assets/sprites/biomes/grassland/Boulder2.png", "assets/sprites/biomes/grassland/Boulder3.png", "assets/sprites/biomes/grassland/Boulder4.png", "assets/sprites/biomes/grassland/Boulder5.png", "assets/sprites/biomes/grassland/Boulder6.png", "assets/sprites/biomes/grassland/Boulder7.png", ]
 
 berry_bush_types = [
-    {"image": "assets/sprites/biomes/grassland/BloodBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareBloodBerryBush.png", "berry": "BloodBerries", "resource": "stick"},
-    {"image": "assets/sprites/biomes/grassland/DawnBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareDawnBerryBush.png", "berry": "DawnBerries", "resource": "stick"},
-    {"image": "assets/sprites/biomes/grassland/DuskBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareDuskBerryBush.png", "berry": "DuskBerries", "resource": "stick"},
-    {"image": "assets/sprites/biomes/grassland/SunBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareSunBerryBush.png", "berry": "SunBerries", "resource": "stick"},
-    {"image": "assets/sprites/biomes/grassland/TealBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareTealBerryBush.png", "berry": "TealBerries", "resource": "stick"},
-    {"image": "assets/sprites/biomes/grassland/TwilightDrupesBush.png", "bare_image": "assets/sprites/biomes/grassland/BareTwilightDrupesBush.png", "berry": "TwilightDrupes", "resource": "stick"},
-    {"image": "assets/sprites/biomes/grassland/VioBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareVioBerryBush.png", "berry": "VioBerries", "resource": "stick"},
+    {"image": "assets/sprites/biomes/grassland/BloodBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareBloodBerryBush.png", "berry": "Blood Berries", "resource": "stick"},
+    {"image": "assets/sprites/biomes/grassland/DawnBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareDawnBerryBush.png", "berry": "Dawn Berries", "resource": "stick"},
+    {"image": "assets/sprites/biomes/grassland/DuskBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareDuskBerryBush.png", "berry": "Dusk Berries", "resource": "stick"},
+    {"image": "assets/sprites/biomes/grassland/SunBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareSunBerryBush.png", "berry": "Sun Berries", "resource": "stick"},
+    {"image": "assets/sprites/biomes/grassland/TealBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareTealBerryBush.png", "berry": "Teal Berries", "resource": "stick"},
+    {"image": "assets/sprites/biomes/grassland/TwilightDrupesBush.png", "bare_image": "assets/sprites/biomes/grassland/BareTwilightDrupesBush.png", "berry": "Twilight Drupes", "resource": "stick"},
+    {"image": "assets/sprites/biomes/grassland/VioBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareVioBerryBush.png", "berry": "Vio Berries", "resource": "stick"},
 ]
 
 
@@ -53,17 +53,22 @@ class Solid(pygame.sprite.Sprite):
     
     def harvest(self, player=None):
         if not self.destroyed:
-            resource_collected = random.randint(3, 7)
-            self.destroyed = True
+            resource_collected = min(self.resource_amount, (1 * player.attack))
+            self.resource_amount -= resource_collected
+            
+            if self.resource_amount <= 0:
+                self.destroyed = True
+            
             return [self.resource] * resource_collected
         return []
-
+    
 
 class Rock(Solid):
     def __init__(self, x, y):
         img = random.choice(rock_images)
         super().__init__(img, x, y, (64, 64))
-        self.resource = "stone"
+        self.resource = "Stone"
+        self.resource_amount = random.randint(10, 15)
 
 
 
@@ -73,7 +78,8 @@ class Boulder(Solid):
         super().__init__(img, x, y, (128, 128))
         self.image_rect = self.rect.copy()
         self.rect = pygame.Rect(self.rect.x, self.rect.y + 40, 128, 88)
-        self.resource = "stone"
+        self.resource = "Stone"
+        self.resource_amount = random.randint(40, 80)
     
     def draw(self, screen, cam_x):
         screen.blit(self.image, (self.image_rect.x - cam_x, self.image_rect.y))
@@ -99,7 +105,7 @@ class BerryBush(pygame.sprite.Sprite):
         self.timer = 0
         self.is_empty = False
         self.destroyed = False
-        self.resource = "sticks"
+        self.resource = "Sticks"
 
     def collect(self):
         if not self.is_empty and self.amount > 0:
@@ -170,7 +176,7 @@ class Tree(pygame.sprite.Sprite):
 
     def harvest(self, player=None):
         if not self.destroyed:
-            resource_collected = min(self.wood_amount, random.randint(5, 10))
+            resource_collected = min(self.wood_amount, random.randint((2 * player.attack), (5 * player.attack)))
             self.wood_amount -= resource_collected
             
             if self.wood_amount <= 0:
