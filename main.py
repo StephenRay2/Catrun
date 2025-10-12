@@ -1,4 +1,5 @@
 import pygame
+pygame.init()
 import sys
 import time, random, math
 from world import *
@@ -6,7 +7,7 @@ from mobs import *
 from buttons import *
 
 
-pygame.init()
+
 screen = pygame.display.set_mode((1280, 720), pygame.FULLSCREEN)
 width = screen.get_width()
 height = screen.get_height()
@@ -23,17 +24,17 @@ font = pygame.font.SysFont(None, 24)
 scroll = 0
 player_speed = 350
 dungeon_traversal_speed = .1
-inventory = Inventory(48)
+inventory = Inventory(64)
 
 ############ PLAYER IMAGES #################
 
-player_stand_image = pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CharacterCorynnFrontStanding.png")
-player_stand_image_back = pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CharacterCorynnBackStanding.png")
-player_stand_left = pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CharacterCorynnLeftStanding.png")
-player_stand_right = pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CharacterCorynnRightStanding.png")
-player_walk_down_images = [pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkDown1.png").convert_alpha(), pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkDown2.png").convert_alpha(), pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkDown3.png").convert_alpha(), pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkDown4.png").convert_alpha(), pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkDown5.png").convert_alpha(), pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkDown6.png").convert_alpha()]
-player_walk_up_images = [pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkUp1.png").convert_alpha(), pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkUp2.png").convert_alpha(), pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkUp3.png").convert_alpha(), pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkUp4.png").convert_alpha(), pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkUp5.png").convert_alpha(), pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkUp6.png").convert_alpha()]
-player_walk_left_images = [pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkLeft1.png").convert_alpha(), pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkLeft2.png").convert_alpha(), pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkLeft3.png").convert_alpha(), pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkLeft4.png").convert_alpha(), pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkLeft5.png").convert_alpha(), pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkLeft6.png").convert_alpha(), pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/player/CorynnWalkLeft7.png").convert_alpha()]
+player_stand_image = pygame.image.load("assets/sprites/player/CharacterCorynnFrontStanding.png")
+player_stand_image_back = pygame.image.load("assets/sprites/player/CharacterCorynnBackStanding.png")
+player_stand_left = pygame.image.load("assets/sprites/player/CharacterCorynnLeftStanding.png")
+player_stand_right = pygame.image.load("assets/sprites/player/CharacterCorynnRightStanding.png")
+player_walk_down_images = [pygame.image.load("assets/sprites/player/CorynnWalkDown1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown6.png").convert_alpha()]
+player_walk_up_images = [pygame.image.load("assets/sprites/player/CorynnWalkUp1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp6.png").convert_alpha()]
+player_walk_left_images = [pygame.image.load("assets/sprites/player/CorynnWalkLeft1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft6.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft7.png").convert_alpha()]
 
 
 player_stand_image = pygame.transform.scale(player_stand_image, (size, size))
@@ -54,19 +55,19 @@ last_direction = "down"
 
 
 bg_green = pygame.Surface((width, height))
-bg_grass = pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/backgrounds/bg_grass.png").convert()
-bg_dirt = pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/backgrounds/bg_dirt.png").convert()
-bg_compact = pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/backgrounds/bg_compact_dirt.png").convert()
-bg_sand = pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/backgrounds/bg_sand.png").convert()
-bg_savannah = pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/backgrounds/bg_savannah.png").convert()
-bg_riverrock = pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/backgrounds/bg_riverrock.png").convert()
-bg_bigrock = pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/backgrounds/bg_bigrock.png").convert()
-bg_duskstone = pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/backgrounds/bg_duskstone.png").convert()
-bg_lavastone = pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/backgrounds/bg_lavastone.png").convert()
-bg_snow = pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/backgrounds/bg_snow.png").convert()
-bg_wasteland = pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/backgrounds/bg_wasteland.png").convert()
-bg_blackstone = pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/backgrounds/bg_blackstone.png").convert()
-bg_redrock = pygame.image.load("/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/backgrounds/bg_redrock.png").convert()
+bg_grass = pygame.image.load("assets/sprites/biomes/backgrounds/bg_grass.png").convert()
+bg_dirt = pygame.image.load("assets/sprites/biomes/backgrounds/bg_dirt.png").convert()
+bg_compact = pygame.image.load("assets/sprites/biomes/backgrounds/bg_compact_dirt.png").convert()
+bg_sand = pygame.image.load("assets/sprites/biomes/backgrounds/bg_sand.png").convert()
+bg_savannah = pygame.image.load("assets/sprites/biomes/backgrounds/bg_savannah.png").convert()
+bg_riverrock = pygame.image.load("assets/sprites/biomes/backgrounds/bg_riverrock.png").convert()
+bg_bigrock = pygame.image.load("assets/sprites/biomes/backgrounds/bg_bigrock.png").convert()
+bg_duskstone = pygame.image.load("assets/sprites/biomes/backgrounds/bg_duskstone.png").convert()
+bg_lavastone = pygame.image.load("assets/sprites/biomes/backgrounds/bg_lavastone.png").convert()
+bg_snow = pygame.image.load("assets/sprites/biomes/backgrounds/bg_snow.png").convert()
+bg_wasteland = pygame.image.load("assets/sprites/biomes/backgrounds/bg_wasteland.png").convert()
+bg_blackstone = pygame.image.load("assets/sprites/biomes/backgrounds/bg_blackstone.png").convert()
+bg_redrock = pygame.image.load("assets/sprites/biomes/backgrounds/bg_redrock.png").convert()
 
 bg_dirt = pygame.transform.scale(bg_dirt, (width, height))
 bg_grass = pygame.transform.scale(bg_grass, (width, height))
@@ -354,6 +355,9 @@ collection_message_num = 0
 paused = False
 inventory_in_use = False
 
+stat_holder_image = pygame.image.load("assets/sprites/buttons/stat_holder.png").convert_alpha()
+stat_holder_image = pygame.transform.scale(stat_holder_image, (50, 100))
+
 hotbar_image = pygame.image.load("assets/sprites/buttons/hotbar.png").convert_alpha()
 hotbar_image = pygame.transform.scale(hotbar_image, (800, 74))
 
@@ -486,7 +490,7 @@ while running:
             if player.rect.colliderect(
                 pygame.Rect(bush.rect.x - cam_x, bush.rect.y, bush.rect.width, bush.rect.height)
             ) and keys[pygame.K_e]:
-                berries = bush.collect()
+                berries = bush.collect(player)
                 
                 if berries:
                     inventory_resources.extend(berries)
@@ -505,7 +509,7 @@ while running:
             if player.rect.colliderect(
                 pygame.Rect(tree.rect.x - cam_x, tree.rect.y, tree.rect.width, tree.rect.height)
             ) and keys[pygame.K_e]:
-                fruit = tree.collect()
+                fruit = tree.collect(player)
                 
                 if fruit:
                     fruit_collect_text = font.render(f"Collected {len(fruit)} {tree.fruit}", True, (20, 255, 20))
@@ -727,13 +731,18 @@ while running:
 
 ############# END NOT INVENTORY IN USE #################
 ############# END NOT PAUSED #################
-
+    player.health_bar(screen)
+    player.stamina_bar(screen)
+    player.hunger_bar(screen)
+    player.exp_bar(screen)
+    player.water_bar(screen)
+    screen.blit(stat_holder_image, (20, 50))
+    player.handle_exp(screen, dt)
 
     if inventory_in_use:
 
         inventory.draw_inventory(screen)
         inventory.draw_items(screen)
-        screen.blit(temp_pause_surface, pause_menu_rect.topleft)
         screen.blit(hotbar_image, (width//2 - hotbar_image.get_width()//2, height - 100))
 
     if paused:

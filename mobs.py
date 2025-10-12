@@ -1,7 +1,8 @@
 import pygame
 import random
 
-
+font = pygame.font.Font(None, 24)
+large_font = pygame.font.Font(None, 40)
 class TempPlayerCollision:
                     def __init__(self, x, y, width, height):
                         self.rect = pygame.Rect(x - width//2, y - height//2, width, height)
@@ -26,12 +27,19 @@ class Player(pygame.sprite.Sprite):
         self.image.fill((0, 200, 0))
         self.rect = self.image.get_rect(center=(x, y)).inflate(-10, -20)
 
-        self.max_health = 100
+        self.health_leveler = 1
+        self.max_health = 100 * self.health_leveler
         self.health = 100
-        self.max_stamina = 100
+        self.stamina_leveler = 1
+        self.max_stamina = 100 * self.stamina_leveler
         self.stamina = 100
-        self.max_hunger = 100
+        self.hunger_leveler = 1
+        self.max_hunger = 100 * self.hunger_leveler
         self.hunger = 100
+        self.water_leveler = 1
+        self.max_water = 100 * self.water_leveler
+        self.water = 100
+        self.warmth_leveler = 1
         self.max_warmth = 100
         self.warmth = 100
         self.attack = 1
@@ -39,19 +47,134 @@ class Player(pygame.sprite.Sprite):
         self.defense = 1
         self.level = 1
         self.experience = 0
+        self.exp_total = 0
+        self.next_level_exp = 100 + (self.exp_total * 1.2)
+        self.level_up_timer = 0
 
         self.inventory = []
         self.is_alive = True
         self.is_attacking = False
         self.direction = pygame.Vector2(0, 0)
 
+    def handle_exp(self, screen, dt):
+        if self.experience >= self.next_level_exp:
+            self.experience -= self.next_level_exp
+            self.level_up(screen)
+
+        if self.level_up_timer > 0:
+            self.show_level_up_message(screen)
+            self.level_up_timer -= dt
+
+    def level_up(self, screen):
+            self.level += 1
+            self.exp_total += self.next_level_exp
+            self.next_level_exp = int(100 + (self.exp_total * 0.2))
+            self.level_up_timer = 10
+
+    def show_level_up_message(self, screen):
+        level_up_text = large_font.render(
+            f"Corynn leveled up to level {self.level}! Upgrade stats in inventory!",
+            True, (20, 255, 20)
+        )
+        screen.blit(level_up_text, (
+            screen.get_width() // 2 - level_up_text.get_width() // 2,
+            20
+        ))
+
+
     def feed_cat(self, cat):
         pass
 
-    def health_bar(self, max_health, health):
+    def health_bar(self, screen):
         max_health = self.max_health
         health = self.health
-        
+        bar_width = self.max_health * 2
+        bar_height = 18
+        x = 43
+        y = 64
+
+        health_ratio = health / max_health
+        health_width = int(bar_width * health_ratio)
+
+        pygame.draw.rect(screen, (60, 60, 60), pygame.Rect(x, y, bar_width, bar_height), border_radius=5)
+        if health_ratio > .4:
+            pygame.draw.rect(screen, (200, 40, 40), pygame.Rect(x, y, health_width, bar_height), border_radius=5)
+        else:
+            pygame.draw.rect(screen, (255, 80, 60), pygame.Rect(x, y, health_width, bar_height), border_radius=5)
+        pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=2, border_radius=5)
+
+    def stamina_bar(self, screen):
+        max_stamina = self.max_stamina
+        stamina = self.stamina
+        bar_width = max_stamina * 2
+        bar_height = 18
+        x = 43
+        y = 82
+
+        stamina_ratio = stamina / max_stamina
+        stamina_width = int(bar_width * stamina_ratio)
+
+        pygame.draw.rect(screen, (60, 60, 60), pygame.Rect(x, y, bar_width, bar_height), border_radius=5)
+        if stamina_ratio > .4:
+            pygame.draw.rect(screen, (140, 230, 100), pygame.Rect(x, y, stamina_width, bar_height), border_radius=5)
+        else:
+            pygame.draw.rect(screen, (90, 180, 60), pygame.Rect(x, y, stamina_width, bar_height), border_radius=5)
+        pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=2, border_radius=5)
+
+    def hunger_bar(self, screen):
+        max_hunger = self.max_hunger
+        hunger = self.hunger
+        bar_width = max_hunger * 2
+        bar_height = 18
+        x = 43
+        y = 100
+
+        hunger_ratio = hunger / max_hunger
+        hunger_width = int(bar_width * hunger_ratio)
+
+        pygame.draw.rect(screen, (60, 60, 60), pygame.Rect(x, y, bar_width, bar_height), border_radius=5)
+        if hunger_ratio > .4:
+            pygame.draw.rect(screen, (240, 128, 0), pygame.Rect(x, y, hunger_width, bar_height), border_radius=5)
+        else:
+            pygame.draw.rect(screen, (200, 100, 40), pygame.Rect(x, y, hunger_width, bar_height), border_radius=5)
+        pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=2, border_radius=5)
+
+    def water_bar(self, screen):
+        max_water = self.max_water
+        water = self.water
+        bar_width = self.max_water * 2
+        bar_height = 18
+        x = 43
+        y = 118
+
+        water_ratio = water / max_water
+        water_width = int(bar_width * water_ratio)
+
+        pygame.draw.rect(screen, (60, 60, 60), pygame.Rect(x, y, bar_width, bar_height), border_radius=5)
+        if water_ratio > .4:
+            pygame.draw.rect(screen, (0, 40, 255), pygame.Rect(x, y, water_width, bar_height), border_radius=5)
+        else:
+            pygame.draw.rect(screen, (100, 100, 255), pygame.Rect(x, y, water_width, bar_height), border_radius=5)
+        pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=2, border_radius=5)
+
+    def exp_bar(self, screen):
+        next_level_exp = self.next_level_exp
+        experience = self.experience
+        bar_width = 800
+        bar_height = 5
+        x = screen.get_width()//2 - 400
+        y = screen.get_height() - 105
+
+        experience_ratio = experience / next_level_exp
+        experience_width = int(bar_width * experience_ratio)
+
+        pygame.draw.rect(screen, (60, 60, 60), pygame.Rect(x, y, bar_width, bar_height), border_radius=5)
+        if experience_ratio < .97:
+            pygame.draw.rect(screen, (20, 255, 20), pygame.Rect(x, y, experience_width, bar_height), border_radius=5)
+        else:
+            pygame.draw.rect(screen, (160, 120, 255), pygame.Rect(x, y, experience_width, bar_height), border_radius=5)
+        pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=2, border_radius=5)
+
 
 
 class Mob(pygame.sprite.Sprite):

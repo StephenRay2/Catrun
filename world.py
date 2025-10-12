@@ -3,7 +3,7 @@ import random
 import time
 from mobs import Player
 
-clock = pygame.time.Clock
+clock = pygame.time.Clock()
 
 rock_images = ["/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock1.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock2.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock3.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock4.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock6.png"]
 
@@ -27,6 +27,8 @@ berry_bush_types = [
     {"image": "assets/sprites/biomes/grassland/VioBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareVioBerryBush.png", "berry": "Vio Berries", "resource": "stick"},
 ]
 
+collect_experience = 4
+harvest_experience = 4
 
 
 class Solid(pygame.sprite.Sprite):
@@ -58,7 +60,8 @@ class Solid(pygame.sprite.Sprite):
             
             if self.resource_amount <= 0:
                 self.destroyed = True
-            
+            player.experience += collect_experience * resource_collected
+            player.exp_total += collect_experience * resource_collected
             return [self.resource] * resource_collected
         return []
     
@@ -107,13 +110,15 @@ class BerryBush(pygame.sprite.Sprite):
         self.destroyed = False
         self.resource = "Sticks"
 
-    def collect(self):
+    def collect(self, player = None):
         if not self.is_empty and self.amount > 0:
             berry_count = self.amount
             self.amount = 0
             self.image = self.bare_image
             self.is_empty = True
             self.timer = 0
+            player.experience += collect_experience * berry_count
+            player.exp_total += collect_experience * berry_count
             return [self.berry] * berry_count
         return []
 
@@ -140,6 +145,8 @@ class BerryBush(pygame.sprite.Sprite):
         if not self.destroyed:
             resource_collected = random.randint(3, 7)
             self.destroyed = True
+            player.experience += collect_experience * resource_collected
+            player.exp_total += collect_experience * resource_collected
             return [self.resource] * resource_collected
         return []
     
@@ -176,23 +183,27 @@ class Tree(pygame.sprite.Sprite):
 
     def harvest(self, player=None):
         if not self.destroyed:
-            resource_collected = min(self.wood_amount, random.randint((2 * player.attack), (5 * player.attack)))
+            resource_collected = min(self.wood_amount, random.randint((1 * player.attack), (3 * player.attack)))
             self.wood_amount -= resource_collected
             
             if self.wood_amount <= 0:
                 self.destroyed = True
+            player.experience += collect_experience * resource_collected
+            player.exp_total += collect_experience * resource_collected
             
             return [self.resource] * resource_collected
         return []
 
 
-    def collect(self):
+    def collect(self, player = None):
         if not self.is_empty and self.amount > 0:
             fruit_count = self.amount
             self.amount = 0
             self.image = self.bare_image
             self.is_empty = True
             self.timer = 0
+            player.experience += collect_experience * fruit_count
+            player.exp_total += collect_experience * fruit_count
             return [self.fruit] * fruit_count
         return []
 
