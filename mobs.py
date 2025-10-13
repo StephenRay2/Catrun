@@ -54,12 +54,15 @@ class Player(pygame.sprite.Sprite):
         self.exp_total = 0
         self.next_level_exp = 100
         self.level_up_timer = 0
+        self.stamina_timer = 0
+        self.stamina_message_timer = 0
 
         self.inventory = []
         self.is_alive = True
         self.is_attacking = False
         self.direction = pygame.Vector2(0, 0)
 
+        self.exhausted = False
         self.dead = False
         self.score = 0
 
@@ -93,7 +96,6 @@ class Player(pygame.sprite.Sprite):
             screen.blit(temp_surface, (score_x - 5, score_y - 5))
             screen.blit(score_text, (score_x, score_y))
             
-
     def handle_exp(self, screen, dt):
         if self.experience >= self.next_level_exp:
             self.experience -= self.next_level_exp
@@ -126,43 +128,62 @@ class Player(pygame.sprite.Sprite):
                 if self.hunger > 0:
                     self.hunger -= dt / 30
 
-    def regain_stamina(self, dt):
+    def regain_stamina(self, dt, screen):
+        """Regenerates stamina after delay timer expires"""
+        # Count down the delay timer first
+        if self.stamina_timer > 0:
+            self.stamina_timer -= dt
+            return  # Don't recharge stamina yet
+        
+        # Only recharge once delay is over
         if self.stamina < self.max_stamina:
             if self.water == self.max_water:
                 self.stamina += dt * 16
-            elif self.water > self.max_water * .7:
+            elif self.water > self.max_water * 0.7:
                 self.stamina += dt * 10
-            elif self.water > self.max_water * .4:
+            elif self.water > self.max_water * 0.4:
                 self.stamina += dt * 6
-            elif self.water > self.max_water * .1:
+            elif self.water > self.max_water * 0.1:
                 self.stamina += dt * 2
             else:
                 self.stamina -= dt / 12
                 self.health -= dt / 12
-            if self.water == 100:
-                self.water_full_timer -= dt
-                if self.water_full_timer <= 0:
-                    self.water -= dt/100
-            else:
-                if self.water > 0:
-                    self.water -= dt / 30
+
+        if self.water == 100:
+            self.water_full_timer -= dt
+            if self.water_full_timer <= 0:
+                self.water -= dt / 100
+        elif self.water > 0:
+            self.water -= dt / 30
 
         if self.stamina > 10 and self.speed < 1:
-                self.speed = 1
+            self.speed = 1
 
 
-    def lose_stamina(self, dt):
+    def lose_stamina(self, screen, dt):
+        """Decreases stamina and returns True when it hits zero"""
+        stamina_depleted = False
         if self.stamina > 0:
             self.stamina -= dt * 6
-        
+            if self.stamina <= 0:
+                self.stamina = 0
+                stamina_depleted = True
+                self.stamina_timer = 2.0  # 2 second delay before recharging
+        return stamina_depleted
 
     def stamina_speed(self):
-        if self.stamina <= 10: 
+        if self.stamina <= 0:
+            self.speed = .3
+            self.exhausted = True
+        elif self.stamina <= 10: 
             self.speed = .4
+            self.exhausted = False
         elif self.stamina <= 20: 
             self.speed = .6
+            self.exhausted = False
         else:
             self.speed = 1
+            self.exhausted = False
 
     def lose_hunger(self, dt):
         if self.hunger > 0:

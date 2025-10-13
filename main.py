@@ -25,6 +25,7 @@ font = pygame.font.SysFont(None, 24)
 scroll = 0
 dungeon_traversal_speed = .1
 inventory = Inventory(64)
+stamina_depleted_message_timer = 0
 ############ PLAYER IMAGES #################
 
 player_stand_image = pygame.image.load("assets/sprites/player/CharacterCorynnFrontStanding.png")
@@ -418,7 +419,7 @@ while running:
 
     current_time = pygame.time.get_ticks()
         
-    if not paused and pygame.mouse.get_pressed()[0]:
+    if not paused and pygame.mouse.get_pressed()[0] and not player.exhausted:
         if current_time - harvest_cooldown > harvest_delay:
             harvest_cooldown = current_time
             for obj in visible_objects:
@@ -633,13 +634,14 @@ while running:
 
         if not inventory_in_use:
 
-            if (keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d] or pygame.mouse.get_pressed()[0]) and keys[pygame.K_LSHIFT]:
-                player.lose_stamina(dt)
+            if (((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]) and keys[pygame.K_LSHIFT]) or pygame.mouse.get_pressed()[0]) and not player.exhausted:
+                if player.lose_stamina(screen, dt):
+                    stamina_depleted_message_timer = 2.0
                 player.stamina_speed()
 
             if not (keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]):
                 if last_direction == "down":
-                    if pygame.mouse.get_pressed()[0]:
+                    if pygame.mouse.get_pressed()[0] and not player.exhausted:
                         player_animation_timer += dt
                         if player_animation_timer > .07:
                             player_frame_index = (player_frame_index + 1) % len(player_stand_attack_down_images)
@@ -648,7 +650,7 @@ while running:
                     else:
                         player_current_image = player_stand_image
                 elif last_direction == "up":
-                    if pygame.mouse.get_pressed()[0]:
+                    if pygame.mouse.get_pressed()[0] and not player.exhausted:
                         player_animation_timer += dt
                         if player_animation_timer > .07:
                             player_frame_index = (player_frame_index + 1) % len(player_stand_attack_up_images)
@@ -657,7 +659,7 @@ while running:
                     else:
                         player_current_image = player_stand_up
                 elif last_direction == "left":
-                    if pygame.mouse.get_pressed()[0]:
+                    if pygame.mouse.get_pressed()[0] and not player.exhausted:
                         player_animation_timer += dt
                         if player_animation_timer > .07:
                             player_frame_index = (player_frame_index + 1) % len(player_stand_attack_left_images)
@@ -666,7 +668,7 @@ while running:
                     else:
                         player_current_image = player_stand_left
                 elif last_direction == "right":
-                    if pygame.mouse.get_pressed()[0]:
+                    if pygame.mouse.get_pressed()[0] and not player.exhausted:
                         player_animation_timer += dt
                         if player_animation_timer > .07:
                             player_frame_index = (player_frame_index + 1) % len(player_stand_attack_right_images)
@@ -712,7 +714,7 @@ while running:
                     player_pos.x += player_speed * dt * shift_multiplier
                     dungeon_depth += dungeon_traversal_speed * shift_multiplier
 
-            if keys[pygame.K_d] and pygame.mouse.get_pressed()[0]:
+            if keys[pygame.K_d] and pygame.mouse.get_pressed()[0] and not player.exhausted:
                 last_direction = "right"
                 player_animation_timer += dt
                 if keys[pygame.K_LSHIFT]:
@@ -742,7 +744,7 @@ while running:
                         player_animation_timer = 0
             
 
-            elif keys[pygame.K_a] and pygame.mouse.get_pressed()[0]:
+            elif keys[pygame.K_a] and pygame.mouse.get_pressed()[0] and not player.exhausted:
                 last_direction = "left"
                 player_animation_timer += dt
                 if keys[pygame.K_LSHIFT]:
@@ -773,7 +775,7 @@ while running:
                         player_animation_timer = 0
 
 
-            elif keys[pygame.K_w] and pygame.mouse.get_pressed()[0]:
+            elif keys[pygame.K_w] and pygame.mouse.get_pressed()[0] and not player.exhausted:
                 last_direction = "up"
                 player_animation_timer += dt
                 if keys[pygame.K_LSHIFT]:
@@ -804,7 +806,7 @@ while running:
             
             
 
-            elif keys[pygame.K_s] and pygame.mouse.get_pressed()[0]:
+            elif keys[pygame.K_s] and pygame.mouse.get_pressed()[0] and not player.exhausted:
                 last_direction = "down"
                 player_animation_timer += dt
                 if keys[pygame.K_LSHIFT]:
@@ -865,11 +867,20 @@ while running:
     player.print_score(screen, dungeon_depth_high)
     player.is_dead(screen, dungeon_depth_high)
 
-
-    if not ((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d] or pygame.mouse.get_pressed()[0]) and keys[pygame.K_LSHIFT]):
-        player.regain_stamina(dt)
+    if (not ((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]) and keys[pygame.K_LSHIFT]) and not pygame.mouse.get_pressed()[0]) or player.exhausted:
+        player.regain_stamina(dt, screen)
         player.stamina_speed()
         player.lose_water(dt)
+        
+    if stamina_depleted_message_timer > 0:
+        tired_text = font.render("Too tired. Rest to regain stamina", True, (40, 255, 20))
+        x = screen.get_width()//2 - tired_text.get_width()//2
+        y = 20
+        temp_surface = pygame.Surface((tired_text.get_width() + 10, tired_text.get_height() + 10), pygame.SRCALPHA)
+        temp_surface.fill((0, 0, 0, 20))
+        screen.blit(temp_surface, (x - 5, y - 5))
+        screen.blit(tired_text, (x, y))
+        stamina_depleted_message_timer -= dt
 
 
     if inventory_in_use:
