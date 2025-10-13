@@ -3,6 +3,7 @@ import random
 
 font = pygame.font.Font(None, 24)
 large_font = pygame.font.Font(None, 40)
+xl_font = pygame.font.Font(None, 100)
 class TempPlayerCollision:
                     def __init__(self, x, y, width, height):
                         self.rect = pygame.Rect(x - width//2, y - height//2, width, height)
@@ -29,20 +30,23 @@ class Player(pygame.sprite.Sprite):
 
         self.health_leveler = 1
         self.max_health = 100 * self.health_leveler
-        self.health = 100
+        self.health = 10
         self.stamina_leveler = 1
         self.max_stamina = 100 * self.stamina_leveler
-        self.stamina = 100
+        self.stamina = 10
         self.hunger_leveler = 1
         self.max_hunger = 100 * self.hunger_leveler
-        self.hunger = 100
+        self.hunger = 0
+        self.full_timer = 60
         self.water_leveler = 1
         self.max_water = 100 * self.water_leveler
         self.water = 100
+        self.water_full_timer = 60
         self.warmth_leveler = 1
         self.max_warmth = 100
         self.warmth = 100
         self.attack = 1
+        self.base_speed = 350
         self.speed = 1
         self.defense = 1
         self.level = 1
@@ -56,6 +60,40 @@ class Player(pygame.sprite.Sprite):
         self.is_attacking = False
         self.direction = pygame.Vector2(0, 0)
 
+        self.dead = False
+        self.score = 0
+
+    def determine_score(self, dungeon_depth):
+        return int(self.exp_total / 100) + int(dungeon_depth)
+
+    def print_score(self, screen, dungeon_depth):
+        score_text = font.render(f"Score: {self.determine_score(dungeon_depth)}", True, (255, 255, 255))
+        x = screen.get_width() - score_text.get_width() - 20
+        y = 20
+        temp_surface = pygame.Surface((score_text.get_width() + 10, score_text.get_height() + 10), pygame.SRCALPHA)
+        temp_surface.fill((0, 0, 0, 100))
+        screen.blit(temp_surface, (x - 5, y - 5))
+        screen.blit(score_text, (x, y))
+        
+    def is_dead(self, screen, dungeon_depth):
+        game_over_text =xl_font.render("YOU DIED. GAME OVER.", True, (255, 20, 20))
+        score_text = large_font.render(f"Score: {self.determine_score(dungeon_depth)}", True, (255, 255, 255))
+        go_x = screen.get_width()//2 - game_over_text.get_width()//2
+        go_y = screen.get_height()//2 - game_over_text.get_height()//2 - 20
+        score_x = screen.get_width()//2 - score_text.get_width()//2
+        score_y = screen.get_height()//2 - score_text.get_height()//2 + 30
+        if self.health < 1:
+            self.dead = True
+            pause_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
+            pygame.draw.rect(pause_surface, (0, 0, 0, 150), screen.get_rect())
+            temp_surface = pygame.Surface((score_text.get_width() + 10, score_text.get_height() + 10), pygame.SRCALPHA)
+            temp_surface.fill((0, 0, 0, 100))
+            screen.blit(pause_surface, (0, 0))
+            screen.blit(game_over_text, (go_x, go_y - 30))
+            screen.blit(temp_surface, (score_x - 5, score_y - 5))
+            screen.blit(score_text, (score_x, score_y))
+            
+
     def handle_exp(self, screen, dt):
         if self.experience >= self.next_level_exp:
             self.experience -= self.next_level_exp
@@ -64,6 +102,88 @@ class Player(pygame.sprite.Sprite):
         if self.level_up_timer > 0:
             self.show_level_up_message(screen)
             self.level_up_timer -= dt
+
+    def get_speed(self):
+        return self.base_speed * self.speed
+
+    def regain_health(self, dt):
+        if 0 < self.health < self.max_health:
+            if self.hunger == self.max_hunger:
+                self.health += dt / 2
+            elif self.hunger > self.max_hunger * .7:
+                self.health += dt / 4
+            elif self.hunger > self.max_hunger * .4:
+                self.health += dt / 8
+            elif self.hunger > self.max_hunger * .1:
+                self.health += dt / 12
+            else:
+                self.health -= dt / 8
+            if self.hunger == 100:
+                self.full_timer -= dt
+                if self.full_timer <= 0:
+                    self.hunger -= dt/100
+            else:
+                if self.hunger > 0:
+                    self.hunger -= dt / 30
+
+    def regain_stamina(self, dt):
+        if self.stamina < self.max_stamina:
+            if self.water == self.max_water:
+                self.stamina += dt * 16
+            elif self.water > self.max_water * .7:
+                self.stamina += dt * 10
+            elif self.water > self.max_water * .4:
+                self.stamina += dt * 6
+            elif self.water > self.max_water * .1:
+                self.stamina += dt * 2
+            else:
+                self.stamina -= dt / 12
+                self.health -= dt / 12
+            if self.water == 100:
+                self.water_full_timer -= dt
+                if self.water_full_timer <= 0:
+                    self.water -= dt/100
+            else:
+                if self.water > 0:
+                    self.water -= dt / 30
+
+        if self.stamina > 10 and self.speed < 1:
+                self.speed = 1
+
+
+    def lose_stamina(self, dt):
+        if self.stamina > 0:
+            self.stamina -= dt * 6
+        
+
+    def stamina_speed(self):
+        if self.stamina <= 10: 
+            self.speed = .4
+        elif self.stamina <= 20: 
+            self.speed = .6
+        else:
+            self.speed = 1
+
+    def lose_hunger(self, dt):
+        if self.hunger > 0:
+            if self.hunger == 100:
+                self.full_timer -= dt
+                if self.full_timer <= 0:
+                    self.hunger -= dt/100
+            else:
+                self.hunger -= dt / 100
+                self.full_timer = 60
+            
+
+    def lose_water(self, dt):
+        if self.water > 0:
+            if self.water == 100:
+                self.water_full_timer -= dt
+                if self.water_full_timer <= 0:
+                    self.water -= dt/100
+            else:
+                self.water -= dt / 100
+                self.water_full_timer = 60
 
     def level_up(self, screen):
             self.level += 1
@@ -93,6 +213,7 @@ class Player(pygame.sprite.Sprite):
         ))
 
 
+
     def feed_cat(self, cat):
         pass
 
@@ -114,6 +235,13 @@ class Player(pygame.sprite.Sprite):
             pygame.draw.rect(screen, (255, 80, 60), pygame.Rect(x, y, health_width, bar_height), border_radius=5)
         pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=2, border_radius=5)
 
+        health_text = f"{int(health)} / {max_health}"
+        text_surface = font.render(health_text, True, (255, 255, 255))
+        text_x = x + (bar_width / 2) - (text_surface.get_width() / 2)
+        text_y = y + (bar_height / 2) - (text_surface.get_height() / 2)
+        
+        screen.blit(text_surface, (text_x, text_y))
+
     def stamina_bar(self, screen):
         max_stamina = self.max_stamina
         stamina = self.stamina
@@ -131,6 +259,14 @@ class Player(pygame.sprite.Sprite):
         else:
             pygame.draw.rect(screen, (90, 180, 60), pygame.Rect(x, y, stamina_width, bar_height), border_radius=5)
         pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=2, border_radius=5)
+
+        stamina_text = f"{int(stamina)} / {max_stamina}"
+        text_surface = font.render(stamina_text, True, (255, 255, 255))
+        text_x = x + (bar_width / 2) - (text_surface.get_width() / 2)
+        text_y = y + (bar_height / 2) - (text_surface.get_height() / 2)
+        
+        screen.blit(text_surface, (text_x, text_y))
+
 
     def hunger_bar(self, screen):
         max_hunger = self.max_hunger
@@ -150,6 +286,13 @@ class Player(pygame.sprite.Sprite):
             pygame.draw.rect(screen, (200, 100, 40), pygame.Rect(x, y, hunger_width, bar_height), border_radius=5)
         pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=2, border_radius=5)
 
+        hunger_text = f"{int(hunger)} / {max_hunger}"
+        text_surface = font.render(hunger_text, True, (255, 255, 255))
+        text_x = x + (bar_width / 2) - (text_surface.get_width() / 2)
+        text_y = y + (bar_height / 2) - (text_surface.get_height() / 2)
+        
+        screen.blit(text_surface, (text_x, text_y))
+
     def water_bar(self, screen):
         max_water = self.max_water
         water = self.water
@@ -167,6 +310,13 @@ class Player(pygame.sprite.Sprite):
         else:
             pygame.draw.rect(screen, (100, 100, 255), pygame.Rect(x, y, water_width, bar_height), border_radius=5)
         pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=2, border_radius=5)
+
+        water_text = f"{int(water)} / {max_water}"
+        text_surface = font.render(water_text, True, (255, 255, 255))
+        text_x = x + (bar_width / 2) - (text_surface.get_width() / 2)
+        text_y = y + (bar_height / 2) - (text_surface.get_height() / 2)
+        
+        screen.blit(text_surface, (text_x, text_y))
 
     def exp_bar(self, screen):
         next_level_exp = self.next_level_exp

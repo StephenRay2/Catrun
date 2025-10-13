@@ -20,9 +20,9 @@ world_x = 0.0
 floor_y = 0
 shift_multiplier = 1
 dungeon_depth = 0
+dungeon_depth_high = 0
 font = pygame.font.SysFont(None, 24)
 scroll = 0
-player_speed = 350
 dungeon_traversal_speed = .1
 inventory = Inventory(64)
 ############ PLAYER IMAGES #################
@@ -147,6 +147,7 @@ cam_x = 0
 cam_y = 0
 
 player = Player(width/2, height/2, "Corynn")
+
 
 allowed_rock_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_lavastone, bg_wasteland, bg_blackstone, bg_redrock]
 
@@ -397,7 +398,8 @@ inventory_resources = []
 ######################### GAME LOOP ################################
 
 while running:
-    
+    player_speed = player.get_speed()
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -497,7 +499,7 @@ while running:
     
 
 
-    if not paused:
+    if not paused and player.dead == False:
 
         for bush in berry_bushes:
             if player.rect.colliderect(
@@ -630,6 +632,11 @@ while running:
 ################# NOT INVENTORY IN USE #################
 
         if not inventory_in_use:
+
+            if (keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d] or pygame.mouse.get_pressed()[0]) and keys[pygame.K_LSHIFT]:
+                player.lose_stamina(dt)
+                player.stamina_speed()
+
             if not (keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]):
                 if last_direction == "down":
                     if pygame.mouse.get_pressed()[0]:
@@ -831,6 +838,7 @@ while running:
 
             if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
                 shift_multiplier = 1.5
+                
             else:
                 shift_multiplier = 1
 
@@ -845,6 +853,24 @@ while running:
     player.water_bar(screen)
     screen.blit(stat_holder_image, (20, 50))
     player.handle_exp(screen, dt)
+    player.regain_health(dt)
+    player.lose_hunger(dt)
+    player.lose_water(dt)
+   
+    
+    if dungeon_depth >= dungeon_depth_high:
+        dungeon_depth_high = dungeon_depth
+
+    player.determine_score(dungeon_depth_high)
+    player.print_score(screen, dungeon_depth_high)
+    player.is_dead(screen, dungeon_depth_high)
+
+
+    if not ((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d] or pygame.mouse.get_pressed()[0]) and keys[pygame.K_LSHIFT]):
+        player.regain_stamina(dt)
+        player.stamina_speed()
+        player.lose_water(dt)
+
 
     if inventory_in_use:
 
