@@ -63,23 +63,21 @@ cat_types = [
     {"type":"sandy", "walk_right_image1" : "assets/sprites/mobs/SandyCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/SandyCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/SandyCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/SandyCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/SandyCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/SandyCatRightStanding.png", "dead_image": "assets/sprites/mobs/SandyCatDead.png", "caged1": "sandy_cat_caged_left", "caged2": "sandy_cat_caged_right"}, 
     {"type":"orange", "walk_right_image1" : "assets/sprites/mobs/OrangeCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/OrangeCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/OrangeCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/OrangeCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/OrangeCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/OrangeCatRightStanding.png", "dead_image": "assets/sprites/mobs/OrangeCatDead.png", "caged1": "orange_cat_caged_left", "caged2": "orange_cat_caged_right"}, 
     {"type":"calico", "walk_right_image1" : "assets/sprites/mobs/CalicoCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/CalicoCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/CalicoCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/CalicoCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/CalicoCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/CalicoCatRightStanding.png", "dead_image": "assets/sprites/mobs/CalicoCatDead.png", "caged1": "calico_cat_caged_left", "caged2": "calico_cat_caged_right"}, 
-    {"type":"gray", "walk_right_image1" : "assets/sprites/mobs/GrayCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/GrayCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/GrayCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/GrayCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/GrayCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/GrayCatRightStanding.png", "dead_image": "assets/sprites/mobs/GrayCatDead.png", "caged1": "gray_cat_caged_left", "caged2": "gray_cat_caged_right"}]
+    {"type":"gray", "walk_right_image1" : "assets/sprites/mobs/GrayCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/GrayCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/GrayCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/GrayCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/GrayCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/GrayCatRightStanding.png", "dead_image": "assets/sprites/mobs/GrayCatDead.png", "caged1": "gray_cat_caged_left", "caged2": "gray_cat_caged_right"}, 
+    {"type":"white_and_orange", "walk_right_image1" : "assets/sprites/mobs/WandOCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/WandOCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/WandOCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/WandOCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/WandOCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/WandOCatRightStanding.png", "dead_image": "assets/sprites/mobs/WandOCatDead.png", "caged1": "WandO_cat_caged_left", "caged2": "WandO_cat_caged_right"}]
 
 
 squirrel_move_images = ["assets/sprites/mobs/SquirrelMove1.png", "assets/sprites/mobs/SquirrelMove2.png", "assets/sprites/mobs/SquirrelMove3.png", "assets/sprites/mobs/SquirrelMove4.png", "assets/sprites/mobs/SquirrelMove5.png", "assets/sprites/mobs/SquirrelMove6.png"]
-
 squirrel_stand_image = "assets/sprites/mobs/SquirrelStand1.png"
 
 crawler_idle_images = ["assets/sprites/mobs/CrawlerIdle1.png", "assets/sprites/mobs/CrawlerIdle2.png"]
-
 crawler_move_left_images = ["assets/sprites/mobs/CrawlerLeftWalk1.png", "assets/sprites/mobs/CrawlerLeftWalk2.png", "assets/sprites/mobs/CrawlerLeftWalk3.png", "assets/sprites/mobs/CrawlerLeftWalk4.png"]
-
 crawler_attack_left_images = ["assets/sprites/mobs/CrawlerAttack1.png", "assets/sprites/mobs/CrawlerAttack2.png", "assets/sprites/mobs/CrawlerAttack3.png", "assets/sprites/mobs/CrawlerAttack4.png"]
-
 crawler_dead_image_left = pygame.transform.scale(
     pygame.image.load("assets/sprites/mobs/CrawlerDead.png").convert_alpha(), (size, size))
-
 crawler_dead_image_right = pygame.transform.flip(crawler_dead_image_left, True, False)
+
+
 
 class Player(pygame.sprite.Sprite):
     def __init__(self, x, y, name):
@@ -610,6 +608,20 @@ class Cat(Mob):
         self.health = 100
         self.max_hunger = 100
         self.hunger = 100
+
+        self.dead_cat_right_image = pygame.image.load(self.cat_type["dead_image"]).convert_alpha()
+        self.dead_cat_left_image = pygame.transform.flip(self.dead_cat_right_image, True, False)
+
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
+        super().update(dt, player, nearby_objects, nearby_mobs)
+
+        
+
+        if not self.is_alive:
+            if self.last_direction == "right":
+                self.image = self.dead_cat_right_image
+            else:
+                self.image = self.dead_cat_left_image
 
     def tame_cat(self):
         pass
