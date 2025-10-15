@@ -1,8 +1,8 @@
 import pygame
 
 
-player_stand_image = pygame.image.load("assets/sprites/player/CharacterCorynnFrontStanding.png")
-player_stand_image = pygame.transform.scale(player_stand_image, (500, 500))
+player_inventory_image = pygame.image.load("assets/sprites/player/CharacterCorynnFrontStanding.png")
+player_inventory_image = pygame.transform.scale(player_inventory_image, (500, 500))
 
 image_path = "assets/sprites/items"
 
@@ -55,7 +55,7 @@ class Inventory():
         pygame.draw.rect(inventory_surface, (0, 0, 0, 150), screen.get_rect())
         screen.blit(inventory_surface, (0, 0))
         screen.blit(self.inventory_image, (x_pos, y_pos - 20))
-        screen.blit(player_stand_image, (700, 130))
+        screen.blit(player_inventory_image, (700, 130))
         
     def draw_items(self, screen):
         start_x = (screen.get_width() / 2 - self.inventory_image.get_width() / 2) + 17

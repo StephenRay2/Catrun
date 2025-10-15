@@ -1,16 +1,10 @@
 import pygame
 pygame.init()
-import sys
-import time, random, math
 from world import *
-from mobs import *
 from buttons import *
+from mob_placement import *
 
 
-
-screen = pygame.display.set_mode((1280, 720), pygame.FULLSCREEN)
-width = screen.get_width()
-height = screen.get_height()
 clock = pygame.time.Clock()
 from inventory import *
 running = True
@@ -26,341 +20,6 @@ scroll = 0
 dungeon_traversal_speed = .1
 inventory = Inventory(64)
 stamina_depleted_message_timer = 0
-############ PLAYER IMAGES #################
-
-player_stand_image = pygame.image.load("assets/sprites/player/CharacterCorynnFrontStanding.png")
-player_stand_image_back = pygame.image.load("assets/sprites/player/CharacterCorynnBackStanding.png")
-player_stand_left = pygame.image.load("assets/sprites/player/CharacterCorynnLeftStanding.png")
-player_stand_right = pygame.image.load("assets/sprites/player/CharacterCorynnRightStanding.png")
-player_walk_down_images = [pygame.image.load("assets/sprites/player/CorynnWalkDown1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown6.png").convert_alpha()]
-player_walk_up_images = [pygame.image.load("assets/sprites/player/CorynnWalkUp1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp6.png").convert_alpha()]
-player_walk_left_images = [pygame.image.load("assets/sprites/player/CorynnWalkLeft1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft6.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft7.png").convert_alpha()]
-player_stand_attack_down_images = [pygame.image.load("assets/sprites/player/CorynnFrontStandAttack1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnFrontStandAttack2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnFrontStandAttack3.png").convert_alpha()]
-player_stand_attack_up_images = [pygame.image.load("assets/sprites/player/CorynnBackStandAttack1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnBackStandAttack2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnBackStandAttack3.png").convert_alpha()]
-player_stand_attack_left_images = [pygame.image.load("assets/sprites/player/CorynnLeftStandAttack1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnLeftStandAttack2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnLeftStandAttack3.png").convert_alpha()]
-player_walk_down_attack_images = [pygame.image.load("assets/sprites/player/CorynnWalkDownAttack1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDownAttack2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDownAttack3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDownAttack4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDownAttack5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDownAttack6.png").convert_alpha()]
-player_walk_up_attack_images = [pygame.image.load("assets/sprites/player/CorynnWalkUpAttack1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUpAttack2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUpAttack3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUpAttack4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUpAttack5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUpAttack6.png").convert_alpha()]
-player_walk_left_attack_images = [pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack6.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack7.png").convert_alpha()] 
-
-player_stand_image = pygame.transform.scale(player_stand_image, (size, size))
-player_stand_up = pygame.transform.scale(player_stand_image_back, (size, size))
-player_stand_left = pygame.transform.scale(player_stand_left, (size, size))
-player_stand_right = pygame.transform.scale(player_stand_right, (size, size))
-player_walk_down_images = [pygame.transform.scale(img, (size, size)) for img in player_walk_down_images]
-player_walk_up_images = [pygame.transform.scale(img, (size, size)) for img in player_walk_up_images]
-player_walk_left_images = [pygame.transform.scale(img, (size, size)) for img in player_walk_left_images]
-player_walk_right_images = [pygame.transform.flip(img, True, False) for img in player_walk_left_images]
-player_stand_attack_down_images = [pygame.transform.scale(img, (size, size)) for img in player_stand_attack_down_images]
-player_stand_attack_up_images  = [pygame.transform.scale(img, (size, size)) for img in player_stand_attack_up_images]
-player_stand_attack_left_images  = [pygame.transform.scale(img, (size, size)) for img in player_stand_attack_left_images]
-player_stand_attack_right_images = [pygame.transform.flip(img, True, False) for img in player_stand_attack_left_images]
-player_walk_down_attack_images = [pygame.transform.scale(img, (size, size)) for img in player_walk_down_attack_images]
-player_walk_up_attack_images = [pygame.transform.scale(img, (size, size)) for img in player_walk_up_attack_images]
-player_walk_left_attack_images = [pygame.transform.scale(img, (size, size)) for img in player_walk_left_attack_images]
-player_walk_right_attack_images = [pygame.transform.flip(img, True, False) for img in player_walk_left_attack_images]
-
-
-player_frame_index = 0
-player_animation_timer = 0
-player_current_image = player_stand_image
-last_direction = "down"
-
-############ BACKGROUND IMAGES ####################
-
-
-bg_green = pygame.Surface((width, height))
-bg_grass = pygame.image.load("assets/sprites/biomes/backgrounds/bg_grass.png").convert()
-bg_dirt = pygame.image.load("assets/sprites/biomes/backgrounds/bg_dirt.png").convert()
-bg_compact = pygame.image.load("assets/sprites/biomes/backgrounds/bg_compact_dirt.png").convert()
-bg_sand = pygame.image.load("assets/sprites/biomes/backgrounds/bg_sand.png").convert()
-bg_savannah = pygame.image.load("assets/sprites/biomes/backgrounds/bg_savannah.png").convert()
-bg_riverrock = pygame.image.load("assets/sprites/biomes/backgrounds/bg_riverrock.png").convert()
-bg_bigrock = pygame.image.load("assets/sprites/biomes/backgrounds/bg_bigrock.png").convert()
-bg_duskstone = pygame.image.load("assets/sprites/biomes/backgrounds/bg_duskstone.png").convert()
-bg_lavastone = pygame.image.load("assets/sprites/biomes/backgrounds/bg_lavastone.png").convert()
-bg_snow = pygame.image.load("assets/sprites/biomes/backgrounds/bg_snow.png").convert()
-bg_wasteland = pygame.image.load("assets/sprites/biomes/backgrounds/bg_wasteland.png").convert()
-bg_blackstone = pygame.image.load("assets/sprites/biomes/backgrounds/bg_blackstone.png").convert()
-bg_redrock = pygame.image.load("assets/sprites/biomes/backgrounds/bg_redrock.png").convert()
-
-bg_dirt = pygame.transform.scale(bg_dirt, (width, height))
-bg_grass = pygame.transform.scale(bg_grass, (width, height))
-bg_compact = pygame.transform.scale(bg_compact, (width, height))
-bg_sand = pygame.transform.scale(bg_sand, (width, height))
-bg_savannah = pygame.transform.scale(bg_savannah, (width, height))
-bg_riverrock = pygame.transform.scale(bg_riverrock, (width, height))
-bg_bigrock = pygame.transform.scale(bg_bigrock, (width, height))
-bg_duskstone = pygame.transform.scale(bg_duskstone, (width, height))
-bg_lavastone = pygame.transform.scale(bg_lavastone, (width, height))
-bg_wasteland = pygame.transform.scale(bg_wasteland, (width, height))
-bg_snow = pygame.transform.scale(bg_snow, (width, height))
-bg_blackstone = pygame.transform.scale(bg_blackstone, (width, height))
-bg_redrock = pygame.transform.scale(bg_redrock, (width, height))
-bg_green.fill((0, 120, 0))
-
-player_pos = pygame.Vector2(screen.get_width()/2, screen.get_height()/2)
-
-background_image = bg_grass
-background_image = pygame.transform.scale(background_image, (width, height))
-
-
-BACKGROUND_SIZE = background_image.get_width()
-
-tiles = []
-for i in range(-1, 6):
-    tiles.append((i * BACKGROUND_SIZE, bg_grass))
-for i in range(6, 20):
-    tiles.append((i * BACKGROUND_SIZE, bg_dirt))
-for i in range(20, 40):
-    tiles.append((i * BACKGROUND_SIZE, bg_compact))
-for i in range(40, 60):
-    tiles.append((i * BACKGROUND_SIZE, bg_sand))
-for i in range(60, 86):
-    tiles.append((i * BACKGROUND_SIZE, bg_savannah))
-for i in range(86, 116):
-    tiles.append((i * BACKGROUND_SIZE, bg_riverrock))
-for i in range(116, 144):
-    tiles.append((i * BACKGROUND_SIZE, bg_bigrock))
-for i in range(144, 150):
-    tiles.append((i * BACKGROUND_SIZE, bg_grass))
-for i in range(150, 180):
-    tiles.append((i * BACKGROUND_SIZE, bg_duskstone))
-for i in range(180, 216):
-    tiles.append((i * BACKGROUND_SIZE, bg_lavastone))
-for i in range(216, 240):
-    tiles.append((i * BACKGROUND_SIZE, bg_wasteland))
-for i in range(240, 256):
-    tiles.append((i * BACKGROUND_SIZE, bg_dirt))
-for i in range(256, 290):
-    tiles.append((i * BACKGROUND_SIZE, bg_snow))
-for i in range(290, 340):
-    tiles.append((i * BACKGROUND_SIZE, bg_blackstone))
-for i in range(340, 380):
-    tiles.append((i * BACKGROUND_SIZE, bg_redrock))
-for i in range(380, 390):
-    tiles.append((i * BACKGROUND_SIZE, bg_grass))
-for i in range(390, 401):
-    tiles.append((i * BACKGROUND_SIZE, bg_redrock))
-
-
-
-cam_x = 0
-cam_y = 0
-
-player = Player(width/2, height/2, "Corynn")
-
-
-allowed_rock_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_lavastone, bg_wasteland, bg_blackstone, bg_redrock]
-
-rock_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_rock_tiles]
-
-rock_weights = {
-    bg_grass: 3,
-    bg_dirt: 2,
-    bg_compact: 1,
-    bg_savannah: 1,
-    bg_riverrock: 4,
-    bg_bigrock: 4,
-    bg_duskstone: 1,
-    bg_lavastone: 1,
-    bg_snow: 0,
-    bg_wasteland: 1,
-    bg_blackstone: 1,
-    bg_redrock: 1
-}
-
-weighted_rock_tiles = []
-for tile_x, tile_image in tiles:
-    weight = rock_weights.get(tile_image, 1)
-    weighted_rock_tiles.extend([(tile_x, tile_image)] * weight)
-
-rocks = []
-num_rocks = 2000
-for _ in range(num_rocks):
-    tile_x, tile_image = random.choice(weighted_rock_tiles)
-    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-    y = random.randint(0, height - 64)
-    rocks.append(Rock(x, y))
-
-rock_border_locations = [(0, i * 28) for i in range(28)] + [(512000, i * 28) for i in range(28)]
-
-for i, pos in enumerate(rock_border_locations):
-    x, y = pos
-    chosen_image = random.choice(rock_images)
-    rock = Rock(x, y)
-    rock.image = pygame.image.load(chosen_image).convert_alpha()
-    rock.image = pygame.transform.scale(rock.image, (64, 64))
-    rock.rect = rock.image.get_rect(topleft=(x, y))
-    rocks.append(rock)
-
-allowed_tree_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah]
-
-tree_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_tree_tiles]
-
-tree_weights = {
-    bg_grass: 30,
-    bg_dirt: 20,
-    bg_compact: 10,
-    bg_sand: 0,
-    bg_savannah: 10,
-    bg_riverrock: 0,
-    bg_bigrock: 0,
-    bg_duskstone: 0,
-    bg_lavastone: 0,
-    bg_snow: 0,
-    bg_wasteland: 1,
-    bg_blackstone: 0,
-    bg_redrock: 0
-
-}
-
-weighted_tree_tiles = []
-for tile_x, tile_image in tiles:
-    weight = tree_weights.get(tile_image, 1)
-    weighted_tree_tiles.extend([(tile_x, tile_image)] * weight)
-
-trees = []
-num_trees = 400
-for _ in range(num_trees):
-    tile_x, tile_image = random.choice(weighted_tree_tiles)
-    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-    y = random.randint(0, height - 64)
-    tree_type = random.choice(tree_types)
-    trees.append(Tree(x, y, tree_type))
-
-allowed_berry_bush_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah]
-
-berry_bush_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_berry_bush_tiles]
-
-berry_bush_weights = {
-    bg_grass: 30,
-    bg_dirt: 20,
-    bg_compact: 10,
-    bg_sand: 0,
-    bg_savannah: 10,
-    bg_riverrock: 0,
-    bg_bigrock: 0,
-    bg_duskstone: 0,
-    bg_lavastone: 0,
-    bg_snow: 0,
-    bg_wasteland: 1,
-    bg_blackstone: 0,
-    bg_redrock: 0
-
-}
-
-weighted_berry_bush_tiles = []
-for tile_x, tile_image in tiles:
-    weight = berry_bush_weights.get(tile_image, 1)
-    weighted_berry_bush_tiles.extend([(tile_x, tile_image)] * weight)
-
-berry_bushes = []
-num_bushes = 400
-for _ in range(num_bushes):
-    tile_x, tile_image = random.choice(weighted_berry_bush_tiles)
-    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-    y = random.randint(0, height - 64)
-    berry_bush_type = random.choice(berry_bush_types)
-    berry_bushes.append(BerryBush(x, y, berry_bush_type))
-
-allowed_boulder_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_lavastone, bg_wasteland, bg_blackstone, bg_redrock]
-boulder_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_boulder_tiles]
-
-boulder_weights = {
-    bg_grass: 2,
-    bg_dirt: 4,
-    bg_compact: 1,
-    bg_savannah: 1,
-    bg_riverrock: 4,
-    bg_bigrock: 4,
-    bg_duskstone: 3,
-    bg_lavastone: 1,
-    bg_snow: 0,
-    bg_wasteland: 3,
-    bg_blackstone: 2,
-    bg_redrock: 2
-}
-
-weighted_boulder_tiles = []
-for tile_x, tile_image in tiles:
-    weight = boulder_weights.get(tile_image, 1)
-    weighted_boulder_tiles.extend([(tile_x, tile_image)] * weight)
-
-boulders = []
-num_boulders = 300
-for _ in range(num_boulders):
-    tile_x, tile_image = random.choice(weighted_boulder_tiles)
-    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-    y = random.randint(0, height - 64)
-    boulders.append(Boulder(x, y))
-
-allowed_squirrel_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_snow, bg_wasteland]
-
-squirrel_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_squirrel_tiles]
-
-squirrel_spawn_weights = {
-    bg_grass: 3,
-    bg_dirt: 2,
-    bg_compact: 2,
-    bg_savannah: 2,
-    bg_riverrock: 0,
-    bg_bigrock: 0,
-    bg_duskstone: 0,
-    bg_lavastone: 0,
-    bg_snow: 1,
-    bg_wasteland: 1,
-    bg_blackstone: 0,
-    bg_redrock: 0
-
-}
-
-weighted_squirrel_tiles = []
-for tile_x, tile_image in tiles:
-    weight = squirrel_spawn_weights.get(tile_image, 1)
-    weighted_squirrel_tiles.extend([(tile_x, tile_image)] * weight)
-
-squirrels = []
-num_squirrels = 400
-for _ in range(num_squirrels):
-    tile_x, tile_image = random.choice(weighted_squirrel_tiles)
-    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-    y = random.randint(0, height - 64)
-    squirrels.append(Squirrel(x, y, "Squirrel"))
-
-allowed_cat_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_sand, bg_duskstone, bg_lavastone, bg_snow, bg_wasteland, bg_blackstone, bg_redrock]
-
-cat_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_cat_tiles]
-
-cat_spawn_weights = {
-    bg_grass: 2,
-    bg_dirt: 1,
-    bg_compact: 1,
-    bg_sand: 1,
-    bg_savannah: 2,
-    bg_riverrock: 1,
-    bg_bigrock: 1,
-    bg_duskstone: 1,
-    bg_lavastone: 1,
-    bg_snow: 1,
-    bg_wasteland: 1,
-    bg_blackstone: 1,
-    bg_redrock: 0
-
-}
-
-weighted_cat_tiles = []
-for tile_x, tile_image in tiles:
-    weight = cat_spawn_weights.get(tile_image, 1)
-    weighted_cat_tiles.extend([(tile_x, tile_image)] * weight)
-
-cats = []
-num_cats = 1000
-for _ in range(num_cats):
-    tile_x, tile_image = random.choice(weighted_cat_tiles)
-    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-    y = random.randint(0, height - 64)
-    cats.append(Cat(x, y, "Cat"))
-
 
 collection_message = None
 collection_timer = 0
@@ -429,13 +88,13 @@ while running:
                     horizontal_dist = abs(obj.rect.centerx - player_world_x)
                     vertical_dist = abs(obj.rect.centery - player_world_y)
                     
-                    if last_direction == "right" and obj.rect.centerx > player_world_x and horizontal_dist < 50 and vertical_dist < 40:
+                    if player.last_direction == "right" and obj.rect.centerx > player_world_x and horizontal_dist < 50 and vertical_dist < 40:
                         facing_object = True
-                    elif last_direction == "left" and obj.rect.centerx < player_world_x and horizontal_dist < 50 and vertical_dist < 40:
+                    elif player.last_direction == "left" and obj.rect.centerx < player_world_x and horizontal_dist < 50 and vertical_dist < 40:
                         facing_object = True
-                    elif last_direction == "up" and obj.rect.centery < player_world_y and vertical_dist < 50 and horizontal_dist < 40:
+                    elif player.last_direction == "up" and obj.rect.centery < player_world_y and vertical_dist < 50 and horizontal_dist < 40:
                         facing_object = True
-                    elif last_direction == "down" and obj.rect.centery > player_world_y and vertical_dist < 50 and horizontal_dist < 40:
+                    elif player.last_direction == "down" and obj.rect.centery > player_world_y and vertical_dist < 50 and horizontal_dist < 40:
                         facing_object = True
                     
                     if facing_object:
@@ -468,10 +127,10 @@ while running:
     keys = pygame.key.get_pressed()
 
     all_objects = rocks + trees + boulders + berry_bushes
-    mobs = cats + squirrels
+    mobs = cats + squirrels + crawlers
 
-    visible_objects = [obj for obj in all_objects if obj.rect.x - cam_x > -100 and obj.rect.x - cam_x < width + 100]
-    visible_mobs = [mob for mob in mobs if mob.rect.x - cam_x > -100 and mob.rect.x - cam_x < width + 100]
+    visible_objects = [obj for obj in all_objects if obj.rect.x - cam_x > -1000 and obj.rect.x - cam_x < width + 1000]
+    visible_mobs = [mob for mob in mobs if mob.rect.x - cam_x > -1000 and mob.rect.x - cam_x < width + 1000]
     visible_objects.extend(visible_mobs)
     visible_objects.sort(key=lambda obj: obj.rect.y + obj.rect.height)
 
@@ -490,11 +149,11 @@ while running:
     player.rect.center = (player_pos.x, player_pos.y)
         
     nearby_objects = [obj for obj in all_objects 
-                if abs(obj.rect.x - (player_pos.x + cam_x)) < 200 
-                and abs(obj.rect.y - player_pos.y) < 200]
+                if abs(obj.rect.x - (player_pos.x + cam_x)) < 1500 
+                and abs(obj.rect.y - player_pos.y) < 800]
     nearby_mobs = [mob for mob in mobs
-                if abs(mob.rect.x - (player_pos.x + cam_x)) < 200 
-                and abs(mob.rect.y - player_pos.y) < 200]
+                if abs(mob.rect.x - (player_pos.x + cam_x)) < 1500 
+                and abs(mob.rect.y - player_pos.y) < 800]
     
     screen.blit(hotbar_image, (width//2 - hotbar_image.get_width()//2, height - 100))
     
@@ -628,7 +287,21 @@ while running:
                             and abs(m.rect.x - mob.rect.x) < 100 
                             and abs(m.rect.y - mob.rect.y) < 100]
             
+        
+            if hasattr(mob, "enemy"):
+                mob.handle_player_proximity(dt, player_world_x, player_world_y, player=None,
+                                            nearby_objects=None, nearby_mobs=None)
+                mob.attack(player_world_x, player_world_y, player)
+
+                
+        
             mob.update(dt, None, mob_nearby_objects, mob_nearby_mobs)
+        player_world_x = player_pos.x + cam_x
+        player_world_y = player_pos.y
+        player.attacking(nearby_mobs, player_world_x, player_world_y)
+        for mob in nearby_mobs:
+            mob.handle_health(screen, cam_x, dt)
+
 
 ################# NOT INVENTORY IN USE #################
 
@@ -640,7 +313,7 @@ while running:
                 player.stamina_speed()
 
             if not (keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]):
-                if last_direction == "down":
+                if player.last_direction == "down":
                     if pygame.mouse.get_pressed()[0] and not player.exhausted:
                         player_animation_timer += dt
                         if player_animation_timer > .07:
@@ -649,7 +322,7 @@ while running:
                             player_animation_timer = 0
                     else:
                         player_current_image = player_stand_image
-                elif last_direction == "up":
+                elif player.last_direction == "up":
                     if pygame.mouse.get_pressed()[0] and not player.exhausted:
                         player_animation_timer += dt
                         if player_animation_timer > .07:
@@ -658,7 +331,7 @@ while running:
                             player_animation_timer = 0
                     else:
                         player_current_image = player_stand_up
-                elif last_direction == "left":
+                elif player.last_direction == "left":
                     if pygame.mouse.get_pressed()[0] and not player.exhausted:
                         player_animation_timer += dt
                         if player_animation_timer > .07:
@@ -667,7 +340,7 @@ while running:
                             player_animation_timer = 0
                     else:
                         player_current_image = player_stand_left
-                elif last_direction == "right":
+                elif player.last_direction == "right":
                     if pygame.mouse.get_pressed()[0] and not player.exhausted:
                         player_animation_timer += dt
                         if player_animation_timer > .07:
@@ -715,7 +388,7 @@ while running:
                     dungeon_depth += dungeon_traversal_speed * shift_multiplier
 
             if keys[pygame.K_d] and pygame.mouse.get_pressed()[0] and not player.exhausted:
-                last_direction = "right"
+                player.last_direction = "right"
                 player_animation_timer += dt
                 if keys[pygame.K_LSHIFT]:
                     if player_animation_timer > .04:
@@ -730,7 +403,7 @@ while running:
                         player_animation_timer = 0
 
             elif keys[pygame.K_d]:
-                last_direction = "right"
+                player.last_direction = "right"
                 player_animation_timer += dt
                 if keys[pygame.K_LSHIFT]:
                     if player_animation_timer > .04:
@@ -745,7 +418,7 @@ while running:
             
 
             elif keys[pygame.K_a] and pygame.mouse.get_pressed()[0] and not player.exhausted:
-                last_direction = "left"
+                player.last_direction = "left"
                 player_animation_timer += dt
                 if keys[pygame.K_LSHIFT]:
                     if player_animation_timer > .04:
@@ -760,7 +433,7 @@ while running:
                         player_animation_timer = 0
 
             elif keys[pygame.K_a]:
-                last_direction = "left"
+                player.last_direction = "left"
                 player_animation_timer += dt
                 if keys[pygame.K_LSHIFT]:
                     if player_animation_timer > .04:
@@ -776,7 +449,7 @@ while running:
 
 
             elif keys[pygame.K_w] and pygame.mouse.get_pressed()[0] and not player.exhausted:
-                last_direction = "up"
+                player.last_direction = "up"
                 player_animation_timer += dt
                 if keys[pygame.K_LSHIFT]:
                     if player_animation_timer > .04:
@@ -791,7 +464,7 @@ while running:
                         player_animation_timer = 0
 
             elif keys[pygame.K_w]:
-                last_direction = "up"
+                player.last_direction = "up"
                 player_animation_timer += dt
                 if keys[pygame.K_LSHIFT]:
                     if player_animation_timer > .04:
@@ -807,7 +480,7 @@ while running:
             
 
             elif keys[pygame.K_s] and pygame.mouse.get_pressed()[0] and not player.exhausted:
-                last_direction = "down"
+                player.last_direction = "down"
                 player_animation_timer += dt
                 if keys[pygame.K_LSHIFT]:
                     if player_animation_timer > .04:
@@ -822,7 +495,7 @@ while running:
                         player_animation_timer = 0
 
             elif keys[pygame.K_s]:
-                last_direction = "down"
+                player.last_direction = "down"
                 player_animation_timer += dt
                 if keys[pygame.K_LSHIFT]:
                     if player_animation_timer > .04:
@@ -883,6 +556,7 @@ while running:
         stamina_depleted_message_timer -= dt
 
 
+
     if inventory_in_use:
 
         inventory.draw_inventory(screen)
@@ -917,9 +591,5 @@ while running:
 
     pygame.display.flip()
     dt = clock.tick(60) / 1000
-
     
-
-    
-
 pygame.quit()
