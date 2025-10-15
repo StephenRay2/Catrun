@@ -63,8 +63,8 @@ class Solid(pygame.sprite.Sprite):
             
             if self.resource_amount <= 0:
                 self.destroyed = True
-            player.experience += collect_experience * resource_collected
-            player.exp_total += collect_experience * resource_collected
+            player.experience += harvest_experience * resource_collected
+            player.exp_total += harvest_experience * resource_collected
             return [self.resource] * resource_collected
         return []
     
@@ -146,10 +146,10 @@ class BerryBush(pygame.sprite.Sprite):
     
     def harvest(self, player=None):
         if not self.destroyed:
-            resource_collected = random.randint(3, 700)
+            resource_collected = random.randint(3, 9)
             self.destroyed = True
-            player.experience += collect_experience * resource_collected
-            player.exp_total += collect_experience * resource_collected
+            player.experience += harvest_experience * resource_collected
+            player.exp_total += harvest_experience * resource_collected
             return [self.resource] * resource_collected
         return []
     
@@ -161,43 +161,39 @@ class Tree(pygame.sprite.Sprite):
         self.full_image = pygame.transform.scale(
             pygame.image.load(tree_type["image"]).convert_alpha(), (tree_type["width"], tree_type["height"])
         )
-        
         if tree_type["bare_image"] is not None:
             self.bare_image = pygame.transform.scale(
                 pygame.image.load(tree_type["bare_image"]).convert_alpha(), (tree_type["width"], tree_type["height"])
             )
         else:
             self.bare_image = self.full_image
-        
         self.image = self.full_image
         self.rect = self.image.get_rect(topleft=(x, y))
         self.image_rect = self.rect.copy()
-        self.rect = pygame.Rect(self.rect.x, self.rect.y + 64, 64, 64)
-
+        collision_height = tree_type["height"] // 2
+        collision_y_offset = tree_type["height"] - collision_height
+        self.rect = pygame.Rect(self.rect.x, self.rect.y + collision_y_offset, tree_type["width"], collision_height)
+        
         self.fruit = tree_type["fruit"]
         self.amount = random.randint(5, 15) if self.fruit else 0
-
         self.regrow_time = 400 #(seconds)
         self.timer = 0
         self.is_empty = False
         self.destroyed = False
         self.resource = tree_type["wood"]
         self.wood_amount = random.randint(30, 60)
-
+        
     def harvest(self, player=None):
         if not self.destroyed:
             resource_collected = min(self.wood_amount, random.randint((1 * player.attack), (3 * player.attack)))
             self.wood_amount -= resource_collected
-            
             if self.wood_amount <= 0:
                 self.destroyed = True
-            player.experience += collect_experience * resource_collected
-            player.exp_total += collect_experience * resource_collected
-            
+            player.experience += harvest_experience * resource_collected
+            player.exp_total += harvest_experience * resource_collected
             return [self.resource] * resource_collected
         return []
-
-
+        
     def collect(self, player = None):
         if not self.is_empty and self.amount > 0:
             fruit_count = self.amount
@@ -209,7 +205,7 @@ class Tree(pygame.sprite.Sprite):
             player.exp_total += collect_experience * fruit_count
             return [self.fruit] * fruit_count
         return []
-
+        
     def update(self, dt):
         if self.is_empty:
             self.timer += dt
@@ -217,16 +213,18 @@ class Tree(pygame.sprite.Sprite):
                 self.amount = random.randint(5, 15)
                 self.image = self.full_image
                 self.is_empty = False
-
+                
     def draw(self, screen, cam_x):
         screen.blit(self.image, (self.image_rect.x - cam_x, self.image_rect.y))
-    
+        
     def get_collision_rect(self, cam_x):
+        # Create a thinner collision box centered on the trunk
+        # Make it 40% of the width for a thinner trunk feel
+        collision_width = int(self.rect.width * 0.4)
+        x_offset = (self.rect.width - collision_width) // 2
+        
         return pygame.Rect(
-            self.rect.x - cam_x + 10,
-            self.rect.y + (self.rect.height * .2),
-            self.rect.width - 20,
-            self.rect.height - 50
+            self.rect.x - cam_x + x_offset, self.rect.y + 10, collision_width, self.rect.height - 40
         )
     
 bg_green = pygame.Surface((width, height))

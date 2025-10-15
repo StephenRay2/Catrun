@@ -112,11 +112,17 @@ while running:
                             collection_messages[0][1].fill((0, 0, 0, 100))
                             if obj.destroyed:
                                 visible_objects.remove(obj)
+
+    
             
     rocks = [r for r in rocks if not r.destroyed]
     trees = [t for t in trees if not t.destroyed]
     boulders = [b for b in boulders if not b.destroyed]
     berry_bushes = [bush for bush in berry_bushes if not bush.destroyed]
+
+    cats = [cat for cat in cats if not cat.destroyed]
+    squirrels = [squirrel for squirrel in squirrels if not squirrel.destroyed]
+    crawlers = [crawler for crawler in crawlers if not crawler.destroyed]
 
         
     for tile_x, tile_image in tiles:
@@ -133,6 +139,10 @@ while running:
     visible_mobs = [mob for mob in mobs if mob.rect.x - cam_x > -1000 and mob.rect.x - cam_x < width + 1000]
     visible_objects.extend(visible_mobs)
     visible_objects.sort(key=lambda obj: obj.rect.y + obj.rect.height)
+
+    for mob in visible_objects:
+        if mob.destroyed:
+            visible_mobs.remove(obj)
 
     player_drawn = False
 
@@ -578,15 +588,23 @@ while running:
 
 
     if keys[pygame.K_i]:
-        target_depth = 10000
-        dungeon_depth = target_depth
+        dungeon_depth = 10000
         cam_x = 500000
         player_pos.x = width / 2
 
     if keys[pygame.K_o]:
-        target_depth = 5000
-        dungeon_depth = target_depth
+        dungeon_depth = 5000
         cam_x = 250000
+        player_pos.x = width / 2
+
+    if keys[pygame.K_p]:
+        dungeon_depth = 2000
+        cam_x = 100000
+        player_pos.x = width / 2
+
+    if keys[pygame.K_l]:
+        dungeon_depth = 6300
+        cam_x = 315000
         player_pos.x = width / 2
 
     pygame.display.flip()

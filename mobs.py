@@ -56,9 +56,14 @@ class TempPlayerCollision:
                         return pygame.Rect(self.rect.x - cam_x, self.rect.y, self.rect.width, self.rect.height)
 
 cat_types = [
-    {"type":"black", "walk_right_image1" : "assets/sprites/mobs/BlackCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/BlackCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/BlackCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/BlackCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/BlackCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/BlackCatRightStanding.png"}, 
-    {"type":"salt_and_pepper", "walk_right_image1" : "assets/sprites/mobs/SandPCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/SandPCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/SandPCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/SandPCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/SandPCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/SandPCatRightStanding.png"},
-    {"type":"white", "walk_right_image1" : "assets/sprites/mobs/WhiteCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/WhiteCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/WhiteCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/WhiteCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/WhiteCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/WhiteCatRightStanding.png"}, {"type":"white_and_black", "walk_right_image1" : "assets/sprites/mobs/WandBCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/WandBCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/WandBCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/WandBCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/WandBCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/WandBCatRightStanding.png"}, {"type":"sandy", "walk_right_image1" : "assets/sprites/mobs/SandyCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/SandyCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/SandyCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/SandyCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/SandyCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/SandyCatRightStanding.png"}, {"type":"orange", "walk_right_image1" : "assets/sprites/mobs/OrangeCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/OrangeCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/OrangeCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/OrangeCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/OrangeCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/OrangeCatRightStanding.png"}, {"type":"calico", "walk_right_image1" : "assets/sprites/mobs/CalicoCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/CalicoCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/CalicoCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/CalicoCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/CalicoCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/CalicoCatRightStanding.png"}]
+    {"type":"black", "walk_right_image1" : "assets/sprites/mobs/BlackCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/BlackCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/BlackCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/BlackCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/BlackCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/BlackCatRightStanding.png", "dead_image": "assets/sprites/mobs/BlackCatDead.png", "caged1": "black_cat_caged_left", "caged2": "black_cat_caged_right"}, 
+    {"type":"salt_and_pepper", "walk_right_image1" : "assets/sprites/mobs/SandPCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/SandPCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/SandPCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/SandPCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/SandPCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/SandPCatRightStanding.png", "dead_image": "assets/sprites/mobs/SandPCatDead.png", "caged1": "SandP_cat_caged_left", "caged2": "SandP_cat_caged_right"},
+    {"type":"white", "walk_right_image1" : "assets/sprites/mobs/WhiteCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/WhiteCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/WhiteCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/WhiteCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/WhiteCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/WhiteCatRightStanding.png", "dead_image": "assets/sprites/mobs/WhiteCatDead.png", "caged1": "white_cat_caged_left", "caged2": "white_cat_caged_right"}, 
+    {"type":"white_and_black", "walk_right_image1" : "assets/sprites/mobs/WandBCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/WandBCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/WandBCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/WandBCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/WandBCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/WandBCatRightStanding.png", "dead_image": "assets/sprites/mobs/WandBCatDead.png", "caged1": "WandB_cat_caged_left", "caged2": "WandB_cat_caged_right"}, 
+    {"type":"sandy", "walk_right_image1" : "assets/sprites/mobs/SandyCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/SandyCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/SandyCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/SandyCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/SandyCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/SandyCatRightStanding.png", "dead_image": "assets/sprites/mobs/SandyCatDead.png", "caged1": "sandy_cat_caged_left", "caged2": "sandy_cat_caged_right"}, 
+    {"type":"orange", "walk_right_image1" : "assets/sprites/mobs/OrangeCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/OrangeCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/OrangeCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/OrangeCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/OrangeCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/OrangeCatRightStanding.png", "dead_image": "assets/sprites/mobs/OrangeCatDead.png", "caged1": "orange_cat_caged_left", "caged2": "orange_cat_caged_right"}, 
+    {"type":"calico", "walk_right_image1" : "assets/sprites/mobs/CalicoCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/CalicoCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/CalicoCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/CalicoCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/CalicoCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/CalicoCatRightStanding.png", "dead_image": "assets/sprites/mobs/CalicoCatDead.png", "caged1": "calico_cat_caged_left", "caged2": "calico_cat_caged_right"}, 
+    {"type":"gray", "walk_right_image1" : "assets/sprites/mobs/GrayCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/GrayCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/GrayCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/GrayCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/GrayCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/GrayCatRightStanding.png", "dead_image": "assets/sprites/mobs/GrayCatDead.png", "caged1": "gray_cat_caged_left", "caged2": "gray_cat_caged_right"}]
 
 
 squirrel_move_images = ["assets/sprites/mobs/SquirrelMove1.png", "assets/sprites/mobs/SquirrelMove2.png", "assets/sprites/mobs/SquirrelMove3.png", "assets/sprites/mobs/SquirrelMove4.png", "assets/sprites/mobs/SquirrelMove5.png", "assets/sprites/mobs/SquirrelMove6.png"]
@@ -454,8 +459,10 @@ class Mob(pygame.sprite.Sprite):
         self.full_health = 100
         self.bar_timer = 0
         self.last_health = 0
-        self.harvestable = False
-        self.resource = []
+        self.resource = "Hide"
+        self.resource_amount = 3
+        self.destroyed = False
+
 
     def get_collision_rect(self, cam_x):
         rect = self.collision_rect or self.rect
@@ -559,17 +566,16 @@ class Mob(pygame.sprite.Sprite):
 
         if self.health <= 0:
             self.is_alive = False
-            self.harvestable = True
 
     def harvest(self, player=None):
-        if not self.destroyed:
+        if not self.destroyed and not self.is_alive:
             resource_collected = min(self.resource_amount, (1 * player.attack))
             self.resource_amount -= resource_collected
             
             if self.resource_amount <= 0:
                 self.destroyed = True
-            player.experience += collect_experience * resource_collected
-            player.exp_total += collect_experience * resource_collected
+            player.experience += harvest_experience * resource_collected
+            player.exp_total += harvest_experience * resource_collected
             return [self.resource] * resource_collected
         return []
 
@@ -715,6 +721,8 @@ class Crawler(Enemy):
         self.attack_damage = 3
         self.speed = 3.8
         self.health = 100
+        self.resource = "Hide"
+        self.resource_amount = random.randint(4, 9)
 
     def draw(self, screen, cam_x):
         screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
