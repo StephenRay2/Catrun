@@ -113,8 +113,11 @@ while running:
                             if obj.destroyed:
                                 visible_objects.remove(obj)
 
-    
-            
+    mushrooms = [m for m in mushrooms if not m.destroyed]
+    savannah_grasses = [sgrass for sgrass in savannah_grasses if not sgrass.destroyed]
+    grasses = [grass for grass in grasses if not grass.destroyed]
+    stones = [stone for stone in stones if not stone.destroyed]
+    sticks = [s for s in sticks if not s.destroyed]
     rocks = [r for r in rocks if not r.destroyed]
     trees = [t for t in trees if not t.destroyed]
     boulders = [b for b in boulders if not b.destroyed]
@@ -122,6 +125,8 @@ while running:
 
     cats = [cat for cat in cats if not cat.destroyed]
     squirrels = [squirrel for squirrel in squirrels if not squirrel.destroyed]
+    cows = [cow for cow in cows if not cow.destroyed]
+    chickens = [chicken for chicken in chickens if not chicken.destroyed]
     crawlers = [crawler for crawler in crawlers if not crawler.destroyed]
 
         
@@ -132,23 +137,30 @@ while running:
 
     keys = pygame.key.get_pressed()
 
+    collectibles = sticks + stones + grasses + savannah_grasses + mushrooms
     all_objects = rocks + trees + boulders + berry_bushes
-    mobs = cats + squirrels + crawlers
+    mobs = cats + squirrels + cows + chickens + crawlers
 
+    visible_collectibles = [col for col in collectibles if col.rect.x- cam_x > -1000 and col.rect.y - cam_x < width + 1000]
     visible_objects = [obj for obj in all_objects if obj.rect.x - cam_x > -1000 and obj.rect.x - cam_x < width + 1000]
     visible_mobs = [mob for mob in mobs if mob.rect.x - cam_x > -1000 and mob.rect.x - cam_x < width + 1000]
     visible_objects.extend(visible_mobs)
+    visible_objects.extend(visible_collectibles)
     visible_objects.sort(key=lambda obj: obj.rect.y + obj.rect.height)
 
     for mob in visible_objects:
         if mob.destroyed:
             visible_mobs.remove(obj)
 
+    for col in visible_objects:
+        if col.destroyed:
+            collectibles.remove(col)
+
     player_drawn = False
 
     for obj in visible_objects:
         object_mid_y = obj.rect.y + obj.rect.height / 2
-        if not player_drawn and player.rect.centery <= object_mid_y:
+        if not player_drawn and (player.rect.centery + 20) <= object_mid_y:
             screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size/2))
             player_drawn = True
         obj.draw(screen, cam_x)
@@ -203,6 +215,25 @@ while running:
                         fruit_collect_text,
                         pygame.Surface((fruit_collect_text.get_width() + 10, fruit_collect_text.get_height() + 10), pygame.SRCALPHA),
                         pygame.Rect(20, 500, fruit_collect_text.get_width(), fruit_collect_text.get_height()),
+                        3.0,
+                        1.0
+                    ])
+                    collection_messages[0][1].fill((0, 0, 0, 100))
+
+        for col in collectibles:
+            if player.rect.colliderect(
+                pygame.Rect(col.rect.x - cam_x, col.rect.y, col.rect.width, col.rect.height)
+            ) and keys[pygame.K_e]:
+                resources = col.collect(player)
+                
+                if resources:
+                    inventory_resources.extend(resources)
+                    resource_collect_text = font.render(f"Collected {len(resources)} {col.resource}", True, (20, 255, 20))
+                    
+                    collection_messages.insert(0, [
+                        resource_collect_text,
+                        pygame.Surface((resource_collect_text.get_width() + 10, resource_collect_text.get_height() + 10), pygame.SRCALPHA),
+                        pygame.Rect(20, 500, resource_collect_text.get_width(), resource_collect_text.get_height()),
                         3.0,
                         1.0
                     ])
@@ -306,11 +337,13 @@ while running:
                 
         
             mob.update(dt, None, mob_nearby_objects, mob_nearby_mobs)
+            mob.keep_in_screen(height)
         player_world_x = player_pos.x + cam_x
         player_world_y = player_pos.y
         player.attacking(nearby_mobs, player_world_x, player_world_y)
         for mob in nearby_mobs:
             mob.handle_health(screen, cam_x, dt)
+            mob.flee(player_world_x, player_world_y, dt)
 
 
 ################# NOT INVENTORY IN USE #################

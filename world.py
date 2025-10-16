@@ -22,13 +22,67 @@ savannah_tree_types = [{"type": "Orange Tree", "image": "assets/sprites/biomes/g
 boulder_images = ["assets/sprites/biomes/grassland/Boulder1.png", "assets/sprites/biomes/grassland/Boulder2.png", "assets/sprites/biomes/grassland/Boulder3.png", "assets/sprites/biomes/grassland/Boulder4.png", "assets/sprites/biomes/grassland/Boulder5.png", "assets/sprites/biomes/grassland/Boulder6.png", "assets/sprites/biomes/grassland/Boulder7.png", ]
 
 berry_bush_types = [
-    {"image": "assets/sprites/biomes/grassland/BloodBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareBloodBerryBush.png", "berry": "Blood Berries", "resource": "stick"},
-    {"image": "assets/sprites/biomes/grassland/DawnBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareDawnBerryBush.png", "berry": "Dawn Berries", "resource": "stick"},
-    {"image": "assets/sprites/biomes/grassland/DuskBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareDuskBerryBush.png", "berry": "Dusk Berries", "resource": "stick"},
-    {"image": "assets/sprites/biomes/grassland/SunBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareSunBerryBush.png", "berry": "Sun Berries", "resource": "stick"},
-    {"image": "assets/sprites/biomes/grassland/TealBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareTealBerryBush.png", "berry": "Teal Berries", "resource": "stick"},
-    {"image": "assets/sprites/biomes/grassland/TwilightDrupesBush.png", "bare_image": "assets/sprites/biomes/grassland/BareTwilightDrupesBush.png", "berry": "Twilight Drupes", "resource": "stick"},
-    {"image": "assets/sprites/biomes/grassland/VioBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareVioBerryBush.png", "berry": "Vio Berries", "resource": "stick"},
+    {"image": "assets/sprites/biomes/grassland/BloodBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareBloodBerryBush.png", "berry": "Blood Berries", "resource": "Sticks"},
+    {"image": "assets/sprites/biomes/grassland/DawnBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareDawnBerryBush.png", "berry": "Dawn Berries", "resource": "Sticks"},
+    {"image": "assets/sprites/biomes/grassland/DuskBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareDuskBerryBush.png", "berry": "Dusk Berries", "resource": "Sticks"},
+    {"image": "assets/sprites/biomes/grassland/SunBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareSunBerryBush.png", "berry": "Sun Berries", "resource": "Sticks"},
+    {"image": "assets/sprites/biomes/grassland/TealBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareTealBerryBush.png", "berry": "Teal Berries", "resource": "Sticks"},
+    {"image": "assets/sprites/biomes/grassland/TwilightDrupesBush.png", "bare_image": "assets/sprites/biomes/grassland/BareTwilightDrupesBush.png", "berry": "Twilight Drupes", "resource": "Sticks"},
+    {"image": "assets/sprites/biomes/grassland/VioBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareVioBerryBush.png", "berry": "Vio Berries", "resource": "Sticks"},
+]
+
+stick_data = [
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image1": "assets/sprites/biomes/grassland/Stick1.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image2": "assets/sprites/biomes/grassland/Stick2.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image3": "assets/sprites/biomes/grassland/Stick3.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image4": "assets/sprites/biomes/grassland/Stick4.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image5": "assets/sprites/biomes/grassland/Stick5.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image6": "assets/sprites/biomes/grassland/Stick6.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image7": "assets/sprites/biomes/grassland/Stick7.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image8": "assets/sprites/biomes/grassland/Stick8.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image9": "assets/sprites/biomes/grassland/Stick9.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image10": "assets/sprites/biomes/grassland/Stick10.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image11": "assets/sprites/biomes/grassland/Stick11.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image12": "assets/sprites/biomes/grassland/Stick12.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image13": "assets/sprites/biomes/grassland/Stick13.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image14": "assets/sprites/biomes/grassland/Stick14.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image15": "assets/sprites/biomes/grassland/Stick15.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image16": "assets/sprites/biomes/grassland/Stick16.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image17": "assets/sprites/biomes/grassland/Stick17.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image18": "assets/sprites/biomes/grassland/Stick18.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image19": "assets/sprites/biomes/grassland/Stick19.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Stick.png", "image20": "assets/sprites/biomes/grassland/Stick20.png"}
+ ]
+
+stone_data = [
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image1": "assets/sprites/biomes/grassland/Stone1.png"},
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image2": "assets/sprites/biomes/grassland/Stone2.png"},
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image3": "assets/sprites/biomes/grassland/Stone3.png"},
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image4": "assets/sprites/biomes/grassland/Stone4.png"},
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image5": "assets/sprites/biomes/grassland/Stone5.png"},
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image6": "assets/sprites/biomes/grassland/Stone6.png"},
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image7": "assets/sprites/biomes/grassland/Stone7.png"},
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image8": "assets/sprites/biomes/grassland/Stone8.png"},
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image9": "assets/sprites/biomes/grassland/Stone9.png"},
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image10": "assets/sprites/biomes/grassland/Stone10.png"}
+]
+
+mushroom_data = [
+    {"resource": "Poisonous Mushroom", "icon": "assets/sprites/items/PoisonousMushroom.png", "image1": "assets/sprites/biomes/grassland/PoisonousMushroom.png"}
+]
+
+grass_data = [
+    {"resource": "Fiber", "icon": "assets/sprites/items/Grass.png", "image1": "assets/sprites/biomes/grassland/Grass1.png"},
+    {"resource": "Fiber", "icon": "assets/sprites/items/Grass.png", "image2": "assets/sprites/biomes/grassland/Grass2.png"},
+    {"resource": "Fiber", "icon": "assets/sprites/items/Grass.png", "image3": "assets/sprites/biomes/grassland/Grass3.png"},
+    {"resource": "Fiber", "icon": "assets/sprites/items/Grass.png", "image4": "assets/sprites/biomes/grassland/Grass4.png"}
+]
+
+savannah_grass_data = [
+    {"resource": "Fiber", "icon": "assets/sprites/items/SavannahGrass.png", "image1": "assets/sprites/biomes/grassland/SavannahGrass1.png"},
+    {"resource": "Fiber", "icon": "assets/sprites/items/SavannahGrass.png", "image2": "assets/sprites/biomes/grassland/SavannahGrass2.png"},
+    {"resource": "Fiber", "icon": "assets/sprites/items/SavannahGrass.png", "image3": "assets/sprites/biomes/grassland/SavannahGrass3.png"},
+    {"resource": "Fiber", "icon": "assets/sprites/items/SavannahGrass.png", "image4": "assets/sprites/biomes/grassland/SavannahGrass4.png"}
 ]
 
 collect_experience = 1
@@ -51,7 +105,7 @@ class Solid(pygame.sprite.Sprite):
     def get_collision_rect(self, cam_x):
         return pygame.Rect(
             self.rect.x - cam_x + 10,
-            self.rect.y + (self.rect.height * .2),
+            self.rect.y + (self.rect.height * .22),
             self.rect.width - 20,
             self.rect.height - 50
         )
@@ -83,7 +137,7 @@ class Boulder(Solid):
         img = random.choice(boulder_images)
         super().__init__(img, x, y, (128, 128))
         self.image_rect = self.rect.copy()
-        self.rect = pygame.Rect(self.rect.x, self.rect.y + 40, 128, 88)
+        self.rect = pygame.Rect(self.rect.x, self.rect.y + 50, 128, 96)
         self.resource = "Stone"
         self.resource_amount = random.randint(40, 80)
     
@@ -138,10 +192,10 @@ class BerryBush(pygame.sprite.Sprite):
     
     def get_collision_rect(self, cam_x):
         return pygame.Rect(
-            self.rect.x - cam_x + 10,
-            self.rect.y + (self.rect.height * .2),
-            self.rect.width - 20,
-            self.rect.height - 50
+            self.rect.x - cam_x + 15,
+            self.rect.y + (self.rect.height * .4),
+            self.rect.width - 35,
+            self.rect.height - 40
         )
     
     def harvest(self, player=None):
@@ -218,15 +272,75 @@ class Tree(pygame.sprite.Sprite):
         screen.blit(self.image, (self.image_rect.x - cam_x, self.image_rect.y))
         
     def get_collision_rect(self, cam_x):
-        # Create a thinner collision box centered on the trunk
-        # Make it 40% of the width for a thinner trunk feel
+        collision_width = int(self.rect.width * 0.4)
+        x_offset = (self.rect.width - collision_width) // 2
+        
+        return pygame.Rect(
+            self.rect.x - cam_x + x_offset, self.rect.y + 15, collision_width, self.rect.height - 30
+        )
+    
+class Collectible(pygame.sprite.Sprite):
+    def __init__(self, x, y, image, resource, size=(48, 48)):
+        super().__init__()
+        self.x = x
+        self.y = y
+        self.image = pygame.transform.scale(pygame.image.load(image).convert_alpha(), size)
+        self.rect = self.image.get_rect(topleft=(x, y))
+        self.resource = resource
+        self.amount = 1
+        self.destroyed = False
+
+    def get_collision_rect(self, cam_x):
         collision_width = int(self.rect.width * 0.4)
         x_offset = (self.rect.width - collision_width) // 2
         
         return pygame.Rect(
             self.rect.x - cam_x + x_offset, self.rect.y + 10, collision_width, self.rect.height - 40
         )
-    
+        
+
+    def collect(self, player=None):
+        if not self.destroyed and self.amount > 0:
+            self.destroyed = True
+            if player:
+                player.experience += collect_experience
+                player.exp_total += collect_experience
+            return [self.resource] * self.amount
+        return []
+
+    def draw(self, screen, cam_x):
+        if not self.destroyed:
+            screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
+
+class Stick(Collectible):
+    def __init__(self, x, y):
+        image_index = random.randint(1, 20)
+        image_path = f"assets/sprites/biomes/grassland/Stick{image_index}.png"
+        super().__init__(x, y, image_path, "Sticks", size=(40, 40))
+
+class Stone(Collectible):
+    def __init__(self, x, y):
+        image_index = random.randint(1, 10)
+        image_path = f"assets/sprites/biomes/grassland/Stone{image_index}.png"
+        super().__init__(x, y, image_path, "Stone", size=(25, 25))
+        
+class Grass(Collectible):
+    def __init__(self, x, y):
+        image_index = random.randint(1, 4)
+        image_path = f"assets/sprites/biomes/grassland/Grass{image_index}.png"
+        super().__init__(x, y, image_path, "Fiber", size=(64, 64))
+
+class SavannahGrass(Collectible):
+    def __init__(self, x, y):
+        self.amount = random.randint(3, 6)
+        image_index = random.randint(1, 4)
+        image_path = f"assets/sprites/biomes/grassland/SavannahGrass{image_index}.png"
+        super().__init__(x, y, image_path, "Fiber", size=(64, 64))
+
+class PoisonousMushroom(Collectible):
+    def __init__(self, x, y):
+        super().__init__(x, y, "assets/sprites/biomes/grassland/PoisonousMushroom.png", "Poisonous Mushrooms", size=(20, 20))
+
 bg_green = pygame.Surface((width, height))
 bg_grass = pygame.image.load("assets/sprites/biomes/backgrounds/bg_grass.png").convert()
 bg_dirt = pygame.image.load("assets/sprites/biomes/backgrounds/bg_dirt.png").convert()
@@ -469,3 +583,165 @@ for _ in range(num_boulders):
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
     boulders.append(Boulder(x, y))
+
+allowed_stick_tiles = [bg_grass, bg_dirt, bg_compact, bg_sand, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_wasteland, bg_blackstone, bg_redrock]
+
+stick_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_stick_tiles]
+
+stick_weights = {
+    bg_grass: 3,
+    bg_dirt: 2,
+    bg_compact: 1,
+    bg_sand: 1,
+    bg_savannah: 3,
+    bg_riverrock: 1,
+    bg_bigrock: 1,
+    bg_duskstone: 1,
+    bg_lavastone: 0,
+    bg_snow: 0,
+    bg_wasteland: 2,
+    bg_blackstone: 1,
+    bg_redrock: 1
+
+}
+
+weighted_stick_tiles = []
+for tile_x, tile_image in tiles:
+    weight = stick_weights.get(tile_image, 1)
+    weighted_stick_tiles.extend([(tile_x, tile_image)] * weight)
+
+sticks = []
+num_sticks = 1000
+for _ in range(num_sticks):
+    tile_x, tile_image = random.choice(weighted_stick_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    sticks.append(Stick(x, y))
+
+
+allowed_stone_tiles = [bg_grass, bg_dirt, bg_compact, bg_sand, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_wasteland, bg_blackstone, bg_redrock]
+
+stone_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_stone_tiles]
+
+stone_weights = {
+    bg_grass: 3,
+    bg_dirt: 2,
+    bg_compact: 1,
+    bg_sand: 1,
+    bg_savannah: 3,
+    bg_riverrock: 1,
+    bg_bigrock: 1,
+    bg_duskstone: 1,
+    bg_lavastone: 0,
+    bg_snow: 0,
+    bg_wasteland: 2,
+    bg_blackstone: 1,
+    bg_redrock: 1
+
+}
+
+weighted_stone_tiles = []
+for tile_x, tile_image in tiles:
+    weight = stone_weights.get(tile_image, 1)
+    weighted_stone_tiles.extend([(tile_x, tile_image)] * weight)
+
+stones = []
+num_stones = 1000
+for _ in range(num_stones):
+    tile_x, tile_image = random.choice(weighted_stone_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    stones.append(Stone(x, y))
+
+allowed_grass_tiles = [bg_grass, bg_dirt, bg_compact]
+
+grass_weights = {
+    bg_grass: 10,
+    bg_dirt: 5,
+    bg_compact: 3,
+    bg_sand: 0,
+    bg_savannah: 0,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 0,
+    bg_lavastone: 0,
+    bg_snow: 0,
+    bg_wasteland: 0,
+    bg_blackstone: 0,
+    bg_redrock: 0
+}
+
+weighted_grass_tiles = []
+for tile_x, tile_image in tiles:
+    weight = grass_weights.get(tile_image, 1)
+    weighted_grass_tiles.extend([(tile_x, tile_image)] * weight)
+
+grasses = []
+num_grasses = 1500
+for _ in range(num_grasses):
+    tile_x, tile_image = random.choice(weighted_grass_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    grasses.append(Grass(x, y))
+
+allowed_savannah_grass_tiles = [bg_savannah]
+
+savannah_grass_weights = {
+    bg_grass: 0,
+    bg_dirt: 0,
+    bg_compact: 0,
+    bg_sand: 0,
+    bg_savannah: 10,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 0,
+    bg_lavastone: 0,
+    bg_snow: 0,
+    bg_wasteland: 0,
+    bg_blackstone: 0,
+    bg_redrock: 0
+}
+
+weighted_savannah_grass_tiles = []
+for tile_x, tile_image in tiles:
+    weight = savannah_grass_weights.get(tile_image, 1)
+    weighted_savannah_grass_tiles.extend([(tile_x, tile_image)] * weight)
+
+savannah_grasses = []
+num_savannah_grasses = 1600
+for _ in range(num_savannah_grasses):
+    tile_x, tile_image = random.choice(weighted_savannah_grass_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    savannah_grasses.append(SavannahGrass(x, y))
+
+allowed_mushroom_tiles = [bg_grass, bg_dirt, bg_compact, bg_duskstone, bg_wasteland]
+
+mushroom_weights = {
+    bg_grass: 5,
+    bg_dirt: 3,
+    bg_compact: 2,
+    bg_sand: 0,
+    bg_savannah: 0,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 8,
+    bg_lavastone: 0,
+    bg_snow: 0,
+    bg_wasteland: 6,
+    bg_blackstone: 0,
+    bg_redrock: 0
+}
+
+weighted_mushroom_tiles = []
+for tile_x, tile_image in tiles:
+    weight = mushroom_weights.get(tile_image, 1)
+    weighted_mushroom_tiles.extend([(tile_x, tile_image)] * weight)
+
+mushrooms = []
+num_mushrooms = 100
+for _ in range(num_mushrooms):
+    tile_x, tile_image = random.choice(weighted_mushroom_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    mushrooms.append(PoisonousMushroom(x, y))

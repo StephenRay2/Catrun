@@ -22,8 +22,10 @@ items_list = [
     {"item_name" : "Twilight Drupes", "icon": "TwilightDrupes.png", "stack_size": 100, "weight": .05},
     {"item_name" : "Vio Berries", "icon": "VioBerries.png", "stack_size": 100, "weight": .05},
     
-    {"item_name" : "Stone", "icon": "Stone.png", "stack_size": 100, "weight": 1},
-    {"item_name" : "Sticks", "icon": "Stick.png", "stack_size": 100, "weight": .1},
+    {"item_name" : "Stone", "icon": "Stone.png", "stack_size": 100, "weight": .5},
+    {"item_name" : "Sticks", "icon": "Stick.png", "stack_size": 100, "weight": .2},
+    {"item_name" : "Poisonous Mushrooms", "icon": "PoisonousMushroom.png", "stack_size": 100, "weight": .1},
+    {"item_name" : "Fiber", "icon": "Fiber.png", "stack_size": 100, "weight": .01},
 
     {"item_name" : "Fence", "icon": "Fence.png", "stack_size": 100, "weight": 6},
     {"item_name" : "Empty Cage", "icon": "EmptyCage.png", "stack_size": 1, "weight": 8},
