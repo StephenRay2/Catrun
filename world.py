@@ -6,6 +6,31 @@ screen = pygame.display.set_mode((1280, 720), pygame.FULLSCREEN)
 width = screen.get_width()
 height = screen.get_height()
 clock = pygame.time.Clock()
+state = "menu"
+
+num_rocks = 2000
+num_boulders = 300
+num_bushes = 400
+num_grassland_trees = 600
+num_savannah_trees = 100
+num_grasses = 1500
+num_sticks = 1000
+num_stones = 1000
+num_savannah_grasses = 1600
+num_mushrooms = 100
+num_dead_bushes = 1000
+
+rocks = []
+dead_bushes = []
+grasses = []
+stones = []
+boulders = []
+berry_bushes = []
+trees = []
+sticks = []
+savannah_grasses = []
+mushrooms = []
+
 
 rock_images = ["/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock1.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock2.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock3.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock4.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock6.png"]
 
@@ -29,6 +54,14 @@ berry_bush_types = [
     {"image": "assets/sprites/biomes/grassland/TealBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareTealBerryBush.png", "berry": "Teal Berries", "resource": "Sticks"},
     {"image": "assets/sprites/biomes/grassland/TwilightDrupesBush.png", "bare_image": "assets/sprites/biomes/grassland/BareTwilightDrupesBush.png", "berry": "Twilight Drupes", "resource": "Sticks"},
     {"image": "assets/sprites/biomes/grassland/VioBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareVioBerryBush.png", "berry": "Vio Berries", "resource": "Sticks"},
+]
+
+dead_bush_data = [
+    {"resource": "Sticks", "icon": "assets/sprites/items/Sticks.png", "image": "assets/sprites/biomes/grassland/DeadBush1.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Sticks.png", "image": "assets/sprites/biomes/grassland/DeadBush2.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Sticks.png", "image": "assets/sprites/biomes/grassland/DeadBush3.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Sticks.png", "image": "assets/sprites/biomes/grassland/DeadBush4.png"},
+    {"resource": "Sticks", "icon": "assets/sprites/items/Sticks.png", "image": "assets/sprites/biomes/grassland/DeadBush5.png"},
 ]
 
 stick_data = [
@@ -198,6 +231,43 @@ class BerryBush(pygame.sprite.Sprite):
             self.rect.height - 40
         )
     
+    def harvest(self, player=None):
+        if not self.destroyed:
+            resource_collected = random.randint(3, 9)
+            self.destroyed = True
+            player.experience += harvest_experience * resource_collected
+            player.exp_total += harvest_experience * resource_collected
+            return [self.resource] * resource_collected
+        return []
+    
+class DeadBush(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+
+        bush_info = random.choice(dead_bush_data)
+        img_path = bush_info["image"]
+        self.image = pygame.transform.scale(
+            pygame.image.load(img_path).convert_alpha(),
+            (64, 64)
+        )
+
+
+        self.rect = self.image.get_rect(topleft=(x, y))
+        self.timer = 0
+        self.destroyed = False
+        self.resource = "Sticks"
+
+    def draw(self, screen, cam_x):
+        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
+
+    def get_collision_rect(self, cam_x):
+        return pygame.Rect(
+            self.rect.x - cam_x + 15,
+            self.rect.y + (self.rect.height * 0.4),
+            self.rect.width - 35,
+            self.rect.height - 40
+        )
+
     def harvest(self, player=None):
         if not self.destroyed:
             resource_collected = random.randint(3, 9)
@@ -439,24 +509,7 @@ for tile_x, tile_image in tiles:
     weight = rock_weights.get(tile_image, 1)
     weighted_rock_tiles.extend([(tile_x, tile_image)] * weight)
 
-rocks = []
-num_rocks = 2000
-for _ in range(num_rocks):
-    tile_x, tile_image = random.choice(weighted_rock_tiles)
-    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-    y = random.randint(0, height - 64)
-    rocks.append(Rock(x, y))
 
-rock_border_locations = [(0, i * 28) for i in range(28)] + [(512000, i * 28) for i in range(28)]
-
-for i, pos in enumerate(rock_border_locations):
-    x, y = pos
-    chosen_image = random.choice(rock_images)
-    rock = Rock(x, y)
-    rock.image = pygame.image.load(chosen_image).convert_alpha()
-    rock.image = pygame.transform.scale(rock.image, (64, 64))
-    rock.rect = rock.image.get_rect(topleft=(x, y))
-    rocks.append(rock)
 
 grassland_tree_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah]
 savannah_tree_tiles = [bg_savannah]
@@ -505,17 +558,7 @@ for tile_x, tile_image in tiles:
         weight = savannah_tree_weights.get(tile_image, 1)
         weighted_savannah_tiles.extend([(tile_x, tile_image)] * weight)
 
-def spawn_trees(tree_list, tree_types, weighted_tiles, num_trees, height):
-    for _ in range(num_trees):
-        tile_x, tile_image = random.choice(weighted_tiles)
-        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-        y = random.randint(0, height - 64)
-        tree_type = random.choice(tree_types)
-        tree_list.append(Tree(x, y, tree_type))
 
-trees = []
-spawn_trees(trees, grassland_tree_types, weighted_grassland_tiles, 400, height)
-spawn_trees(trees, savannah_tree_types, weighted_savannah_tiles, 100, height)
 
 
 allowed_berry_bush_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah]
@@ -544,14 +587,7 @@ for tile_x, tile_image in tiles:
     weight = berry_bush_weights.get(tile_image, 1)
     weighted_berry_bush_tiles.extend([(tile_x, tile_image)] * weight)
 
-berry_bushes = []
-num_bushes = 400
-for _ in range(num_bushes):
-    tile_x, tile_image = random.choice(weighted_berry_bush_tiles)
-    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-    y = random.randint(0, height - 64)
-    berry_bush_type = random.choice(berry_bush_types)
-    berry_bushes.append(BerryBush(x, y, berry_bush_type))
+
 
 allowed_boulder_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_lavastone, bg_wasteland, bg_blackstone, bg_redrock]
 boulder_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_boulder_tiles]
@@ -576,13 +612,7 @@ for tile_x, tile_image in tiles:
     weight = boulder_weights.get(tile_image, 1)
     weighted_boulder_tiles.extend([(tile_x, tile_image)] * weight)
 
-boulders = []
-num_boulders = 300
-for _ in range(num_boulders):
-    tile_x, tile_image = random.choice(weighted_boulder_tiles)
-    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-    y = random.randint(0, height - 64)
-    boulders.append(Boulder(x, y))
+
 
 allowed_stick_tiles = [bg_grass, bg_dirt, bg_compact, bg_sand, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_wasteland, bg_blackstone, bg_redrock]
 
@@ -610,13 +640,7 @@ for tile_x, tile_image in tiles:
     weight = stick_weights.get(tile_image, 1)
     weighted_stick_tiles.extend([(tile_x, tile_image)] * weight)
 
-sticks = []
-num_sticks = 1000
-for _ in range(num_sticks):
-    tile_x, tile_image = random.choice(weighted_stick_tiles)
-    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-    y = random.randint(0, height - 64)
-    sticks.append(Stick(x, y))
+
 
 
 allowed_stone_tiles = [bg_grass, bg_dirt, bg_compact, bg_sand, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_wasteland, bg_blackstone, bg_redrock]
@@ -645,13 +669,7 @@ for tile_x, tile_image in tiles:
     weight = stone_weights.get(tile_image, 1)
     weighted_stone_tiles.extend([(tile_x, tile_image)] * weight)
 
-stones = []
-num_stones = 1000
-for _ in range(num_stones):
-    tile_x, tile_image = random.choice(weighted_stone_tiles)
-    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-    y = random.randint(0, height - 64)
-    stones.append(Stone(x, y))
+
 
 allowed_grass_tiles = [bg_grass, bg_dirt, bg_compact]
 
@@ -676,14 +694,6 @@ for tile_x, tile_image in tiles:
     weight = grass_weights.get(tile_image, 1)
     weighted_grass_tiles.extend([(tile_x, tile_image)] * weight)
 
-grasses = []
-num_grasses = 1500
-for _ in range(num_grasses):
-    tile_x, tile_image = random.choice(weighted_grass_tiles)
-    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-    y = random.randint(0, height - 64)
-    grasses.append(Grass(x, y))
-
 allowed_savannah_grass_tiles = [bg_savannah]
 
 savannah_grass_weights = {
@@ -707,13 +717,7 @@ for tile_x, tile_image in tiles:
     weight = savannah_grass_weights.get(tile_image, 1)
     weighted_savannah_grass_tiles.extend([(tile_x, tile_image)] * weight)
 
-savannah_grasses = []
-num_savannah_grasses = 1600
-for _ in range(num_savannah_grasses):
-    tile_x, tile_image = random.choice(weighted_savannah_grass_tiles)
-    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-    y = random.randint(0, height - 64)
-    savannah_grasses.append(SavannahGrass(x, y))
+
 
 allowed_mushroom_tiles = [bg_grass, bg_dirt, bg_compact, bg_duskstone, bg_wasteland]
 
@@ -738,10 +742,129 @@ for tile_x, tile_image in tiles:
     weight = mushroom_weights.get(tile_image, 1)
     weighted_mushroom_tiles.extend([(tile_x, tile_image)] * weight)
 
-mushrooms = []
-num_mushrooms = 100
-for _ in range(num_mushrooms):
-    tile_x, tile_image = random.choice(weighted_mushroom_tiles)
-    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-    y = random.randint(0, height - 64)
-    mushrooms.append(PoisonousMushroom(x, y))
+
+
+allowed_dead_bush_tiles = [bg_grass, bg_dirt, bg_compact, bg_duskstone, bg_wasteland]
+
+dead_bush_weights = {
+    bg_grass: 2,
+    bg_dirt: 4,
+    bg_compact: 6,
+    bg_sand: 4,
+    bg_savannah: 4,
+    bg_riverrock: 4,
+    bg_bigrock: 4,
+    bg_duskstone: 2,
+    bg_lavastone: 2,
+    bg_snow: 4,
+    bg_wasteland: 6,
+    bg_blackstone: 2,
+    bg_redrock: 5
+}
+
+weighted_dead_bush_tiles = []
+for tile_x, tile_image in tiles:
+    weight = dead_bush_weights.get(tile_image, 1)
+    weighted_dead_bush_tiles.extend([(tile_x, tile_image)] * weight)
+
+
+
+def generate_world():
+    global rocks, dead_bushes, grasses, stones, boulders, berry_bushes, trees, sticks, savannah_grasses, mushrooms
+    
+    rocks.clear()
+    dead_bushes.clear()
+    grasses.clear()
+    stones.clear()
+    boulders.clear()
+    berry_bushes.clear()
+    trees.clear()
+    sticks.clear()
+    savannah_grasses.clear()
+    mushrooms.clear()
+    for _ in range(num_rocks):
+        tile_x, tile_image = random.choice(weighted_rock_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        rocks.append(Rock(x, y))
+
+    rock_border_locations = [(0, i * 28) for i in range(28)] + [(512000, i * 28) for i in range(28)]
+
+    # Always generate border rocks for proper world boundaries
+    for i, pos in enumerate(rock_border_locations):
+        x, y = pos
+        chosen_image = random.choice(rock_images)
+        rock = Rock(x, y)
+        rock.image = pygame.image.load(chosen_image).convert_alpha()
+        rock.image = pygame.transform.scale(rock.image, (64, 64))
+        rock.rect = rock.image.get_rect(topleft=(x, y))
+        rocks.append(rock)
+    
+    
+    for _ in range(num_boulders):
+        tile_x, tile_image = random.choice(weighted_boulder_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        boulders.append(Boulder(x, y))
+    
+    for _ in range(num_bushes):
+        tile_x, tile_image = random.choice(weighted_berry_bush_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        berry_bush_type = random.choice(berry_bush_types)
+        berry_bushes.append(BerryBush(x, y, berry_bush_type))
+    
+    def spawn_trees(tree_list, tree_types, weighted_tiles, num_trees, height):
+        for _ in range(num_trees):
+            tile_x, tile_image = random.choice(weighted_tiles)
+            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            y = random.randint(0, height - 64)
+            tree_type = random.choice(tree_types)
+            tree_list.append(Tree(x, y, tree_type))
+
+    spawn_trees(trees, grassland_tree_types, weighted_grassland_tiles, num_grassland_trees, height)
+    spawn_trees(trees, savannah_tree_types, weighted_savannah_tiles, num_savannah_trees, height)
+    
+    
+    for _ in range(num_sticks):
+        tile_x, tile_image = random.choice(weighted_stick_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        sticks.append(Stick(x, y))
+    
+  
+    for _ in range(num_stones):
+        tile_x, tile_image = random.choice(weighted_stone_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        stones.append(Stone(x, y))
+    
+    
+    for _ in range(num_grasses):
+        tile_x, tile_image = random.choice(weighted_grass_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        grasses.append(Grass(x, y))
+   
+    for _ in range(num_savannah_grasses):
+        tile_x, tile_image = random.choice(weighted_savannah_grass_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        savannah_grasses.append(SavannahGrass(x, y))
+    
+    for _ in range(num_mushrooms):
+        tile_x, tile_image = random.choice(weighted_mushroom_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        mushrooms.append(PoisonousMushroom(x, y))
+    
+    
+    for _ in range(num_dead_bushes):
+        tile_x, tile_image = random.choice(weighted_dead_bush_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        dead_bushes.append(DeadBush(x, y))
+
+    
+    
+    return rocks, boulders, berry_bushes, trees, sticks, stones, grasses, savannah_grasses, mushrooms, dead_bushes

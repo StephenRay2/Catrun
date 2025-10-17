@@ -141,6 +141,7 @@ class Player(pygame.sprite.Sprite):
         self.attack_cooldown = pygame.time.get_ticks()
         self.attack_delay = 300
 
+
     def attacking(self, nearby_mobs, player_world_x, player_world_y):
         if pygame.mouse.get_pressed()[0] and not self.exhausted:
             current_time = pygame.time.get_ticks()
@@ -161,6 +162,7 @@ class Player(pygame.sprite.Sprite):
 
                     if facing_object and 1 <= mob.health:
                         mob.health -= self.damage * self.attack
+
 
 
     def determine_score(self, dungeon_depth):
