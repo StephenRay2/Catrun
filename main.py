@@ -29,6 +29,9 @@ collection_message_num = 0
 paused = False
 inventory_in_use = False
 
+
+collect_cooldown = 0
+collect_delay = 300
 harvest_cooldown = 0
 harvest_delay = 300
 inventory_resources = []
@@ -97,42 +100,40 @@ while running:
         
         if game_just_started:
             generate_world()
-            # Regenerate mobs for new game
             cats.clear()
             squirrels.clear()
             cows.clear()
             chickens.clear()
             crawlers.clear()
 
-            # Regenerate cats
             for _ in range(num_cats):
                 tile_x, tile_image = random.choice(weighted_cat_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
                 cats.append(Cat(x, y, "Cat"))
 
-            # Regenerate squirrels
+            
             for _ in range(num_squirrels):
                 tile_x, tile_image = random.choice(weighted_squirrel_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
                 squirrels.append(Squirrel(x, y, "Squirrel"))
 
-            # Regenerate cows
+            
             for _ in range(num_cows):
                 tile_x, tile_image = random.choice(weighted_cow_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
                 cows.append(Cow(x, y, "Cow"))
 
-            # Regenerate chickens
+           
             for _ in range(num_chickens):
                 tile_x, tile_image = random.choice(weighted_chicken_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
                 chickens.append(Chicken(x, y, "Chicken"))
 
-            # Regenerate crawlers
+           
             for _ in range(num_crawlers):
                 tile_x, tile_image = random.choice(weighted_crawler_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
@@ -144,22 +145,19 @@ while running:
             cam_x = 0
             player_pos.x = width / 2
             player_pos.y = height / 2
-
-            # Reset player stats for new game
+       
             player.health = player.max_health
             player.stamina = player.max_stamina
             player.hunger = player.max_hunger
             player.water = player.max_water
             player.dead = False
 
-            # Reset experience and leveling
             player.experience = 0
             player.exp_total = 0
             player.level = 1
             player.next_level_exp = 100
             player.level_up_timer = 0
 
-            # Reset player stats and levelers
             player.health_leveler = 1
             player.stamina_leveler = 1
             player.hunger_leveler = 1
@@ -171,18 +169,15 @@ while running:
             player.max_water = 100 * player.water_leveler
             player.max_warmth = 100
 
-            # Reset combat stats
             player.damage = 5
             player.attack = 1
             player.base_speed = 275
             player.speed = 1
             player.defense = 1
 
-            # Reset player inventory
             player.inventory = []
             player.score = 0
 
-            # Reset inventory object
             inventory.inventory_list = []
 
             inventory_resources = []
@@ -219,20 +214,26 @@ while running:
                 harvest_cooldown = current_time
                 for obj in visible_objects:
                     if hasattr(obj, 'harvest') and hasattr(obj, 'destroyed') and not obj.destroyed:
+                        
+                        obj_collision = obj.get_collision_rect(0)
+                        
+                        horizontal_dist = abs(obj_collision.centerx - player_world_x)
+                        vertical_dist = abs(obj_collision.centery - player_world_y)
+                        
+                        harvest_reach = 25
+                        horizontal_range = (obj_collision.width / 2) + harvest_reach
+                        vertical_range = (obj_collision.height / 2) + harvest_reach
+                        
                         facing_object = False
-                        
-                        horizontal_dist = abs(obj.rect.centerx - player_world_x)
-                        vertical_dist = abs(obj.rect.centery - player_world_y)
-                        
-                        if player.last_direction == "right" and obj.rect.centerx > player_world_x and horizontal_dist < 50 and vertical_dist < 40:
+                        if player.last_direction == "right" and obj_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
                             facing_object = True
-                        elif player.last_direction == "left" and obj.rect.centerx < player_world_x and horizontal_dist < 50 and vertical_dist < 40:
+                        elif player.last_direction == "left" and obj_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
                             facing_object = True
-                        elif player.last_direction == "up" and obj.rect.centery < player_world_y and vertical_dist < 50 and horizontal_dist < 40:
+                        elif player.last_direction == "up" and obj_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
                             facing_object = True
-                        elif player.last_direction == "down" and obj.rect.centery > player_world_y and vertical_dist < 50 and horizontal_dist < 40:
+                        elif player.last_direction == "down" and obj_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
                             facing_object = True
-                        
+                            
                         if facing_object:
                             resource = obj.harvest(player)
                             if resource:
@@ -246,8 +247,8 @@ while running:
                                     1.0
                                 ])
                                 collection_messages[0][1].fill((0, 0, 0, 100))
-                                if obj.destroyed:
-                                    visible_objects.remove(obj)
+                            if obj.destroyed:
+                                visible_objects.remove(obj)
 
         dead_bushes = [db for db in dead_bushes if not db.destroyed]
         mushrooms = [m for m in mushrooms if not m.destroyed]
@@ -265,6 +266,7 @@ while running:
         cows = [cow for cow in cows if not cow.destroyed]
         chickens = [chicken for chicken in chickens if not chicken.destroyed]
         crawlers = [crawler for crawler in crawlers if not crawler.destroyed]
+        duskwretches = [duskwretch for duskwretch in duskwretches if not duskwretch.destroyed]
 
             
         for tile_x, tile_image in tiles:
@@ -276,7 +278,7 @@ while running:
 
         collectibles = sticks + stones + grasses + savannah_grasses + mushrooms
         all_objects = rocks + trees + boulders + berry_bushes + dead_bushes
-        mobs = cats + squirrels + cows + chickens + crawlers
+        mobs = cats + squirrels + cows + chickens + crawlers + duskwretches
 
         visible_collectibles = [col for col in collectibles if col.rect.x- cam_x > -1000 and col.rect.y - cam_x < width + 1000]
         visible_objects = [obj for obj in all_objects if obj.rect.x - cam_x > -1000 and obj.rect.x - cam_x < width + 1000]
@@ -321,60 +323,66 @@ while running:
         if not paused and player.dead == False:
 
             for bush in berry_bushes:
-                if player.rect.colliderect(
-                    pygame.Rect(bush.rect.x - cam_x, bush.rect.y, bush.rect.width, bush.rect.height)
-                ) and keys[pygame.K_e]:
-                    berries = bush.collect(player)
-                    
-                    if berries:
-                        inventory_resources.extend(berries)
-                        berry_collect_text = font.render(f"Collected {len(berries)} {bush.berry}", True, (20, 255, 20))
+                if current_time - collect_cooldown > collect_delay:
+                    if player.rect.colliderect(
+                        pygame.Rect(bush.rect.x - cam_x, bush.rect.y, bush.rect.width, bush.rect.height)
+                    ) and keys[pygame.K_e]:
+                        berries = bush.collect(player)
                         
-                        collection_messages.insert(0, [
-                            berry_collect_text,
-                            pygame.Surface((berry_collect_text.get_width() + 10, berry_collect_text.get_height() + 10), pygame.SRCALPHA),
-                            pygame.Rect(20, 500, berry_collect_text.get_width(), berry_collect_text.get_height()),
-                            3.0,
-                            1.0
-                        ])
-                        collection_messages[0][1].fill((0, 0, 0, 100))
+                        if berries:
+                            collect_cooldown = current_time
+                            inventory_resources.extend(berries)
+                            berry_collect_text = font.render(f"Collected {len(berries)} {bush.berry}", True, (20, 255, 20))
+                            
+                            collection_messages.insert(0, [
+                                berry_collect_text,
+                                pygame.Surface((berry_collect_text.get_width() + 10, berry_collect_text.get_height() + 10), pygame.SRCALPHA),
+                                pygame.Rect(20, 500, berry_collect_text.get_width(), berry_collect_text.get_height()),
+                                3.0,
+                                1.0
+                            ])
+                            collection_messages[0][1].fill((0, 0, 0, 100))
 
             for tree in trees:
-                if player.rect.colliderect(
-                    pygame.Rect(tree.rect.x - cam_x, tree.rect.y, tree.rect.width, tree.rect.height)
-                ) and keys[pygame.K_e]:
-                    fruit = tree.collect(player)
-                    
-                    if fruit:
-                        fruit_collect_text = font.render(f"Collected {len(fruit)} {tree.fruit}", True, (20, 255, 20))
-                        inventory_resources.extend(fruit)
-                        collection_messages.insert(0, [
-                            fruit_collect_text,
-                            pygame.Surface((fruit_collect_text.get_width() + 10, fruit_collect_text.get_height() + 10), pygame.SRCALPHA),
-                            pygame.Rect(20, 500, fruit_collect_text.get_width(), fruit_collect_text.get_height()),
-                            3.0,
-                            1.0
-                        ])
-                        collection_messages[0][1].fill((0, 0, 0, 100))
+                if current_time - collect_cooldown > collect_delay:
+                    if player.rect.colliderect(
+                        pygame.Rect(tree.rect.x - cam_x, tree.rect.y, tree.rect.width, tree.rect.height)
+                    ) and keys[pygame.K_e]:
+                        fruit = tree.collect(player)
+                        
+                        if fruit:
+                            collect_cooldown = current_time
+                            fruit_collect_text = font.render(f"Collected {len(fruit)} {tree.fruit}", True, (20, 255, 20))
+                            inventory_resources.extend(fruit)
+                            collection_messages.insert(0, [
+                                fruit_collect_text,
+                                pygame.Surface((fruit_collect_text.get_width() + 10, fruit_collect_text.get_height() + 10), pygame.SRCALPHA),
+                                pygame.Rect(20, 500, fruit_collect_text.get_width(), fruit_collect_text.get_height()),
+                                3.0,
+                                1.0
+                            ])
+                            collection_messages[0][1].fill((0, 0, 0, 100))
 
             for col in collectibles:
-                if player.rect.colliderect(
-                    pygame.Rect(col.rect.x - cam_x, col.rect.y, col.rect.width, col.rect.height)
-                ) and keys[pygame.K_e]:
-                    resources = col.collect(player)
-                    
-                    if resources:
-                        inventory_resources.extend(resources)
-                        resource_collect_text = font.render(f"Collected {len(resources)} {col.resource}", True, (20, 255, 20))
+                if current_time - collect_cooldown > collect_delay:
+                    if player.rect.colliderect(
+                        pygame.Rect(col.rect.x - cam_x, col.rect.y, col.rect.width, col.rect.height)
+                    ) and keys[pygame.K_e]:
+                        resources = col.collect(player)
                         
-                        collection_messages.insert(0, [
-                            resource_collect_text,
-                            pygame.Surface((resource_collect_text.get_width() + 10, resource_collect_text.get_height() + 10), pygame.SRCALPHA),
-                            pygame.Rect(20, 500, resource_collect_text.get_width(), resource_collect_text.get_height()),
-                            3.0,
-                            1.0
-                        ])
-                        collection_messages[0][1].fill((0, 0, 0, 100))
+                        if resources:
+                            collect_cooldown = current_time
+                            inventory_resources.extend(resources)
+                            resource_collect_text = font.render(f"Collected {len(resources)} {col.resource}", True, (20, 255, 20))
+                            
+                            collection_messages.insert(0, [
+                                resource_collect_text,
+                                pygame.Surface((resource_collect_text.get_width() + 10, resource_collect_text.get_height() + 10), pygame.SRCALPHA),
+                                pygame.Rect(20, 500, resource_collect_text.get_width(), resource_collect_text.get_height()),
+                                3.0,
+                                1.0
+                            ])
+                            collection_messages[0][1].fill((0, 0, 0, 100))
             
             inventory.add(inventory_resources)
             inventory_resources = []

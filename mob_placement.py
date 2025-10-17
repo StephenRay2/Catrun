@@ -167,3 +167,37 @@ for _ in range(num_crawlers):
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
     crawlers.append(Crawler(x, y, "Crawler"))
+
+
+allowed_duskwretch_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_snow, bg_wasteland]
+
+duskwretch_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_duskwretch_tiles]
+
+duskwretch_spawn_weights = {
+    bg_grass: 2,
+    bg_dirt: 2,
+    bg_compact: 2,
+    bg_savannah: 2,
+    bg_riverrock: 2,
+    bg_bigrock: 2,
+    bg_duskstone: 2,
+    bg_lavastone: 0,
+    bg_snow: 2,
+    bg_wasteland: 5,
+    bg_blackstone: 2,
+    bg_redrock: 3
+
+}
+
+weighted_duskwretch_tiles = []
+for tile_x, tile_image in tiles:
+    weight = duskwretch_spawn_weights.get(tile_image, 1)
+    weighted_duskwretch_tiles.extend([(tile_x, tile_image)] * weight)
+
+duskwretches = []
+num_duskwretches = 300
+for _ in range(num_duskwretches):
+    tile_x, tile_image = random.choice(weighted_duskwretch_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    duskwretches.append(Duskwretch(x, y, "Duskwretch"))

@@ -790,7 +790,6 @@ def generate_world():
 
     rock_border_locations = [(0, i * 28) for i in range(28)] + [(512000, i * 28) for i in range(28)]
 
-    # Always generate border rocks for proper world boundaries
     for i, pos in enumerate(rock_border_locations):
         x, y = pos
         chosen_image = random.choice(rock_images)
@@ -818,7 +817,7 @@ def generate_world():
         for _ in range(num_trees):
             tile_x, tile_image = random.choice(weighted_tiles)
             x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-            y = random.randint(0, height - 64)
+            y = random.randint(0, height - 80)
             tree_type = random.choice(tree_types)
             tree_list.append(Tree(x, y, tree_type))
 

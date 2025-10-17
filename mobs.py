@@ -87,6 +87,15 @@ crawler_dead_image_left = pygame.transform.scale(
     pygame.image.load("assets/sprites/mobs/CrawlerDead.png").convert_alpha(), (size, size))
 crawler_dead_image_right = pygame.transform.flip(crawler_dead_image_left, True, False)
 
+duskwretch_idle_images = ["assets/sprites/mobs/DuskwretchLeftStand1.png", "assets/sprites/mobs/DuskwretchLeftStand2.png", "assets/sprites/mobs/DuskwretchLeftStand3.png"]
+duskwretch_start_move_left_images = ["assets/sprites/mobs/DuskwretchStartLeftWalk1.png", "assets/sprites/mobs/DuskwretchStartLeftWalk2.png"]
+duskwretch_end_move_left_images = ["assets/sprites/mobs/DuskwretchStartLeftWalk2.png", "assets/sprites/mobs/DuskwretchStartLeftWalk1.png"]
+duskwretch_move_left_images = ["assets/sprites/mobs/DuskwretchLeftWalk1.png", "assets/sprites/mobs/DuskwretchLeftWalk2.png", "assets/sprites/mobs/DuskwretchLeftWalk3.png", "assets/sprites/mobs/DuskwretchLeftWalk4.png"]
+duskwretch_chase_left_images = ["assets/sprites/mobs/DuskwretchChaseLeft1.png", "assets/sprites/mobs/DuskwretchChaseLeft2.png", "assets/sprites/mobs/DuskwretchChaseLeft4.png", "assets/sprites/mobs/DuskwretchChaseLeft3.png", "assets/sprites/mobs/DuskwretchChaseLeft5.png"]
+duskwretch_attack_left_images = ["assets/sprites/mobs/DuskwretchLeftAttack1.png", "assets/sprites/mobs/DuskwretchLeftAttack2.png", "assets/sprites/mobs/DuskwretchLeftAttack3.png"]
+duskwretch_dead_image_left = pygame.image.load("assets/sprites/mobs/DuskwretchDead.png").convert_alpha()
+duskwretch_dead_image_right = pygame.transform.flip(duskwretch_dead_image_left, True, False)
+
 
 
 class Player(pygame.sprite.Sprite):
@@ -148,16 +157,23 @@ class Player(pygame.sprite.Sprite):
             if current_time - self.attack_cooldown > self.attack_delay:
                 self.attack_cooldown = current_time
                 for mob in nearby_mobs:
-                    horizontal_dist = abs(mob.rect.centerx - player_world_x)
-                    vertical_dist = abs(mob.rect.centery - player_world_y)
+                    mob_collision = mob.get_collision_rect(0)
+                    
+                    horizontal_dist = abs(mob_collision.centerx - player_world_x)
+                    vertical_dist = abs(mob_collision.centery - player_world_y)
+                    
+                    attack_reach = 25
+                    horizontal_range = (mob_collision.width / 2) + attack_reach
+                    vertical_range = (mob_collision.height / 2) + attack_reach
+                    
                     facing_object = False
-                    if self.last_direction == "right" and mob.rect.centerx > player_world_x and horizontal_dist < 50 and vertical_dist < 40:
+                    if self.last_direction == "right" and mob_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
                         facing_object = True
-                    elif self.last_direction == "left" and mob.rect.centerx < player_world_x and horizontal_dist < 50 and vertical_dist < 40:
+                    elif self.last_direction == "left" and mob_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
                         facing_object = True
-                    elif self.last_direction == "up" and mob.rect.centery < player_world_y and vertical_dist < 50 and horizontal_dist < 40:
+                    elif self.last_direction == "up" and mob_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
                         facing_object = True
-                    elif self.last_direction == "down" and mob.rect.centery > player_world_y and vertical_dist < 50 and horizontal_dist < 40:
+                    elif self.last_direction == "down" and mob_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
                         facing_object = True
 
                     if facing_object and 1 <= mob.health:
@@ -457,7 +473,6 @@ class Mob(pygame.sprite.Sprite):
         self.name = name
         self.x = x
         self.y = y
-        self.collision_rect = None
         self.direction = pygame.Vector2(0, 0)
         self.move_timer = 0
         self.frame_index = 0
@@ -474,7 +489,8 @@ class Mob(pygame.sprite.Sprite):
         self.destroyed = False
         self.fleeing = False
         self.flee_timer = 0
-        self.speed = 4
+        self.base_speed = 100
+        self.speed = 1 
 
 
     def keep_in_screen(self, screen_height):
@@ -483,16 +499,18 @@ class Mob(pygame.sprite.Sprite):
         elif self.rect.bottom > screen_height:
             self.rect.bottom = screen_height
     def get_collision_rect(self, cam_x):
-        rect = self.collision_rect or self.rect
+        rect = self.rect
         return pygame.Rect(rect.x - cam_x, rect.y, rect.width, rect.height)
 
     def check_collision(self, direction, nearby_objects, nearby_mobs):
         all_nearby = nearby_objects + nearby_mobs
 
-        left_check = pygame.Rect(self.rect.left - 1, self.rect.top + 5, 1, self.rect.height - 12)
-        right_check = pygame.Rect(self.rect.right, self.rect.top + 5, 1, self.rect.height - 12)
-        top_check = pygame.Rect(self.rect.left + 5, self.rect.top - 1, self.rect.width - 12, 1)
-        bottom_check = pygame.Rect(self.rect.left + 5, self.rect.bottom, self.rect.width - 12, 1)
+        collision_rect = self.get_collision_rect(0)
+        
+        left_check = pygame.Rect(collision_rect.left - 1, collision_rect.top + 5, 1, collision_rect.height - 10)
+        right_check = pygame.Rect(collision_rect.right, collision_rect.top + 5, 1, collision_rect.height - 10)
+        top_check = pygame.Rect(collision_rect.left + 5, collision_rect.top - 1, collision_rect.width - 10, 1)
+        bottom_check = pygame.Rect(collision_rect.left + 5, collision_rect.bottom, collision_rect.width - 10, 1)
 
         left_collision = any(left_check.colliderect(obj.get_collision_rect(0)) for obj in all_nearby)
         right_collision = any(right_check.colliderect(obj.get_collision_rect(0)) for obj in all_nearby)
@@ -504,10 +522,13 @@ class Mob(pygame.sprite.Sprite):
 
         return can_move_x, can_move_y
 
+    def get_speed(self):
+        return self.base_speed * self.speed
+
     def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
         if not hasattr(self, "cow") and self.move_timer <= 0 and self.is_alive and not self.fleeing:
             if random.random() < 0.02:
-                self.direction.xy = random.choice([(-2,0), (2,0), (0,-2), (0,2), (0,0), (-1,0), (1,0), (0,-1), (0,1), (0,0), (0,0)])
+                self.direction.xy = random.choice([(-1,0), (1,0), (0,-1), (0,1), (0,0), (0,0), (0,0)])
                 self.move_timer = random.randint(30, 120)
             else:
                 self.direction.xy = (0, 0)
@@ -525,8 +546,12 @@ class Mob(pygame.sprite.Sprite):
 
         if self.direction.length_squared() > 0:
             can_move_x, can_move_y = self.check_collision(self.direction, nearby_objects or [], nearby_mobs or [])
-            new_x = self.rect.x + self.direction.x if can_move_x else self.rect.x
-            new_y = self.rect.y + self.direction.y if can_move_y else self.rect.y
+            
+            actual_speed = self.get_speed() * dt
+            movement = self.direction * actual_speed
+            
+            new_x = self.rect.x + movement.x if can_move_x else self.rect.x
+            new_y = self.rect.y + movement.y if can_move_y else self.rect.y
             self.rect.topleft = (new_x, new_y)
 
             self.animate_walk()
@@ -620,15 +645,15 @@ class Mob(pygame.sprite.Sprite):
             if self.fleeing and self.is_alive:
                 if self.move_timer <= 0:
                     if random.random() < 0.02:
-                        direction = pygame.Vector2(random.choice([(-2,0), (2,0), (0,-2), (0,2)]))
+                        direction = pygame.Vector2(random.choice([(-1,0), (1,0), (0,-1), (0,1)]))
                     else:
                         direction = pygame.Vector2(-dx, -dy)
                         
                     if direction.length_squared() > 0:
                         direction = direction.normalize()
                         
-                    speed = self.speed * 1.3
-                    self.direction = direction * speed
+                    self.speed = 1.3
+                    self.direction = direction
                     
                     self.move_timer = random.randint(30, 120)
                 
@@ -636,12 +661,14 @@ class Mob(pygame.sprite.Sprite):
                     
                 if distance_sq > 400*400:
                     self.fleeing = False
+                    self.speed = 1.0
                     
             if self.flee_timer > 0:
                 self.flee_timer -= dt
             else:
                 if distance_sq > 400*400:
                     self.fleeing = False
+                    self.speed = 1.0 
 class Cat(Mob):
     def __init__(self, x, y, name):
         super().__init__(x, y, name)
@@ -672,7 +699,8 @@ class Cat(Mob):
         self.health = 100
         self.max_hunger = 100
         self.hunger = 100
-        self.speed = 3
+        self.base_speed = 160
+        self.speed = 1
 
         self.dead_cat_right_image = pygame.image.load(self.cat_type["dead_image"]).convert_alpha()
         self.dead_cat_left_image = pygame.transform.flip(self.dead_cat_right_image, True, False)
@@ -702,7 +730,8 @@ class Squirrel(Mob):
 
         self.image = self.stand_right_image
         self.rect = self.image.get_rect(center=(x, y))
-        self.speed = 3.2
+        self.base_speed = 150
+        self.speed = 1
         self.full_health = 50
         self.health = 50
 
@@ -752,7 +781,8 @@ class Cow(Mob):
 
         self.full_health = 150
         self.health = 150
-        self.speed = 2
+        self.base_speed = 70
+        self.speed = 1
         self.resource = "Raw Beef"
         self.resource_amount = 5
         self.cow = "moo"
@@ -785,7 +815,8 @@ class Chicken(Mob):
 
         self.image = self.stand_right_image
         self.rect = self.image.get_rect(center=(x, y))
-        self.speed = 3
+        self.base_speed = 120
+        self.speed = 1
         self.resource = "Chicken"
         self.resource_amount = 2
         self.full_health = 70
@@ -834,8 +865,7 @@ class Enemy(Mob):
                 direction = pygame.Vector2(dx, dy)
                 if direction.length_squared() > 0:
                     direction = direction.normalize()
-                speed = self.speed
-                self.direction = direction * speed
+                self.direction = direction 
 
     def flee(self, player_world_x, player_world_y, dt):
         dx = player_world_x - self.rect.centerx
@@ -878,8 +908,12 @@ class Enemy(Mob):
 
             if self.direction.length_squared() > 0:
                 can_move_x, can_move_y = self.check_collision(self.direction, nearby_objects or [], nearby_mobs or [])
-                new_x = self.rect.x + self.direction.x if can_move_x else self.rect.x
-                new_y = self.rect.y + self.direction.y if can_move_y else self.rect.y
+                
+                actual_speed = self.get_speed() * dt
+                movement = self.direction * actual_speed
+                
+                new_x = self.rect.x + movement.x if can_move_x else self.rect.x
+                new_y = self.rect.y + movement.y if can_move_y else self.rect.y
                 self.rect.topleft = (new_x, new_y)
 
                 self.animate_walk()
@@ -912,10 +946,13 @@ class Crawler(Enemy):
         self.attack_duration = 20
 
         self.attack_damage = 3
-        self.speed = 3.3
+        self.base_speed = 100
+        self.speed = 1
         self.health = 100
         self.resource = "Hide"
         self.resource_amount = random.randint(4, 9)
+
+    
 
     def draw(self, screen, cam_x):
         screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
@@ -924,6 +961,10 @@ class Crawler(Enemy):
         dx = player_world_x - self.rect.centerx
         dy = player_world_y - self.rect.centery
         distance_sq = dx*dx + dy*dy
+        if self.chasing == True:
+            self.speed = 1.5
+        else:
+            self.speed = 1
 
         if self.is_alive and (self.health / self.full_health) < 0.2:
             if not self.fleeing:
@@ -966,3 +1007,170 @@ class Crawler(Enemy):
                 self.image = crawler_dead_image_left
             else:
                 self.image = crawler_dead_image_right
+
+class Duskwretch(Enemy):
+    def __init__(self, x, y, name):
+        super().__init__(x, y, name)
+        self.name = name
+        self.walk_left_images = [pygame.image.load(img).convert_alpha() for img in duskwretch_move_left_images]
+        self.stand_left_images = [pygame.image.load(img).convert_alpha() for img in duskwretch_idle_images]
+        self.attack_left_images = [pygame.image.load(img).convert_alpha() for img in duskwretch_attack_left_images]
+        self.start_walk_left_images = [pygame.image.load(img).convert_alpha() for img in duskwretch_start_move_left_images]
+        self.end_walk_left_images = [pygame.image.load(img).convert_alpha() for img in duskwretch_end_move_left_images]
+        self.chase_left_images = [pygame.image.load(img).convert_alpha() for img in duskwretch_chase_left_images]
+
+        self.walk_right_images = [pygame.transform.flip(img, True, False) for img in self.walk_left_images]
+        self.stand_right_images = [pygame.transform.flip(img, True, False) for img in self.stand_left_images]
+        self.attack_right_images = [pygame.transform.flip(img, True, False) for img in self.attack_left_images]
+        self.start_walk_right_images = [pygame.transform.flip(img, True, False) for img in self.start_walk_left_images]
+        self.end_walk_right_images = [pygame.transform.flip(img, True, False) for img in self.end_walk_left_images]
+        self.chase_right_images = [pygame.transform.flip(img, True, False) for img in self.chase_left_images]
+
+        self.image = self.stand_right_images[0]
+        self.rect = self.image.get_rect(center=(x, y))
+
+        self.frame_index = 0
+        self.animation_speed = 0.1
+        self.direction = pygame.Vector2(0, 0)
+        self.move_timer = 0
+
+        self.last_direction = "right" 
+        self.attacking = False
+        self.attack_timer = 0
+        self.attack_duration = 20
+
+        self.attack_damage = 4
+        self.base_speed = 150
+        self.speed = 1
+        self.full_health = 150
+        self.health = 150
+        self.resource = "Hide"
+        self.resource_amount = random.randint(4, 9)
+
+        self.state = "idle"
+        self.was_moving = False
+        self.is_moving = False
+        self.transition_done = False
+
+    def get_collision_rect(self, cam_x):
+        rect = self.rect
+        return pygame.Rect(rect.x - cam_x + 10, rect.y + 50, rect.width - 20, rect.height - 70)
+
+    def draw(self, screen, cam_x):
+        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
+
+    def attack(self, player_world_x, player_world_y, player):
+        dx = player_world_x - self.rect.centerx
+        dy = player_world_y - self.rect.centery
+        distance_sq = dx*dx + dy*dy
+
+        if self.is_alive and distance_sq < (70 * 70):
+            if not self.attacking:
+                self.attacking = True
+                self.attack_timer = self.attack_duration
+                self.frame_index = 0.0
+
+        if self.attacking:
+            self.state = "attacking"
+            self.animation_speed = .13
+            frames = self.attack_right_images if self.last_direction == "right" else self.attack_left_images
+            self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+            self.image = frames[int(self.frame_index)]
+
+            self.attack_timer -= 2
+
+            if self.attack_timer == self.attack_duration // 2 and distance_sq < (70 * 70):
+                player.health -= self.attack_damage
+
+            if self.attack_timer <= 0:
+                self.attacking = False
+                self.frame_index = 0.0
+                self.state = "idle"
+
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
+        super().update(dt, player, nearby_objects, nearby_mobs)
+
+        if self.attacking:
+            return
+
+        self.is_moving = self.direction.length_squared() > 0 and self.is_alive
+
+        if self.is_moving and not self.was_moving:
+            if self.chasing:
+                self.state = "chase"
+                self.speed = 2.2
+            else:
+                self.state = "start_walk"
+                self.speed = 1.0
+            self.frame_index = 0
+            self.transition_done = False
+
+        elif not self.is_moving and self.was_moving:
+            self.state = "end_walk"
+            self.speed = 1.0  # Reset speed
+            self.frame_index = 0
+            self.transition_done = False
+
+        elif self.is_moving and self.chasing and self.state != "chase":
+            self.state = "chase"
+            self.speed = 2.2
+            self.frame_index = 0
+
+        elif self.is_moving and not self.chasing and self.state == "chase":
+            self.state = "walk"
+            self.speed = 1.0
+            self.frame_index = 0
+
+        self.animate_state(dt)
+        self.was_moving = self.is_moving
+
+        if not self.is_alive:
+            if self.last_direction == "left":
+                self.image = duskwretch_dead_image_left
+            else:
+                self.image = duskwretch_dead_image_right
+
+    def animate_state(self, dt):
+        if self.state == "attacking":
+            return
+            
+        elif self.state == "start_walk":
+            self.animation_speed = .1
+            frames = self.start_walk_right_images if self.last_direction == "right" else self.start_walk_left_images
+            self.frame_index += self.animation_speed
+            if self.frame_index >= len(frames):
+                if self.chasing:
+                    self.state = "chase"
+                else:
+                    self.state = "walk"
+                self.frame_index = 0
+            else:
+                self.image = frames[int(self.frame_index)]
+
+        elif self.state == "walk":
+            frames = self.walk_right_images if self.last_direction == "right" else self.walk_left_images
+            self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+            self.image = frames[int(self.frame_index)]
+
+        elif self.state == "chase":
+            self.animation_speed = .13
+            frames = self.chase_right_images if self.last_direction == "right" else self.chase_left_images
+            self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+            self.image = frames[int(self.frame_index)]
+
+        elif self.state == "end_walk":
+            frames = self.end_walk_right_images if self.last_direction == "right" else self.end_walk_left_images
+            self.frame_index += self.animation_speed
+            if self.frame_index >= len(frames):
+                self.state = "idle"
+                self.frame_index = 0
+            else:
+                self.image = frames[int(self.frame_index)]
+
+        elif self.state == "idle":
+            frames = self.stand_right_images if self.last_direction == "right" else self.stand_left_images
+            self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+            self.image = frames[int(self.frame_index)]
+
+    def flee(self, player_world_x, player_world_y, dt):
+        return
