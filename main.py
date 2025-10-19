@@ -16,7 +16,7 @@ dungeon_depth_high = 0
 font = pygame.font.SysFont(None, 24)
 scroll = 0
 dungeon_traversal_speed = .1
-inventory = Inventory(64)
+
 stamina_depleted_message_timer = 0
 player_world_x = player_pos.x + cam_x
 player_world_y = player_pos.y
@@ -105,6 +105,12 @@ while running:
             cows.clear()
             chickens.clear()
             crawlers.clear()
+            pocks.clear()
+            deers.clear()
+            black_bears.clear()
+            brown_bears.clear()
+            gilas.clear()
+            crows.clear()
 
             for _ in range(num_cats):
                 tile_x, tile_image = random.choice(weighted_cat_tiles)
@@ -139,6 +145,42 @@ while running:
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
                 crawlers.append(Crawler(x, y, "Crawler"))
+
+            for _ in range(num_pocks):
+                tile_x, tile_image = random.choice(weighted_pock_tiles)
+                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                y = random.randint(0, height - 64)
+                pocks.append(Pock(x, y, "Pock"))
+
+            for _ in range(num_deers):
+                tile_x, tile_image = random.choice(weighted_deer_tiles)
+                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                y = random.randint(0, height - 64)
+                deers.append(Deer(x, y, "Deer"))
+
+            for _ in range(num_black_bears):
+                tile_x, tile_image = random.choice(weighted_black_bear_tiles)
+                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                y = random.randint(0, height - 64)
+                black_bears.append(BlackBear(x, y, "Black Bear"))
+
+            for _ in range(num_brown_bears):
+                tile_x, tile_image = random.choice(weighted_brown_bear_tiles)
+                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                y = random.randint(0, height - 64)
+                brown_bears.append(BrownBear(x, y, "Brown Bear"))
+
+            for _ in range(num_gilas):
+                tile_x, tile_image = random.choice(weighted_gila_tiles)
+                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                y = random.randint(0, height - 64)
+                gilas.append(Gila(x, y, "Gila"))
+
+            for _ in range(num_crows):
+                tile_x, tile_image = random.choice(weighted_crow_tiles)
+                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                y = random.randint(0, height - 64)
+                crows.append(Crow(x, y, "Crow"))
 
             dungeon_depth = 0
             dungeon_depth_high = 0
@@ -267,8 +309,14 @@ while running:
         chickens = [chicken for chicken in chickens if not chicken.destroyed]
         crawlers = [crawler for crawler in crawlers if not crawler.destroyed]
         duskwretches = [duskwretch for duskwretch in duskwretches if not duskwretch.destroyed]
+        pocks = [pock for pock in pocks if not pock.destroyed]
+        deers = [deer for deer in deers if not deer.destroyed]
+        black_bears = [black_bear for black_bear in black_bears if not black_bear.destroyed]
+        brown_bears = [brown_bear for brown_bear in brown_bears if not brown_bear.destroyed]
+        gilas = [gila for gila in gilas if not gila.destroyed]
+        crows = [crow for crow in crows if not crow.destroyed]
 
-            
+
         for tile_x, tile_image in tiles:
             screen_x = tile_x - cam_x
             if -BACKGROUND_SIZE < screen_x < width:
@@ -278,7 +326,7 @@ while running:
 
         collectibles = sticks + stones + grasses + savannah_grasses + mushrooms
         all_objects = rocks + trees + boulders + berry_bushes + dead_bushes
-        mobs = cats + squirrels + cows + chickens + crawlers + duskwretches
+        mobs = cats + squirrels + cows + chickens + crawlers + duskwretches + pocks + deers + black_bears + brown_bears + gilas + crows
 
         visible_collectibles = [col for col in collectibles if col.rect.x- cam_x > -1000 and col.rect.y - cam_x < width + 1000]
         visible_objects = [obj for obj in all_objects if obj.rect.x - cam_x > -1000 and obj.rect.x - cam_x < width + 1000]
@@ -775,8 +823,8 @@ while running:
             player_pos.x = width / 2
 
         if keys[pygame.K_p]:
-            dungeon_depth = 2000
-            cam_x = 100000
+            dungeon_depth = 1600
+            cam_x = 75000
             player_pos.x = width / 2
 
         if keys[pygame.K_l]:

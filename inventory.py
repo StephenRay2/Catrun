@@ -1,4 +1,5 @@
 import pygame
+from mob_placement import player
 
 
 player_inventory_image = pygame.image.load("assets/sprites/player/CharacterCorynnFrontStanding.png")
@@ -25,7 +26,9 @@ items_list = [
     {"item_name" : "Stone", "icon": "Stone.png", "stack_size": 100, "weight": .5},
     {"item_name" : "Sticks", "icon": "Stick.png", "stack_size": 100, "weight": .2},
     {"item_name" : "Poisonous Mushrooms", "icon": "PoisonousMushroom.png", "stack_size": 100, "weight": .1},
-    {"item_name" : "Fiber", "icon": "Fiber.png", "stack_size": 100, "weight": .01},
+    {"item_name" : "Fiber", "icon": "Fiber.png", "stack_size": 100, "weight": .05},
+    {"item_name" : "Hide", "icon": "Hide.png", "stack_size": 100, "weight": .3},
+
 
     {"item_name" : "Fence", "icon": "Fence.png", "stack_size": 100, "weight": 6},
     {"item_name" : "Empty Cage", "icon": "EmptyCage.png", "stack_size": 1, "weight": 8},
@@ -47,6 +50,7 @@ class Inventory():
         self.columns = 8
         self.gap_size = 4
         self.padding_size = 5
+        self.total_inventory_weight = 0
         self.inventory_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/inventory_screen.png").convert_alpha(), (1100, 600))
 
     def draw_inventory(self, screen):
@@ -64,16 +68,31 @@ class Inventory():
         start_y = (screen.get_height() / 2 - self.inventory_image.get_height() / 2) + 44
         used_slots = 0
         displayed_items = {}
-        font = pygame.font.SysFont(None, 24)
+        font = pygame.font.SysFont(None, 20)
         
-        for i, item_name in enumerate(self.inventory_list):
+        self.total_inventory_weight = 0
+        
+        # Get unique items to avoid processing duplicates
+        unique_items = []
+        seen = set()
+        for item_name in self.inventory_list:
+            if item_name not in seen:
+                unique_items.append(item_name)
+                seen.add(item_name)
+        
+        for item_name in unique_items:
             for item in items_list:
                 if item["item_name"] == item_name:
                     total_count = self.inventory_list.count(item_name)
-                    stacks_drawn = displayed_items.get(item_name, 0)
-                    remaining = total_count - (stacks_drawn * item["stack_size"])
+                    total_item_weight = round(total_count * item["weight"], 1)
                     
-                    if remaining > 0 and used_slots < self.capacity:
+                    # Add to total weight once per unique item
+                    self.total_inventory_weight += total_item_weight
+                    
+                    stacks_drawn = 0
+                    remaining = total_count
+                    
+                    while remaining > 0 and used_slots < self.capacity:
                         row = used_slots // self.columns
                         col = used_slots % self.columns
                         x = start_x + col * (self.slot_size + self.gap_size)
@@ -82,6 +101,8 @@ class Inventory():
                         screen.blit(item["image"], (x, y))
                         
                         stack_num = min(remaining, item["stack_size"])
+                        weight_text = font.render(str(total_item_weight), True, (200, 200, 50))
+                        screen.blit(weight_text, (x + 38, y + 4))
                         if stack_num > 1:
                             stack_text = font.render(str(stack_num), True, (255, 255, 255))
                             if stack_num == 100:
@@ -92,14 +113,20 @@ class Inventory():
                                 screen.blit(stack_text, (x + 47, y + 44))
                         
                         used_slots += 1
-                        displayed_items[item_name] = stacks_drawn + 1
-                        
-                        if remaining > item["stack_size"]:
-                            continue
-                        else:
-                            break
+                        stacks_drawn += 1
+                        remaining -= item["stack_size"]
+                    
                     break
+        
+        player.weight = self.total_inventory_weight
+        weight_text = font.render("Weight: ", True, (200, 200, 50))
+        weight_num_text = font.render(str(f"{round(self.total_inventory_weight, 1)} / {player.max_weight}"), True, (200, 200, 50))
+        total_weight_pos_x = screen.get_width()/2
+        screen.blit(weight_text, (total_weight_pos_x + 20, 110))
+        screen.blit(weight_num_text, (total_weight_pos_x + 20, 125))
 
 
     def add(self, resource):
         self.inventory_list.extend(resource)
+
+inventory = Inventory(64)
