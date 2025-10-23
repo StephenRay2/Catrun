@@ -435,7 +435,7 @@ while running:
                 sound_manager.play_sound(random.choice(["cow_moo1", "cow_moo2"]))
             elif isinstance(mob, Crow) and random.random() < 0.001:
                 sound_manager.play_sound(random.choice([f"crow_caw{i}" for i in range(1,4)]))
-            elif isinstance(mob, Duskwretch) and random.random() < 0.001:
+            elif isinstance(mob, Duskwretch) and random.random() < 0.001 and not mob.chasing and not mob.attacking:
                 sound_manager.play_sound("duskwretch_growl")
             elif isinstance(mob, (BlackBear, BrownBear)) and random.random() < 0.001:
                 sound_manager.play_sound("animal_breath")
@@ -469,7 +469,7 @@ while running:
                     if abs(obj.rect.x - (player_pos.x + cam_x)) < 1500 
                     and abs(obj.rect.y - player_pos.y) < 800]
         nearby_mobs = [mob for mob in mobs
-                    if abs(mob.rect.x - (player_pos.x + cam_x)) < 1500 
+                    if abs(mob.rect.x - (player_pos.x + cam_x)) < 3000
                     and abs(mob.rect.y - player_pos.y) < 800]
         
         screen.blit(hotbar_image, (width//2 - hotbar_image.get_width()//2, height - 100))

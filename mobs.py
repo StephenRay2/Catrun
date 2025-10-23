@@ -1094,6 +1094,8 @@ class Duskwretch(Enemy):
         self.attacking = False
         self.attack_timer = 0
         self.attack_duration = 20
+        self.has_roared = False
+        self.chase_steps_timer = 0
 
         self.attack_damage = 4
         self.base_speed = 150
@@ -1155,7 +1157,6 @@ class Duskwretch(Enemy):
         if self.is_moving and not self.was_moving:
             if self.chasing:
                 self.state = "chase"
-                sound_manager.play_sound(random.choice(["duskwretch_roar1", "duskwretch_roar2"]))
                 self.speed = 2.2
             else:
                 self.state = "start_walk"
@@ -1179,14 +1180,18 @@ class Duskwretch(Enemy):
             self.speed = 1.0
             self.frame_index = 0
 
+        if self.chasing and self.is_moving:
+            self.chase_steps_timer -= dt
+            if self.chase_steps_timer <= 0:
+                sound_manager.play_sound(random.choice([f"duskwretch_chase_steps{i}" for i in range(1, 6)]))
+                self.chase_steps_timer = 0.5
+
         self.animate_state(dt)
         self.was_moving = self.is_moving
 
         if not self.is_alive:
-            if self.last_direction == "left":
-                self.image = duskwretch_dead_image_left
-            else:
-                self.image = duskwretch_dead_image_right
+            self.image = duskwretch_dead_image_left if self.last_direction == "left" else duskwretch_dead_image_right
+
 
     def animate_state(self, dt):
         if self.state == "attacking":

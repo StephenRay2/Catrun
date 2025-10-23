@@ -196,7 +196,7 @@ for tile_x, tile_image in tiles:
     weighted_duskwretch_tiles.extend([(tile_x, tile_image)] * weight)
 
 duskwretches = []
-num_duskwretches = 30
+num_duskwretches = 75
 for _ in range(num_duskwretches):
     tile_x, tile_image = random.choice(weighted_duskwretch_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
