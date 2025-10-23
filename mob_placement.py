@@ -2,6 +2,21 @@ from mobs import *
 player = Player(width/2, height/2, "Corynn")
 
 
+num_deers = 50
+num_squirrels = 100
+num_cats = 250
+num_cows = 50
+num_chickens = 50
+num_crows = 75
+num_gilas = 50
+num_black_bears = 50
+num_brown_bears = 30
+
+
+num_crawlers = 50
+num_pocks = 50
+num_duskwretches = 40
+
 
 allowed_squirrel_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_snow, bg_wasteland]
 
@@ -29,7 +44,6 @@ for tile_x, tile_image in tiles:
     weighted_squirrel_tiles.extend([(tile_x, tile_image)] * weight)
 
 squirrels = []
-num_squirrels = 200
 for _ in range(num_squirrels):
     tile_x, tile_image = random.choice(weighted_squirrel_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
@@ -63,7 +77,6 @@ for tile_x, tile_image in tiles:
     weighted_cat_tiles.extend([(tile_x, tile_image)] * weight)
 
 cats = []
-num_cats = 500
 for _ in range(num_cats):
     tile_x, tile_image = random.choice(weighted_cat_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
@@ -96,7 +109,6 @@ for tile_x, tile_image in tiles:
     weighted_cow_tiles.extend([(tile_x, tile_image)] * weight)
 
 cows = []
-num_cows = 100
 for _ in range(num_cows):
     tile_x, tile_image = random.choice(weighted_cow_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
@@ -129,7 +141,6 @@ for tile_x, tile_image in tiles:
     weighted_chicken_tiles.extend([(tile_x, tile_image)] * weight)
 
 chickens = []
-num_chickens = 100
 for _ in range(num_chickens):
     tile_x, tile_image = random.choice(weighted_chicken_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
@@ -162,7 +173,6 @@ for tile_x, tile_image in tiles:
     weighted_crawler_tiles.extend([(tile_x, tile_image)] * weight)
 
 crawlers = []
-num_crawlers = 200
 for _ in range(num_crawlers):
     tile_x, tile_image = random.choice(weighted_crawler_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
@@ -196,7 +206,6 @@ for tile_x, tile_image in tiles:
     weighted_duskwretch_tiles.extend([(tile_x, tile_image)] * weight)
 
 duskwretches = []
-num_duskwretches = 75
 for _ in range(num_duskwretches):
     tile_x, tile_image = random.choice(weighted_duskwretch_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
@@ -228,7 +237,6 @@ for tile_x, tile_image in tiles:
     weighted_pock_tiles.extend([(tile_x, tile_image)] * weight)
 
 pocks = []
-num_pocks = 150
 for _ in range(num_pocks):
     tile_x, tile_image = random.choice(weighted_pock_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
@@ -260,7 +268,6 @@ for tile_x, tile_image in tiles:
     weighted_deer_tiles.extend([(tile_x, tile_image)] * weight)
 
 deers = []
-num_deers = 200
 for _ in range(num_deers):
     tile_x, tile_image = random.choice(weighted_deer_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
@@ -292,7 +299,6 @@ for tile_x, tile_image in tiles:
     weighted_black_bear_tiles.extend([(tile_x, tile_image)] * weight)
 
 black_bears = []
-num_black_bears = 100
 for _ in range(num_black_bears):
     tile_x, tile_image = random.choice(weighted_black_bear_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
@@ -324,7 +330,6 @@ for tile_x, tile_image in tiles:
     weighted_brown_bear_tiles.extend([(tile_x, tile_image)] * weight)
 
 brown_bears = []
-num_brown_bears = 100
 for _ in range(num_brown_bears):
     tile_x, tile_image = random.choice(weighted_brown_bear_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
@@ -357,7 +362,6 @@ for tile_x, tile_image in tiles:
     weighted_gila_tiles.extend([(tile_x, tile_image)] * weight)
 
 gilas = []
-num_gilas = 100
 for _ in range(num_gilas):
     tile_x, tile_image = random.choice(weighted_gila_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
@@ -389,7 +393,6 @@ for tile_x, tile_image in tiles:
     weighted_crow_tiles.extend([(tile_x, tile_image)] * weight)
 
 crows = []
-num_crows = 150
 for _ in range(num_crows):
     tile_x, tile_image = random.choice(weighted_crow_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)

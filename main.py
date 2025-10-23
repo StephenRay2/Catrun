@@ -423,9 +423,9 @@ while running:
         all_objects = rocks + trees + boulders + berry_bushes + dead_bushes
         mobs = cats + squirrels + cows + chickens + crawlers + duskwretches + pocks + deers + black_bears + brown_bears + gilas + crows
 
-        visible_collectibles = [col for col in collectibles if col.rect.x- cam_x > -1000 and col.rect.y - cam_x < width + 1000]
-        visible_objects = [obj for obj in all_objects if obj.rect.x - cam_x > -1000 and obj.rect.x - cam_x < width + 1000]
-        visible_mobs = [mob for mob in mobs if mob.rect.x - cam_x > -1000 and mob.rect.x - cam_x < width + 1000]
+        visible_collectibles = [col for col in collectibles if col.rect.x- cam_x > -256 and col.rect.x - cam_x < width + 256]
+        visible_objects = [obj for obj in all_objects if obj.rect.x - cam_x > -256 and obj.rect.x - cam_x < width + 256 and obj.rect.y > -256 and obj.rect.y < height + 256]
+        visible_mobs = [mob for mob in mobs if mob.rect.x - cam_x > -256 and mob.rect.x - cam_x < width + 256 and mob.rect.y > -256 and mob.rect.y < height + 256]
         for mob in visible_mobs:
             if isinstance(mob, Cat) and random.random() < 0.001:
                 sound_manager.play_sound(random.choice([f"cat_meow{i}" for i in range(1,7)]))
@@ -487,17 +487,17 @@ while running:
                         obj_collision = obj.get_collision_rect(0)
                         horizontal_dist = abs(obj_collision.centerx - player_world_x)
                         vertical_dist = abs(obj_collision.centery - player_world_y)
-                        collect_reach = 25
+                        collect_reach = 40
                         horizontal_range = (obj_collision.width / 2) + collect_reach
                         vertical_range = (obj_collision.height / 2) + collect_reach
                         facing_object = False
-                        if player.last_direction == "right" and obj_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                        if player.last_direction == "right" and obj_collision.centerx > player_world_x - 10 and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
                             facing_object = True
-                        elif player.last_direction == "left" and obj_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                        elif player.last_direction == "left" and obj_collision.centerx < player_world_x + 10 and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
                             facing_object = True
-                        elif player.last_direction == "up" and obj_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                        elif player.last_direction == "up" and obj_collision.centery < player_world_y + 10 and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
                             facing_object = True
-                        elif player.last_direction == "down" and obj_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                        elif player.last_direction == "down" and obj_collision.centery > player_world_y - 10 and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
                             facing_object = True
                         if facing_object:
                             resource = obj.collect(player)
@@ -540,8 +540,12 @@ while running:
             for tree in trees:
                 tree.update(dt)
 
+            # Mark visibility for mobs to control sound effects
+            visible_mob_set = set(visible_mobs)
+            for mob in nearby_mobs:
+                mob.is_visible = mob in visible_mob_set
 
-            for mob in mobs:
+            for mob in nearby_mobs:
                 mob_nearby_objects = [obj for obj in nearby_objects 
                                     if abs(obj.rect.x - mob.rect.x) < 100 
                                     and abs(obj.rect.y - mob.rect.y) < 100]

@@ -99,6 +99,9 @@ duskwretch_dead_image_right = pygame.transform.flip(duskwretch_dead_image_left, 
 pock_idle_images = ["assets/sprites/mobs/PockIdle1.png", "assets/sprites/mobs/PockIdle2.png"]
 pock_move_right_images = ["assets/sprites/mobs/PockMoveRight1.png", "assets/sprites/mobs/PockMoveRight2.png", "assets/sprites/mobs/PockMoveRight3.png", "assets/sprites/mobs/PockMoveRight4.png"]
 pock_throw_right_images = ["assets/sprites/mobs/PockThrowRight1.png", "assets/sprites/mobs/PockThrowRight2.png", "assets/sprites/mobs/PockThrowRight3.png", "assets/sprites/mobs/PockThrowRight4.png"]
+pock_dead_image_left = pygame.image.load("assets/sprites/mobs/PockDead.png").convert_alpha()
+pock_dead_image_right = pygame.transform.flip(pock_dead_image_left, True, False)
+
 
 deer_idle_images = ["assets/sprites/mobs/DeerIdle1.png", "assets/sprites/mobs/DeerIdle2.png", "assets/sprites/mobs/DeerIdle3.png", "assets/sprites/mobs/DeerIdle4.png", "assets/sprites/mobs/DeerIdle5.png", "assets/sprites/mobs/DeerIdle6.png", "assets/sprites/mobs/DeerIdle7.png", "assets/sprites/mobs/DeerIdle8.png"]
 deer_walk_left_images = ["assets/sprites/mobs/DeerWalkLeft1.png", "assets/sprites/mobs/DeerWalkLeft2.png", "assets/sprites/mobs/DeerWalkLeft3.png", "assets/sprites/mobs/DeerWalkLeft4.png", "assets/sprites/mobs/DeerWalkLeft5.png", "assets/sprites/mobs/DeerWalkLeft6.png", "assets/sprites/mobs/DeerWalkLeft7.png", "assets/sprites/mobs/DeerWalkLeft8.png"]
@@ -1156,6 +1159,7 @@ class Duskwretch(Enemy):
 
         if self.is_moving and not self.was_moving:
             if self.chasing:
+                sound_manager.play_sound(random.choice(["duskwretch_roar1", "duskwretch_roar2"]))
                 self.state = "chase"
                 self.speed = 2.2
             else:
@@ -1184,7 +1188,7 @@ class Duskwretch(Enemy):
             self.chase_steps_timer -= dt
             if self.chase_steps_timer <= 0:
                 sound_manager.play_sound(random.choice([f"duskwretch_chase_steps{i}" for i in range(1, 6)]))
-                self.chase_steps_timer = 0.5
+                self.chase_steps_timer = 0.3
 
         self.animate_state(dt)
         self.was_moving = self.is_moving
@@ -1237,7 +1241,7 @@ class Duskwretch(Enemy):
 
     def flee(self, player_world_x, player_world_y, dt):
         return
-
+    
 
 class AggressiveMob(Mob):
     def __init__(self, x, y, name):
@@ -1378,7 +1382,11 @@ class Pock(Enemy):
         super().update(dt, player, nearby_objects, nearby_mobs)
 
         if not self.is_alive:
-            pass
+            if self.last_direction == "left":
+                self.image = pock_dead_image_left
+            else:
+                self.image = pock_dead_image_right
+
 
 
 class Deer(AggressiveMob):
@@ -1428,18 +1436,6 @@ class Deer(AggressiveMob):
             self.aggressive = False
             self.enemy = False
 
-    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
-        was_moving = self.direction.length_squared() > 0
-        
-        super().update(dt, player, nearby_objects, nearby_mobs)
-        
-        self.is_moving = self.direction.length_squared() > 0 and self.is_alive
-        
-        if self.is_moving:
-            self.hoof_timer -= dt
-            if self.hoof_timer <= 0:
-                sound_manager.play_sound(random.choice([f"hoofs{i}" for i in range(1,7)]))
-                self.hoof_timer = random.uniform(0.3, 0.7)
 
     def get_collision_rect(self, cam_x):
             rect = self.rect
@@ -1561,15 +1557,28 @@ class Deer(AggressiveMob):
     
     def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
         if self.attacking:
+            super().update(dt, player, nearby_objects, nearby_mobs)
             return
         
         super().update(dt, player, nearby_objects, nearby_mobs)
+        
+        self.is_moving = self.direction.length_squared() > 0 and self.is_alive
+        
+        if self.is_moving or self.chasing == True or self.fleeing == True:
+            self.hoof_timer -= dt
+            if self.hoof_timer <= 0 and getattr(self, 'is_visible', True):
+                sound_manager.play_sound(random.choice([f"hoofs{i}" for i in range(1, 7)]))
+                self.hoof_timer = random.uniform(0.3, 0.7)
+        else:
+            # Reset timer when deer stops moving
+            self.hoof_timer = random.uniform(0.5, 1.0)
         
         if not self.is_alive:
             if self.last_direction == "right":
                 self.image = pygame.transform.flip(self.dead_image_left, True, False)
             else:
                 self.image = self.dead_image_left
+
 
 class BlackBear(AggressiveMob):
     def __init__(self, x, y, name):

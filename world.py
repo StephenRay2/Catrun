@@ -8,17 +8,17 @@ height = screen.get_height()
 clock = pygame.time.Clock()
 state = "menu"
 
-num_rocks = 2000
-num_boulders = 300
+num_rocks = 1500
+num_boulders = 200
 num_bushes = 400
-num_grassland_trees = 600
-num_savannah_trees = 100
-num_grasses = 1500
-num_sticks = 1000
-num_stones = 1000
+num_grassland_trees = 400
+num_savannah_trees = 50
+num_grasses = 1000
+num_sticks = 500
+num_stones = 500
 num_savannah_grasses = 1600
-num_mushrooms = 100
-num_dead_bushes = 1000
+num_mushrooms = 50
+num_dead_bushes = 300
 
 rocks = []
 dead_bushes = []
