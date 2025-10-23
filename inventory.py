@@ -1,5 +1,7 @@
 import pygame
 from mob_placement import player
+from buttons import inventory_tab, crafting_tab, level_up_tab, cats_tab, inventory_tab_unused, crafting_tab_unused, level_up_tab_unused, cats_tab_unused
+
 
 
 player_inventory_image = pygame.image.load("assets/sprites/player/CharacterCorynnFrontStanding.png")
@@ -51,17 +53,63 @@ class Inventory():
         self.gap_size = 4
         self.padding_size = 5
         self.total_inventory_weight = 0
+        self.state = "inventory"
         self.inventory_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/inventory_screen.png").convert_alpha(), (1100, 600))
+        self.crafting_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/crafting_screen.png").convert_alpha(), (1100, 600))
+        self.level_up_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/level_up_screen.png").convert_alpha(), (1100, 600))
+        self.cat_screen_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/cats_screen.png").convert_alpha(), (1100, 600))
 
     def draw_inventory(self, screen):
         
+        width = screen.get_width()
+        height = screen.get_height()
         x_pos = screen.get_width() / 2 - self.inventory_image.get_width() / 2
         y_pos = screen.get_height() / 2 - self.inventory_image.get_height() / 2
-        inventory_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
-        pygame.draw.rect(inventory_surface, (0, 0, 0, 150), screen.get_rect())
-        screen.blit(inventory_surface, (0, 0))
-        screen.blit(self.inventory_image, (x_pos, y_pos - 20))
-        screen.blit(player_inventory_image, (700, 130))
+        if self.state == "inventory":
+            inventory_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
+            pygame.draw.rect(inventory_surface, (0, 0, 0, 150), screen.get_rect())
+            screen.blit(inventory_surface, (0, 0))
+            screen.blit(self.inventory_image, (x_pos, y_pos - 20))
+            screen.blit(player_inventory_image, (700, 130))
+
+            screen.blit(inventory_tab, (width // 2 - 533, height // 2 - 303))
+            crafting_tab_unused.draw(screen)
+            level_up_tab_unused.draw(screen)
+            cats_tab_unused.draw(screen)
+
+        elif self.state == "crafting":
+            inventory_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
+            pygame.draw.rect(inventory_surface, (0, 0, 0, 150), screen.get_rect())
+            screen.blit(inventory_surface, (0, 0))
+            screen.blit(self.crafting_image, (x_pos, y_pos - 20))
+
+            inventory_tab_unused.draw(screen)
+            screen.blit(crafting_tab, (width // 2 - 397, height // 2 - 303))
+            level_up_tab_unused.draw(screen)
+            cats_tab_unused.draw(screen)
+    
+        elif self.state == "level_up":
+            inventory_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
+            pygame.draw.rect(inventory_surface, (0, 0, 0, 150), screen.get_rect())
+            screen.blit(inventory_surface, (0, 0))
+            screen.blit(self.level_up_image, (x_pos, y_pos - 20))
+            screen.blit(player_inventory_image, (700, 130))
+
+            inventory_tab_unused.draw(screen)
+            crafting_tab_unused.draw(screen)
+            screen.blit(level_up_tab, (width // 2 - 261, height // 2 - 303))
+            cats_tab_unused.draw(screen)
+
+        elif self.state == "cats":
+            inventory_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
+            pygame.draw.rect(inventory_surface, (0, 0, 0, 150), screen.get_rect())
+            screen.blit(inventory_surface, (0, 0))
+            screen.blit(self.cat_screen_image, (x_pos, y_pos - 20))
+
+            inventory_tab_unused.draw(screen)
+            crafting_tab_unused.draw(screen)
+            level_up_tab_unused.draw(screen)
+            screen.blit(cats_tab, (width // 2 - 125, height // 2 - 303))
         
     def draw_items(self, screen):
         start_x = (screen.get_width() / 2 - self.inventory_image.get_width() / 2) + 17
@@ -72,7 +120,6 @@ class Inventory():
         
         self.total_inventory_weight = 0
         
-        # Get unique items to avoid processing duplicates
         unique_items = []
         seen = set()
         for item_name in self.inventory_list:
@@ -86,7 +133,6 @@ class Inventory():
                     total_count = self.inventory_list.count(item_name)
                     total_item_weight = round(total_count * item["weight"], 1)
                     
-                    # Add to total weight once per unique item
                     self.total_inventory_weight += total_item_weight
                     
                     stacks_drawn = 0

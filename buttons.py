@@ -60,3 +60,29 @@ new_game_button = Button(width//2 - new_game_button.get_width()//2, height//2 - 
 load_button = Button(width//2 - load_button.get_width()//2, height//2 + 50, load_button)
 menu_settings_button = Button(width//2 - menu_settings_button.get_width()//2, height//2 + 150, menu_settings_button)
 menu_quit_button = Button(width//2 - menu_quit_button.get_width()//2, height//2 + 250, menu_quit_button)
+
+inventory_tab = pygame.image.load("assets/sprites/buttons/inventory_tab.png").convert_alpha()
+inventory_tab_unused = pygame.image.load("assets/sprites/buttons/inventory_tab_unused.png").convert_alpha()
+crafting_tab = pygame.image.load("assets/sprites/buttons/crafting_tab.png").convert_alpha()
+crafting_tab_unused = pygame.image.load("assets/sprites/buttons/crafting_tab_unused.png").convert_alpha()
+level_up_tab = pygame.image.load("assets/sprites/buttons/level_up_tab.png").convert_alpha()
+level_up_tab_unused = pygame.image.load("assets/sprites/buttons/level_up_tab_unused.png").convert_alpha()
+cats_tab = pygame.image.load("assets/sprites/buttons/cats_tab.png").convert_alpha()
+cats_tab_unused = pygame.image.load("assets/sprites/buttons/cats_tab_unused.png").convert_alpha()
+
+inventory_tab = pygame.transform.scale(inventory_tab, (134, 44))
+inventory_tab_unused = pygame.transform.scale(inventory_tab_unused, (134, 44))
+crafting_tab = pygame.transform.scale(crafting_tab, (134, 44))
+crafting_tab_unused = pygame.transform.scale(crafting_tab_unused, (134, 44))
+level_up_tab = pygame.transform.scale(level_up_tab, (134, 44))
+level_up_tab_unused = pygame.transform.scale(level_up_tab_unused, (134, 44))
+cats_tab = pygame.transform.scale(cats_tab, (134, 44))
+cats_tab_unused = pygame.transform.scale(cats_tab_unused, (134, 44))
+
+
+inventory_tab_unused = Button(width // 2 - 533, height // 2 - 303, inventory_tab_unused)
+crafting_tab_unused = Button(width // 2 - 397, height // 2 - 303, crafting_tab_unused)
+level_up_tab_unused = Button(width // 2 - 261, height // 2 - 303, level_up_tab_unused)
+cats_tab_unused = Button(width // 2 - 125, height // 2 - 303, cats_tab_unused)
+
+

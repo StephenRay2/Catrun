@@ -1,7 +1,7 @@
 import pygame
 import random
 from world import *
-
+from sounds import *
 font = pygame.font.Font(None, 24)
 large_font = pygame.font.Font(None, 40)
 xl_font = pygame.font.Font(None, 100)
@@ -176,6 +176,7 @@ class Player(pygame.sprite.Sprite):
         self.is_alive = True
         self.is_attacking = False
         self.direction = pygame.Vector2(0, 0)
+        self.step_sound = random.choice(grass_steps)
 
         self.exhausted = False
         self.dead = False
@@ -211,7 +212,15 @@ class Player(pygame.sprite.Sprite):
                         facing_object = True
 
                     if facing_object and 1 <= mob.health:
+                        old_health = mob.health
                         mob.health -= self.damage * self.attack
+                        if mob.health < old_health:
+                            if mob.__class__.__name__ in ["BlackBear", "BrownBear"]:
+                                sound_manager.play_sound("bear_get_hit")
+                            elif mob.__class__.__name__ == "Deer":
+                                sound_manager.play_sound("buck_get_hit")
+                            elif mob.__class__.__name__ == "Chicken":
+                                sound_manager.play_sound(random.choice([f"chicken_get_hit{i}" for i in range(1,4)]))
 
 
 
@@ -366,6 +375,7 @@ class Player(pygame.sprite.Sprite):
             elif self.level <= 100:
                 self.next_level_exp = int(1500 + (self.exp_total * 0.007))
             self.level_up_timer = 10
+            sound_manager.play_sound("level_up")
 
     def show_level_up_message(self, screen):
         level_up_text = large_font.render(
@@ -376,6 +386,10 @@ class Player(pygame.sprite.Sprite):
             screen.get_width() // 2 - level_up_text.get_width() // 2,
             20
         ))
+
+    def take_damage(self, damage):
+        self.health -= damage
+        sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1,5)]))
 
     def feed_cat(self, cat):
         pass
@@ -1026,6 +1040,7 @@ class Crawler(Enemy):
 
             if self.attack_timer == self.attack_duration // 2 and distance_sq < (50 * 50):
                 player.health -= self.attack_damage
+                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
 
             if self.attack_timer <= 0:
                 self.attacking = False
@@ -1103,6 +1118,7 @@ class Duskwretch(Enemy):
                 self.attacking = True
                 self.attack_timer = self.attack_duration
                 self.frame_index = 0.0
+                sound_manager.play_sound(random.choice(["duskwretch_roar1", "duskwretch_roar2"]))
 
         if self.attacking:
             self.state = "attacking"
@@ -1115,6 +1131,7 @@ class Duskwretch(Enemy):
 
             if self.attack_timer == self.attack_duration // 2 and distance_sq < (70 * 70):
                 player.health -= self.attack_damage
+                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
 
             if self.attack_timer <= 0:
                 self.attacking = False
@@ -1141,7 +1158,7 @@ class Duskwretch(Enemy):
 
         elif not self.is_moving and self.was_moving:
             self.state = "end_walk"
-            self.speed = 1.0  # Reset speed
+            self.speed = 1.0
             self.frame_index = 0
             self.transition_done = False
 
@@ -1336,6 +1353,7 @@ class Pock(Enemy):
 
             if self.throw_timer == self.throw_duration // 2 and distance_sq < (100 * 100):
                 player.health -= self.attack_damage
+                
 
             if self.throw_timer <= 0:
                 self.throwing = False
@@ -1505,7 +1523,8 @@ class Deer(AggressiveMob):
             
             if self.attack_timer == self.attack_duration // 2 and distance_sq < (70 * 70):
                 player.health -= self.attack_damage
-            
+                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+
             if self.attack_timer <= 0:
                 self.attacking = False
                 self.frame_index = 0.0
@@ -1681,6 +1700,7 @@ class BlackBear(AggressiveMob):
             
             if self.attack_timer == self.attack_duration // 2 and distance_sq < (70 * 70):
                 player.health -= self.attack_damage
+                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
             
             if self.attack_timer <= 0:
                 self.attacking = False
@@ -1844,6 +1864,7 @@ class BrownBear(AggressiveMob):
             
             if self.attack_timer == self.attack_duration // 2 and distance_sq < (70 * 70):
                 player.health -= self.attack_damage
+                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
             
             if self.attack_timer <= 0:
                 self.attacking = False
@@ -1908,7 +1929,6 @@ class Gila(AggressiveMob):
         self.attack_duration = 25
         self.attack_damage = 6
         
-        # Gila starts non-aggressive
         self.aggressive = False
         self.enemy = False
     
@@ -1974,6 +1994,7 @@ class Gila(AggressiveMob):
             
             if self.attack_timer == self.attack_duration // 2 and distance_sq < (50 * 50):
                 player.health -= self.attack_damage
+                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
             
             if self.attack_timer <= 0:
                 self.attacking = False
@@ -2128,7 +2149,6 @@ class Crow(Mob):
         if self.state == "walking":
             super().animate_stand()
         elif self.state == "flying":
-            # Check if still in takeoff animation
             if self.frame_index < len(self.start_fly_left_images):
                 frames = self.start_fly_right_images if self.last_direction == "right" else self.start_fly_left_images
                 self.frame_index += self.animation_speed

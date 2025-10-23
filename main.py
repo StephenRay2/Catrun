@@ -2,6 +2,7 @@ import pygame
 pygame.init()
 from buttons import *
 from mob_placement import *
+from sounds import *
 
 clock = pygame.time.Clock()
 from inventory import *
@@ -29,7 +30,8 @@ collection_message_num = 0
 paused = False
 inventory_in_use = False
 
-
+step_sound_timer = 0
+step_sound_delay = 0.3
 collect_cooldown = 0
 collect_delay = 300
 harvest_cooldown = 0
@@ -37,12 +39,19 @@ harvest_delay = 300
 inventory_resources = []
 state = "menu"
 generate_world()
-
-game_just_started = False
-
+previous_state = state
+sound_manager.play_music("assets/music/Settler's End.wav")
 ######################### GAME LOOP ################################
 
 while running:
+    if state != previous_state:
+        if state == "menu":
+            sound_manager.stop_music()
+            sound_manager.play_music("assets/music/Settler's End.wav")
+        elif state == "game":
+            sound_manager.stop_music()
+            sound_manager.play_random_ambient_music(min_delay=100, max_delay=500, volume=0.2, fade_in=5000)
+        previous_state = state
     if state == "menu":
         menu_image = bg_grass
         menu_screen = pygame.Rect(0, 0, width, height)
@@ -68,7 +77,8 @@ while running:
             object_mid_y = obj.rect.y + obj.rect.height / 2
             obj.draw(screen, cam_x)
 
-
+        catrun_title = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/catrun_title.png").convert_alpha(), (800, 200))
+        screen.blit(catrun_title, (width/2 - catrun_title.get_width()/2, 100))
         new_game_button.draw(screen)
         load_button.draw(screen)
         menu_settings_button.draw(screen)
@@ -242,6 +252,40 @@ while running:
             if event.type == pygame.KEYDOWN and event.key == pygame.K_q:
                 inventory_in_use = not inventory_in_use
 
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
+                if current_time - collect_cooldown > collect_delay:
+                    collect_cooldown = current_time
+                    for obj in visible_objects:
+                        if hasattr(obj, 'collect') and hasattr(obj, 'is_empty') and not obj.destroyed and not obj.is_empty:
+                            obj_collision = obj.get_collision_rect(0)
+                            horizontal_dist = abs(obj_collision.centerx - player_world_x)
+                            vertical_dist = abs(obj_collision.centery - player_world_y)
+                            collect_reach = 25
+                            horizontal_range = (obj_collision.width / 2) + collect_reach
+                            vertical_range = (obj_collision.height / 2) + collect_reach
+                            facing_object = False
+                            if player.last_direction == "right" and obj_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                facing_object = True
+                            elif player.last_direction == "left" and obj_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                facing_object = True
+                            elif player.last_direction == "up" and obj_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                facing_object = True
+                            elif player.last_direction == "down" and obj_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                facing_object = True
+                            if facing_object:
+                                resource = obj.collect(player)
+                                if resource:
+                                    sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
+                                    inventory_resources.extend(resource)
+                                    collection_messages.insert(0, [
+                                        font.render(f"Collected {len(resource)} {obj.berry}", True, (20, 255, 20)),
+                                        pygame.Surface((font.render(f"Collected {len(resource)} {obj.berry}", True, (20, 255, 20)).get_width() + 10, font.render(f"Collected {len(resource)} {obj.berry}", True, (20, 255, 20)).get_height() + 10), pygame.SRCALPHA),
+                                        pygame.Rect(20, 500, font.render(f"Collected {len(resource)} {obj.berry}", True, (20, 255, 20)).get_width(), font.render(f"Collected {len(resource)} {obj.berry}", True, (20, 255, 20)).get_height()),
+                                        3.0,
+                                        1.0
+                                    ])
+                                    collection_messages[0][1].fill((0, 0, 0, 100))
+
             if paused:
                 if resume_button.is_clicked(event):
                     paused = False
@@ -250,8 +294,10 @@ while running:
                     paused = False
     
         current_time = pygame.time.get_ticks()
+
+
             
-        if not paused and pygame.mouse.get_pressed()[0] and not player.exhausted:
+        if not paused and not inventory_in_use and pygame.mouse.get_pressed()[0] and not player.exhausted:
             if current_time - harvest_cooldown > harvest_delay:
                 harvest_cooldown = current_time
                 for obj in visible_objects:
@@ -279,6 +325,13 @@ while running:
                         if facing_object:
                             resource = obj.harvest(player)
                             if resource:
+                                if hasattr(obj, 'resource'):
+                                    if obj.resource == "Stone":
+                                        sound_manager.play_sound(random.choice([f"harvest_stone{i}" for i in range(1, 7)]))
+                                    elif obj.resource in ["Apple Wood", "Dusk Wood", "Fir Wood", "Oak Wood", "Orange Wood"]:
+                                        sound_manager.play_sound(random.choice(["gather_wood1", "gather_wood2", "gather_wood3"]))
+                                    elif obj.resource == "Sticks":
+                                        sound_manager.play_sound(random.choice(["break_bush1", "break_bush2"]))
                                 inventory_resources.extend(resource)
                                 resource_collect_text = font.render(f"Collected {len(resource)} {obj.resource}", True, (20, 255, 20))
                                 collection_messages.insert(0, [
@@ -368,7 +421,7 @@ while running:
         
 
 
-        if not paused and player.dead == False:
+        if not paused and not inventory_in_use and player.dead == False:
 
             for bush in berry_bushes:
                 if current_time - collect_cooldown > collect_delay:
@@ -378,6 +431,7 @@ while running:
                         berries = bush.collect(player)
                         
                         if berries:
+                            sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1, 5)]))
                             collect_cooldown = current_time
                             inventory_resources.extend(berries)
                             berry_collect_text = font.render(f"Collected {len(berries)} {bush.berry}", True, (20, 255, 20))
@@ -542,12 +596,38 @@ while running:
 
             if not inventory_in_use:
 
-                if (((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]) and keys[pygame.K_LSHIFT]) or pygame.mouse.get_pressed()[0]) and not player.exhausted:
+                if (((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]) and (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT])) or pygame.mouse.get_pressed()[0]) and not player.exhausted:
                     if player.lose_stamina(screen, dt):
                         stamina_depleted_message_timer = 2.0
                     player.stamina_speed()
 
-                if not (keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]):
+                # Check if player is moving in any direction
+                is_moving = keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]
+                is_running = (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]) and is_moving
+                
+                # Play footstep sound if moving (only once per delay, regardless of direction)
+                if is_moving:
+                    # Calculate delay based on actual player speed (accounts for exhaustion and sprinting)
+                    # player_speed is calculated from player.get_speed() which returns base_speed * speed
+                    # shift_multiplier (1.5 when running, 1.0 when walking) affects actual movement
+                    base_delay = 0.3  # Base walking speed delay
+                    
+                    # The actual speed being used includes shift_multiplier
+                    actual_speed = player_speed * shift_multiplier
+                    base_speed = player.base_speed * player.speed
+                    speed_ratio = actual_speed / base_speed if base_speed > 0 else 1.0
+                    
+                    current_step_delay = base_delay / speed_ratio
+                    
+                    step_sound_timer += dt
+                    if step_sound_timer >= current_step_delay:
+                        sound_manager.play_sound(random.choice(grass_steps))
+                        step_sound_timer = 0
+                else:
+                    # Reset timer when not moving
+                    step_sound_timer = 0
+
+                if not is_moving:
                     if player.last_direction == "down":
                         if pygame.mouse.get_pressed()[0] and not player.exhausted:
                             player_animation_timer += dt
@@ -625,7 +705,7 @@ while running:
                 if keys[pygame.K_d] and pygame.mouse.get_pressed()[0] and not player.exhausted:
                     player.last_direction = "right"
                     player_animation_timer += dt
-                    if keys[pygame.K_LSHIFT]:
+                    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
                         if player_animation_timer > .04:
                             player_frame_index = (player_frame_index + 1) % len(player_walk_right_attack_images)
                             player_current_image = player_walk_right_attack_images[player_frame_index]
@@ -640,7 +720,7 @@ while running:
                 elif keys[pygame.K_d]:
                     player.last_direction = "right"
                     player_animation_timer += dt
-                    if keys[pygame.K_LSHIFT]:
+                    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
                         if player_animation_timer > .04:
                             player_frame_index = (player_frame_index + 1) % len(player_walk_right_images)
                             player_current_image = player_walk_right_images[player_frame_index]
@@ -655,7 +735,7 @@ while running:
                 elif keys[pygame.K_a] and pygame.mouse.get_pressed()[0] and not player.exhausted:
                     player.last_direction = "left"
                     player_animation_timer += dt
-                    if keys[pygame.K_LSHIFT]:
+                    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
                         if player_animation_timer > .04:
                             player_frame_index = (player_frame_index + 1) % len(player_walk_left_attack_images)
                             player_current_image = player_walk_left_attack_images[player_frame_index]
@@ -670,7 +750,7 @@ while running:
                 elif keys[pygame.K_a]:
                     player.last_direction = "left"
                     player_animation_timer += dt
-                    if keys[pygame.K_LSHIFT]:
+                    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
                         if player_animation_timer > .04:
                             player_frame_index = (player_frame_index + 1) % len(player_walk_left_images)
                             player_current_image = player_walk_left_images[player_frame_index]
@@ -686,7 +766,7 @@ while running:
                 elif keys[pygame.K_w] and pygame.mouse.get_pressed()[0] and not player.exhausted:
                     player.last_direction = "up"
                     player_animation_timer += dt
-                    if keys[pygame.K_LSHIFT]:
+                    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
                         if player_animation_timer > .04:
                             player_frame_index = (player_frame_index + 1) % len(player_walk_up_attack_images)
                             player_current_image = player_walk_up_attack_images[player_frame_index]
@@ -701,7 +781,7 @@ while running:
                 elif keys[pygame.K_w]:
                     player.last_direction = "up"
                     player_animation_timer += dt
-                    if keys[pygame.K_LSHIFT]:
+                    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
                         if player_animation_timer > .04:
                             player_frame_index = (player_frame_index + 1) % len(player_walk_up_images)
                             player_current_image = player_walk_up_images[player_frame_index]
@@ -717,7 +797,7 @@ while running:
                 elif keys[pygame.K_s] and pygame.mouse.get_pressed()[0] and not player.exhausted:
                     player.last_direction = "down"
                     player_animation_timer += dt
-                    if keys[pygame.K_LSHIFT]:
+                    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
                         if player_animation_timer > .04:
                             player_frame_index = (player_frame_index + 1) % len(player_walk_down_attack_images)
                             player_current_image = player_walk_down_attack_images[player_frame_index]
@@ -732,7 +812,7 @@ while running:
                 elif keys[pygame.K_s]:
                     player.last_direction = "down"
                     player_animation_timer += dt
-                    if keys[pygame.K_LSHIFT]:
+                    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
                         if player_animation_timer > .04:
                             player_frame_index = (player_frame_index + 1) % len(player_walk_down_images)
                             player_current_image = player_walk_down_images[player_frame_index]
@@ -752,7 +832,12 @@ while running:
                 else:
                     shift_multiplier = 1
 
-        
+                step_sound_timer += dt
+                if step_sound_timer >= step_sound_delay and (keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]):
+                    sound_manager.play_sound(random.choice(grass_steps))
+                    step_sound_timer = 0
+
+
 
     ############# END NOT INVENTORY IN USE #################
     ############# END NOT PAUSED #################
@@ -775,7 +860,7 @@ while running:
         player.print_score(screen, dungeon_depth_high)
         player.is_dead(screen, dungeon_depth_high)
 
-        if (not ((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]) and keys[pygame.K_LSHIFT]) and not pygame.mouse.get_pressed()[0]) or player.exhausted:
+        if (not ((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]) and (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT])) and not pygame.mouse.get_pressed()[0]) or player.exhausted:
             player.regain_stamina(dt, screen)
             player.stamina_speed()
             player.lose_water(dt)
@@ -795,8 +880,17 @@ while running:
         if inventory_in_use:
 
             inventory.draw_inventory(screen)
-            inventory.draw_items(screen)
+            if inventory.state == "inventory":
+                inventory.draw_items(screen)
             screen.blit(hotbar_image, (width//2 - hotbar_image.get_width()//2, height - 100))
+            if inventory_tab_unused.is_clicked(event):
+                inventory.state = "inventory"
+            elif crafting_tab_unused.is_clicked(event):
+                inventory.state = "crafting"
+            elif level_up_tab_unused.is_clicked(event):
+                inventory.state = "level_up"
+            elif cats_tab_unused.is_clicked(event):
+                inventory.state = "cats"
 
         if paused:
             screen.blit(temp_pause_surface, pause_menu_rect.topleft)

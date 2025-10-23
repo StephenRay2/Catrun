@@ -212,6 +212,15 @@ class BerryBush(pygame.sprite.Sprite):
             return [self.berry] * berry_count
         return []
 
+    def harvest(self, player=None):
+        if not self.destroyed:
+            resource_collected = random.randint(3, 9)
+            self.destroyed = True
+            player.experience += harvest_experience * resource_collected
+            player.exp_total += harvest_experience * resource_collected
+            return [self.resource] * resource_collected
+        return []
+
     def update(self, dt):
         if self.is_empty:
             self.timer += dt
