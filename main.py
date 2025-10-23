@@ -31,9 +31,9 @@ paused = False
 inventory_in_use = False
 
 step_sound_timer = 0
-step_sound_delay = 0.3
+step_sound_delay = 0.4
 collect_cooldown = 0
-collect_delay = 300
+collect_delay = 100
 harvest_cooldown = 0
 harvest_delay = 300
 inventory_resources = []
@@ -41,7 +41,26 @@ state = "menu"
 generate_world()
 previous_state = state
 sound_manager.play_music("assets/music/Settler's End.wav")
-######################### GAME LOOP ################################
+
+def get_current_background(player_world_x, tiles):
+    for tile_x, tile_image in tiles:
+        if tile_x <= player_world_x < tile_x + BACKGROUND_SIZE:
+            return tile_image
+    return bg_grass
+
+def get_footstep_sounds(background):
+    grass_backgrounds = [bg_grass, bg_compact]
+    dirt_backgrounds = [bg_dirt, bg_duskstone, bg_wasteland, bg_blackstone, bg_redrock, bg_lavastone]
+    sand_backgrounds = [bg_sand, bg_savannah]
+    
+    if background in grass_backgrounds:
+        return [f"footstep_grass{i}" for i in range(1, 7)]
+    elif background in dirt_backgrounds:
+        return [f"footstep_dirt{i}" for i in range(1, 7)]
+    elif background in sand_backgrounds:
+        return [f"footstep_sand{i}" for i in range(1, 7)]
+    else:
+        return [f"footstep_grass{i}" for i in range(1, 7)]
 
 while running:
     if state != previous_state:
@@ -253,38 +272,60 @@ while running:
                 inventory_in_use = not inventory_in_use
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
-                if current_time - collect_cooldown > collect_delay:
-                    collect_cooldown = current_time
-                    for obj in visible_objects:
-                        if hasattr(obj, 'collect') and hasattr(obj, 'is_empty') and not obj.destroyed and not obj.is_empty:
-                            obj_collision = obj.get_collision_rect(0)
-                            horizontal_dist = abs(obj_collision.centerx - player_world_x)
-                            vertical_dist = abs(obj_collision.centery - player_world_y)
-                            collect_reach = 25
-                            horizontal_range = (obj_collision.width / 2) + collect_reach
-                            vertical_range = (obj_collision.height / 2) + collect_reach
-                            facing_object = False
-                            if player.last_direction == "right" and obj_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
-                                facing_object = True
-                            elif player.last_direction == "left" and obj_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
-                                facing_object = True
-                            elif player.last_direction == "up" and obj_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
-                                facing_object = True
-                            elif player.last_direction == "down" and obj_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
-                                facing_object = True
-                            if facing_object:
-                                resource = obj.collect(player)
-                                if resource:
+                for obj in visible_objects:
+                    if hasattr(obj, 'collect') and not obj.destroyed:
+                        if hasattr(obj, 'is_empty') and obj.is_empty:
+                            continue
+                        
+                        obj_collision = obj.get_collision_rect(0)
+                        horizontal_dist = abs(obj_collision.centerx - player_world_x)
+                        vertical_dist = abs(obj_collision.centery - player_world_y)
+                        collect_reach = 25
+                        horizontal_range = (obj_collision.width / 2) + collect_reach
+                        vertical_range = (obj_collision.height / 2) + collect_reach
+                        facing_object = False
+                        if player.last_direction == "right" and obj_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                            facing_object = True
+                        elif player.last_direction == "left" and obj_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                            facing_object = True
+                        elif player.last_direction == "up" and obj_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                            facing_object = True
+                        elif player.last_direction == "down" and obj_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                            facing_object = True
+                        if facing_object:
+                            resource = obj.collect(player)
+                            if resource:
+                                if hasattr(obj, 'berry'):
+                                    collected_item = obj.berry
+                                elif hasattr(obj, 'fruit'):
+                                    collected_item = obj.fruit
+                                elif hasattr(obj, 'resource'):
+                                    collected_item = obj.resource
+                                else:
+                                    collected_item = "Items"
+                                
+                                if hasattr(obj, 'berry') or hasattr(obj, 'fruit'):
                                     sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
-                                    inventory_resources.extend(resource)
-                                    collection_messages.insert(0, [
-                                        font.render(f"Collected {len(resource)} {obj.berry}", True, (20, 255, 20)),
-                                        pygame.Surface((font.render(f"Collected {len(resource)} {obj.berry}", True, (20, 255, 20)).get_width() + 10, font.render(f"Collected {len(resource)} {obj.berry}", True, (20, 255, 20)).get_height() + 10), pygame.SRCALPHA),
-                                        pygame.Rect(20, 500, font.render(f"Collected {len(resource)} {obj.berry}", True, (20, 255, 20)).get_width(), font.render(f"Collected {len(resource)} {obj.berry}", True, (20, 255, 20)).get_height()),
-                                        3.0,
-                                        1.0
-                                    ])
-                                    collection_messages[0][1].fill((0, 0, 0, 100))
+                                elif hasattr(obj, 'resource'):
+                                    if obj.resource == "Sticks":
+                                        sound_manager.play_sound("pickup_stick")
+                                    elif obj.resource == "Stone":
+                                        sound_manager.play_sound(random.choice(["collect_stone1", "collect_stone2"]))
+                                    elif obj.resource == "Fiber":
+                                        sound_manager.play_sound(random.choice(["pickup_grass1", "pickup_grass2", "pickup_grass3"]))
+                                    elif obj.resource == "Poisonous Mushrooms":
+                                        sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
+                                inventory_resources.extend(resource)
+                                collection_messages.insert(0, [
+                                    font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)),
+                                    pygame.Surface((font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_width() + 10, font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_height() + 10), pygame.SRCALPHA),
+                                    pygame.Rect(20, 500, font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_width(), font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_height()),
+                                    3.0,
+                                    1.0
+                                ])
+                                collection_messages[0][1].fill((0, 0, 0, 100))
+                                collect_cooldown = current_time
+                                break
 
             if paused:
                 if resume_button.is_clicked(event):
@@ -299,7 +340,6 @@ while running:
             
         if not paused and not inventory_in_use and pygame.mouse.get_pressed()[0] and not player.exhausted:
             if current_time - harvest_cooldown > harvest_delay:
-                harvest_cooldown = current_time
                 for obj in visible_objects:
                     if hasattr(obj, 'harvest') and hasattr(obj, 'destroyed') and not obj.destroyed:
                         
@@ -342,8 +382,10 @@ while running:
                                     1.0
                                 ])
                                 collection_messages[0][1].fill((0, 0, 0, 100))
-                            if obj.destroyed:
-                                visible_objects.remove(obj)
+                                harvest_cooldown = current_time
+                                if obj.destroyed:
+                                    visible_objects.remove(obj)
+                                break
 
         dead_bushes = [db for db in dead_bushes if not db.destroyed]
         mushrooms = [m for m in mushrooms if not m.destroyed]
@@ -384,6 +426,19 @@ while running:
         visible_collectibles = [col for col in collectibles if col.rect.x- cam_x > -1000 and col.rect.y - cam_x < width + 1000]
         visible_objects = [obj for obj in all_objects if obj.rect.x - cam_x > -1000 and obj.rect.x - cam_x < width + 1000]
         visible_mobs = [mob for mob in mobs if mob.rect.x - cam_x > -1000 and mob.rect.x - cam_x < width + 1000]
+        for mob in visible_mobs:
+            if isinstance(mob, Cat) and random.random() < 0.001:
+                sound_manager.play_sound(random.choice([f"cat_meow{i}" for i in range(1,7)]))
+            elif isinstance(mob, Chicken) and random.random() < 0.001:
+                sound_manager.play_sound(random.choice([f"chicken_cluck{i}" for i in range(1,7)]))
+            elif isinstance(mob, Cow) and random.random() < 0.001:
+                sound_manager.play_sound(random.choice(["cow_moo1", "cow_moo2"]))
+            elif isinstance(mob, Crow) and random.random() < 0.001:
+                sound_manager.play_sound(random.choice([f"crow_caw{i}" for i in range(1,4)]))
+            elif isinstance(mob, Duskwretch) and random.random() < 0.001:
+                sound_manager.play_sound("duskwretch_growl")
+            elif isinstance(mob, (BlackBear, BrownBear)) and random.random() < 0.001:
+                sound_manager.play_sound("animal_breath")
         visible_objects.extend(visible_mobs)
         visible_objects.extend(visible_collectibles)
         visible_objects.sort(key=lambda obj: obj.rect.y + obj.rect.height)
@@ -423,68 +478,104 @@ while running:
 
         if not paused and not inventory_in_use and player.dead == False:
 
+            if keys[pygame.K_e] and current_time - collect_cooldown > collect_delay:
+                for obj in visible_objects:
+                    if hasattr(obj, 'collect') and not obj.destroyed:
+                        if hasattr(obj, 'is_empty') and obj.is_empty:
+                            continue
+                        
+                        obj_collision = obj.get_collision_rect(0)
+                        horizontal_dist = abs(obj_collision.centerx - player_world_x)
+                        vertical_dist = abs(obj_collision.centery - player_world_y)
+                        collect_reach = 25
+                        horizontal_range = (obj_collision.width / 2) + collect_reach
+                        vertical_range = (obj_collision.height / 2) + collect_reach
+                        facing_object = False
+                        if player.last_direction == "right" and obj_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                            facing_object = True
+                        elif player.last_direction == "left" and obj_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                            facing_object = True
+                        elif player.last_direction == "up" and obj_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                            facing_object = True
+                        elif player.last_direction == "down" and obj_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                            facing_object = True
+                        if facing_object:
+                            resource = obj.collect(player)
+                            if resource:
+                                if hasattr(obj, 'berry'):
+                                    collected_item = obj.berry
+                                elif hasattr(obj, 'fruit'):
+                                    collected_item = obj.fruit
+                                elif hasattr(obj, 'resource'):
+                                    collected_item = obj.resource
+                                else:
+                                    collected_item = "Items"
+                                
+                                if hasattr(obj, 'berry') or hasattr(obj, 'fruit'):
+                                    sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
+                                elif hasattr(obj, 'resource'):
+                                    if obj.resource == "Sticks":
+                                        sound_manager.play_sound("pickup_stick")
+                                    elif obj.resource == "Stone":
+                                        sound_manager.play_sound(random.choice(["collect_stone1", "collect_stone2"]))
+                                    elif obj.resource == "Fiber":
+                                        sound_manager.play_sound(random.choice(["pickup_grass1", "pickup_grass2", "pickup_grass3"]))
+                                    elif obj.resource == "Poisonous Mushrooms":
+                                        sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
+                                inventory_resources.extend(resource)
+                                collection_messages.insert(0, [
+                                    font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)),
+                                    pygame.Surface((font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_width() + 10, font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_height() + 10), pygame.SRCALPHA),
+                                    pygame.Rect(20, 500, font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_width(), font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_height()),
+                                    3.0,
+                                    1.0
+                                ])
+                                collection_messages[0][1].fill((0, 0, 0, 100))
+                                collect_cooldown = current_time
+                                break
+
             for bush in berry_bushes:
-                if current_time - collect_cooldown > collect_delay:
-                    if player.rect.colliderect(
-                        pygame.Rect(bush.rect.x - cam_x, bush.rect.y, bush.rect.width, bush.rect.height)
-                    ) and keys[pygame.K_e]:
-                        berries = bush.collect(player)
-                        
-                        if berries:
-                            sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1, 5)]))
-                            collect_cooldown = current_time
-                            inventory_resources.extend(berries)
-                            berry_collect_text = font.render(f"Collected {len(berries)} {bush.berry}", True, (20, 255, 20))
-                            
-                            collection_messages.insert(0, [
-                                berry_collect_text,
-                                pygame.Surface((berry_collect_text.get_width() + 10, berry_collect_text.get_height() + 10), pygame.SRCALPHA),
-                                pygame.Rect(20, 500, berry_collect_text.get_width(), berry_collect_text.get_height()),
-                                3.0,
-                                1.0
-                            ])
-                            collection_messages[0][1].fill((0, 0, 0, 100))
-
+                bush.update(dt)
+            
             for tree in trees:
-                if current_time - collect_cooldown > collect_delay:
-                    if player.rect.colliderect(
-                        pygame.Rect(tree.rect.x - cam_x, tree.rect.y, tree.rect.width, tree.rect.height)
-                    ) and keys[pygame.K_e]:
-                        fruit = tree.collect(player)
-                        
-                        if fruit:
-                            collect_cooldown = current_time
-                            fruit_collect_text = font.render(f"Collected {len(fruit)} {tree.fruit}", True, (20, 255, 20))
-                            inventory_resources.extend(fruit)
-                            collection_messages.insert(0, [
-                                fruit_collect_text,
-                                pygame.Surface((fruit_collect_text.get_width() + 10, fruit_collect_text.get_height() + 10), pygame.SRCALPHA),
-                                pygame.Rect(20, 500, fruit_collect_text.get_width(), fruit_collect_text.get_height()),
-                                3.0,
-                                1.0
-                            ])
-                            collection_messages[0][1].fill((0, 0, 0, 100))
+                tree.update(dt)
 
-            for col in collectibles:
-                if current_time - collect_cooldown > collect_delay:
-                    if player.rect.colliderect(
-                        pygame.Rect(col.rect.x - cam_x, col.rect.y, col.rect.width, col.rect.height)
-                    ) and keys[pygame.K_e]:
-                        resources = col.collect(player)
-                        
-                        if resources:
-                            collect_cooldown = current_time
-                            inventory_resources.extend(resources)
-                            resource_collect_text = font.render(f"Collected {len(resources)} {col.resource}", True, (20, 255, 20))
-                            
-                            collection_messages.insert(0, [
-                                resource_collect_text,
-                                pygame.Surface((resource_collect_text.get_width() + 10, resource_collect_text.get_height() + 10), pygame.SRCALPHA),
-                                pygame.Rect(20, 500, resource_collect_text.get_width(), resource_collect_text.get_height()),
-                                3.0,
-                                1.0
-                            ])
-                            collection_messages[0][1].fill((0, 0, 0, 100))
+
+            for mob in mobs:
+                mob_nearby_objects = [obj for obj in nearby_objects 
+                                    if abs(obj.rect.x - mob.rect.x) < 100 
+                                    and abs(obj.rect.y - mob.rect.y) < 100]
+                
+                
+                
+                if abs(player_world_x - mob.rect.x) < 200 and abs(player_world_y - mob.rect.y) < 200:
+                    
+                    temp_player = TempPlayerCollision(player_world_x, player_world_y, player.rect.width, player.rect.height)
+                    mob_nearby_objects.append(temp_player)
+                
+                mob_nearby_mobs = [m for m in nearby_mobs 
+                                if m is not mob 
+                                and abs(m.rect.x - mob.rect.x) < 100 
+                                and abs(m.rect.y - mob.rect.y) < 100]
+                
+            
+                if hasattr(mob, "enemy"):
+                    mob.handle_player_proximity(dt, player_world_x, player_world_y, player=None,
+                                                nearby_objects=None, nearby_mobs=None)
+                    mob.attack(player_world_x, player_world_y, player)
+
+                    
+            
+                mob.update(dt, None, mob_nearby_objects, mob_nearby_mobs)
+                mob.keep_in_screen(height)
+            player_world_x = player_pos.x + cam_x
+            player_world_y = player_pos.y
+            player.attacking(nearby_mobs, player_world_x, player_world_y)
+            for mob in nearby_mobs:
+                mob.handle_health(screen, cam_x, dt)
+                mob.flee(player_world_x, player_world_y, dt)
+
+
             
             inventory.add(inventory_resources)
             inventory_resources = []
@@ -550,49 +641,6 @@ while running:
                 for obj in all_nearby
             )
 
-            for bush in berry_bushes:
-                bush.update(dt)
-            
-            for tree in trees:
-                tree.update(dt)
-
-
-            for mob in mobs:
-                mob_nearby_objects = [obj for obj in nearby_objects 
-                                    if abs(obj.rect.x - mob.rect.x) < 100 
-                                    and abs(obj.rect.y - mob.rect.y) < 100]
-                
-                
-                
-                if abs(player_world_x - mob.rect.x) < 200 and abs(player_world_y - mob.rect.y) < 200:
-                    
-                    temp_player = TempPlayerCollision(player_world_x, player_world_y, player.rect.width, player.rect.height)
-                    mob_nearby_objects.append(temp_player)
-                
-                mob_nearby_mobs = [m for m in nearby_mobs 
-                                if m is not mob 
-                                and abs(m.rect.x - mob.rect.x) < 100 
-                                and abs(m.rect.y - mob.rect.y) < 100]
-                
-            
-                if hasattr(mob, "enemy"):
-                    mob.handle_player_proximity(dt, player_world_x, player_world_y, player=None,
-                                                nearby_objects=None, nearby_mobs=None)
-                    mob.attack(player_world_x, player_world_y, player)
-
-                    
-            
-                mob.update(dt, None, mob_nearby_objects, mob_nearby_mobs)
-                mob.keep_in_screen(height)
-            player_world_x = player_pos.x + cam_x
-            player_world_y = player_pos.y
-            player.attacking(nearby_mobs, player_world_x, player_world_y)
-            for mob in nearby_mobs:
-                mob.handle_health(screen, cam_x, dt)
-                mob.flee(player_world_x, player_world_y, dt)
-
-
-    ################# NOT INVENTORY IN USE #################
 
             if not inventory_in_use:
 
@@ -601,18 +649,12 @@ while running:
                         stamina_depleted_message_timer = 2.0
                     player.stamina_speed()
 
-                # Check if player is moving in any direction
                 is_moving = keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]
                 is_running = (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]) and is_moving
                 
-                # Play footstep sound if moving (only once per delay, regardless of direction)
                 if is_moving:
-                    # Calculate delay based on actual player speed (accounts for exhaustion and sprinting)
-                    # player_speed is calculated from player.get_speed() which returns base_speed * speed
-                    # shift_multiplier (1.5 when running, 1.0 when walking) affects actual movement
-                    base_delay = 0.3  # Base walking speed delay
+                    base_delay = 0.4
                     
-                    # The actual speed being used includes shift_multiplier
                     actual_speed = player_speed * shift_multiplier
                     base_speed = player.base_speed * player.speed
                     speed_ratio = actual_speed / base_speed if base_speed > 0 else 1.0
@@ -621,10 +663,11 @@ while running:
                     
                     step_sound_timer += dt
                     if step_sound_timer >= current_step_delay:
-                        sound_manager.play_sound(random.choice(grass_steps))
+                        current_bg = get_current_background(player_world_x, tiles)
+                        current_footsteps = get_footstep_sounds(current_bg)
+                        sound_manager.play_sound(random.choice(current_footsteps))
                         step_sound_timer = 0
                 else:
-                    # Reset timer when not moving
                     step_sound_timer = 0
 
                 if not is_moving:
@@ -838,9 +881,6 @@ while running:
                     step_sound_timer = 0
 
 
-
-    ############# END NOT INVENTORY IN USE #################
-    ############# END NOT PAUSED #################
         player.health_bar(screen)
         player.stamina_bar(screen)
         player.hunger_bar(screen)

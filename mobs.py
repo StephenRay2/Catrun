@@ -218,9 +218,16 @@ class Player(pygame.sprite.Sprite):
                             if mob.__class__.__name__ in ["BlackBear", "BrownBear"]:
                                 sound_manager.play_sound("bear_get_hit")
                             elif mob.__class__.__name__ == "Deer":
-                                sound_manager.play_sound("buck_get_hit")
+                                if hasattr(mob, 'is_buck') and mob.is_buck:
+                                    sound_manager.play_sound("buck_get_hit")
+                                else:
+                                    sound_manager.play_sound("deer_get_hit")
                             elif mob.__class__.__name__ == "Chicken":
                                 sound_manager.play_sound(random.choice([f"chicken_get_hit{i}" for i in range(1,4)]))
+                            elif mob.__class__.__name__ == "Cat":
+                                sound_manager.play_sound("cat_get_hit1")
+                            elif mob.__class__.__name__ == "Cow":
+                                sound_manager.play_sound(random.choice([f"cow_moo1", "cow_moo2"]))
 
 
 
@@ -1118,7 +1125,6 @@ class Duskwretch(Enemy):
                 self.attacking = True
                 self.attack_timer = self.attack_duration
                 self.frame_index = 0.0
-                sound_manager.play_sound(random.choice(["duskwretch_roar1", "duskwretch_roar2"]))
 
         if self.attacking:
             self.state = "attacking"
@@ -1149,6 +1155,7 @@ class Duskwretch(Enemy):
         if self.is_moving and not self.was_moving:
             if self.chasing:
                 self.state = "chase"
+                sound_manager.play_sound(random.choice(["duskwretch_roar1", "duskwretch_roar2"]))
                 self.speed = 2.2
             else:
                 self.state = "start_walk"
@@ -1353,6 +1360,7 @@ class Pock(Enemy):
 
             if self.throw_timer == self.throw_duration // 2 and distance_sq < (100 * 100):
                 player.health -= self.attack_damage
+                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
                 
 
             if self.throw_timer <= 0:
@@ -1405,14 +1413,29 @@ class Deer(AggressiveMob):
         self.direction = pygame.Vector2(0, 0)
         self.move_timer = 0
         self.last_direction = "left"
-        
+        self.hoof_timer = 0
+        self.is_moving = False
+
         if self.is_buck:
             self.aggressive = False
             self.enemy = False
         else:
             self.aggressive = False
             self.enemy = False
+
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
+        was_moving = self.direction.length_squared() > 0
         
+        super().update(dt, player, nearby_objects, nearby_mobs)
+        
+        self.is_moving = self.direction.length_squared() > 0 and self.is_alive
+        
+        if self.is_moving:
+            self.hoof_timer -= dt
+            if self.hoof_timer <= 0:
+                sound_manager.play_sound(random.choice([f"hoofs{i}" for i in range(1,7)]))
+                self.hoof_timer = random.uniform(0.3, 0.7)
+
     def get_collision_rect(self, cam_x):
             rect = self.rect
             return pygame.Rect(rect.x - cam_x + 15, rect.y + 50, rect.width - 30, rect.height - 55)
@@ -1542,7 +1565,6 @@ class Deer(AggressiveMob):
                 self.image = pygame.transform.flip(self.dead_image_left, True, False)
             else:
                 self.image = self.dead_image_left
-
 
 class BlackBear(AggressiveMob):
     def __init__(self, x, y, name):
