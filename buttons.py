@@ -32,9 +32,6 @@ class Button:
 stat_holder_image = pygame.image.load("assets/sprites/buttons/stat_holder.png").convert_alpha()
 stat_holder_image = pygame.transform.scale(stat_holder_image, (50, 100))
 
-hotbar_image = pygame.image.load("assets/sprites/buttons/hotbar.png").convert_alpha()
-hotbar_image = pygame.transform.scale(hotbar_image, (800, 74))
-
 quit_image = pygame.image.load("assets/sprites/buttons/quit_button.png").convert_alpha()
 resume_image = pygame.image.load("assets/sprites/buttons/resume_button.png").convert_alpha()
 

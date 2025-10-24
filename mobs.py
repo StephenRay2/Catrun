@@ -9,6 +9,9 @@ size = 64
 
 ############ PLAYER IMAGES #################
 
+hotbar_image = pygame.image.load("assets/sprites/buttons/hotbar.png").convert_alpha()
+hotbar_image = pygame.transform.scale(hotbar_image, (686, 74))
+
 player_stand_image = pygame.image.load("assets/sprites/player/CharacterCorynnFrontStanding.png")
 player_stand_image_back = pygame.image.load("assets/sprites/player/CharacterCorynnBackStanding.png")
 player_stand_left = pygame.image.load("assets/sprites/player/CharacterCorynnLeftStanding.png")
@@ -170,6 +173,7 @@ class Player(pygame.sprite.Sprite):
         self.level = 1
         self.experience = 0
         self.exp_total = 0
+        self.req_multiplier = .5
         self.next_level_exp = 100
         self.level_up_timer = 0
         self.stamina_timer = 0
@@ -187,6 +191,7 @@ class Player(pygame.sprite.Sprite):
         self.last_direction = "down"
         self.attack_cooldown = pygame.time.get_ticks()
         self.attack_delay = 300
+        self.mob_noise_delay = 3
 
 
     def attacking(self, nearby_mobs, player_world_x, player_world_y):
@@ -196,14 +201,14 @@ class Player(pygame.sprite.Sprite):
                 self.attack_cooldown = current_time
                 for mob in nearby_mobs:
                     mob_collision = mob.get_collision_rect(0)
-                    
+
                     horizontal_dist = abs(mob_collision.centerx - player_world_x)
                     vertical_dist = abs(mob_collision.centery - player_world_y)
-                    
+
                     attack_reach = 25
                     horizontal_range = (mob_collision.width / 2) + attack_reach
                     vertical_range = (mob_collision.height / 2) + attack_reach
-                    
+
                     facing_object = False
                     if self.last_direction == "right" and mob_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
                         facing_object = True
@@ -217,7 +222,13 @@ class Player(pygame.sprite.Sprite):
                     if facing_object and 1 <= mob.health:
                         old_health = mob.health
                         mob.health -= self.damage * self.attack
-                        if mob.health < old_health:
+
+                        if not hasattr(mob, "last_hit_sound_time"):
+                            mob.last_hit_sound_time = 0
+
+                        hit_sound_cooldown = 6000
+                        if current_time - mob.last_hit_sound_time > hit_sound_cooldown:
+                            mob.last_hit_sound_time = current_time
                             if mob.__class__.__name__ in ["BlackBear", "BrownBear"]:
                                 sound_manager.play_sound("bear_get_hit")
                             elif mob.__class__.__name__ == "Deer":
@@ -230,7 +241,11 @@ class Player(pygame.sprite.Sprite):
                             elif mob.__class__.__name__ == "Cat":
                                 sound_manager.play_sound("cat_get_hit1")
                             elif mob.__class__.__name__ == "Cow":
-                                sound_manager.play_sound(random.choice([f"cow_moo1", "cow_moo2"]))
+                                sound_manager.play_sound(random.choice(["cow_moo1", "cow_moo2"]))
+                            elif mob.__class__.__name__ == "Squirrel":
+                                sound_manager.play_sound("squirrel_get_hit")
+                            elif mob.__class__.__name__ == "Crow":
+                                sound_manager.play_sound(random.choice(["crow_caw1", "crow_caw2", "crow_caw"]))
 
 
 
@@ -272,6 +287,35 @@ class Player(pygame.sprite.Sprite):
         if self.level_up_timer > 0:
             self.show_level_up_message(screen)
             self.level_up_timer -= dt
+
+    def level_up(self, screen):
+        self.level += 1
+        self.exp_total += self.next_level_exp
+        if self.level < 100:
+            self.next_level_exp += (self.next_level_exp * self.req_multiplier)
+            if self.level <= 20:
+                self.req_multiplier -= .022
+            elif self.level <= 40:
+                self.req_multiplier -= .0018
+            elif self.level <= 60:
+                self.req_multiplier -= .0008
+            elif self.level <= 80:
+                self.req_multiplier -= .00008
+            elif self.level < 100:
+                self.req_multiplier -= .00003
+        self.level_up_timer = 10
+        sound_manager.play_sound("level_up")
+
+    def show_level_up_message(self, screen):
+        level_up_text = large_font.render(
+            f"You leveled up to level {self.level}! Upgrade stats in inventory!",
+            True, (20, 255, 20)
+        )
+        screen.blit(level_up_text, (
+            screen.get_width() // 2 - level_up_text.get_width() // 2,
+            20
+        ))
+
 
     def get_speed(self):
         return self.base_speed * self.speed
@@ -370,32 +414,6 @@ class Player(pygame.sprite.Sprite):
             else:
                 self.water -= dt / 100
                 self.water_full_timer = 60
-
-    def level_up(self, screen):
-            self.level += 1
-            self.exp_total += self.next_level_exp
-            if self.level <= 10:
-                self.next_level_exp = int(100 + (self.exp_total * 0.3))
-            elif self.level <= 30:
-                self.next_level_exp = int(200 + (self.exp_total * 0.122))
-            elif self.level <= 50:
-                self.next_level_exp = int(500 + (self.exp_total * 0.045))
-            elif self.level <= 70:
-                self.next_level_exp = int(1000 + (self.exp_total * 0.01))
-            elif self.level <= 100:
-                self.next_level_exp = int(1500 + (self.exp_total * 0.007))
-            self.level_up_timer = 10
-            sound_manager.play_sound("level_up")
-
-    def show_level_up_message(self, screen):
-        level_up_text = large_font.render(
-            f"You leveled up to level {self.level}! Upgrade stats in inventory!",
-            True, (20, 255, 20)
-        )
-        screen.blit(level_up_text, (
-            screen.get_width() // 2 - level_up_text.get_width() // 2,
-            20
-        ))
 
     def take_damage(self, damage):
         self.health -= damage
@@ -508,9 +526,9 @@ class Player(pygame.sprite.Sprite):
     def exp_bar(self, screen):
         next_level_exp = self.next_level_exp
         experience = self.experience
-        bar_width = 800
+        bar_width = hotbar_image.get_width()
         bar_height = 5
-        x = screen.get_width()//2 - 400
+        x = screen.get_width()//2 - bar_width // 2
         y = screen.get_height() - 105
 
         experience_ratio = experience / next_level_exp
@@ -548,8 +566,16 @@ class Mob(pygame.sprite.Sprite):
         self.fleeing = False
         self.flee_timer = 0
         self.base_speed = 100
-        self.speed = 1 
+        self.speed = 1
+        self.level = 1
+        self.death_experience = 50
 
+
+    def give_experience(self, player):
+        if self.health < 1:
+            player.experience += self.death_experience
+            player.exp_total += self.death_experience
+            self.death_experience = 0
 
     def keep_in_screen(self, screen_height):
         if self.rect.top < 0:
@@ -752,9 +778,12 @@ class Cat(Mob):
         self.tame_max = 100
         self.tame = 0
         self.tamed = False
+        self.death_experience = 200  * (1 + (self.level * self.death_experience * .0001))
+        self.level = 1
+        self.tamed_boost = 1.1
 
-        self.full_health = 100
-        self.health = 100
+        self.full_health = 100 + (random.randint(5, 7) * self.level) * self.tamed_boost
+        self.health = self.full_health
         self.max_hunger = 100
         self.hunger = 100
         self.base_speed = 160
@@ -790,8 +819,11 @@ class Squirrel(Mob):
         self.rect = self.image.get_rect(center=(x, y))
         self.base_speed = 150
         self.speed = 1
-        self.full_health = 50
-        self.health = 50
+        self.full_health = 50 + (random.randint(5, 7) * self.level)
+        self.health = self.full_health
+        self.level = 1
+        self.death_experience = 75 * (1 + (self.level * self.death_experience * .0001))
+        
 
         self.frame_index = 0
         self.animation_speed = 0.3
@@ -837,13 +869,15 @@ class Cow(Mob):
 
         self.last_direction = "right"
 
-        self.full_health = 150
-        self.health = 150
+        self.full_health = 150 + (random.randint(5, 7) * self.level)
+        self.health = self.full_health
         self.base_speed = 70
         self.speed = 1
         self.resource = "Raw Beef"
         self.resource_amount = 5
         self.cow = "moo"
+        self.death_experience = 100  * (1 + (self.level * self.death_experience * .0001))
+        self.level = 1
 
         self.dead_cow_right_image = pygame.transform.scale(pygame.image.load(self.cow_type["dead_image"]).convert_alpha(), (size, size))
         self.dead_cow_left_image = pygame.transform.flip(self.dead_cow_right_image, True, False)
@@ -876,9 +910,11 @@ class Chicken(Mob):
         self.base_speed = 120
         self.speed = 1
         self.resource = "Chicken"
-        self.resource_amount = 2
-        self.full_health = 70
-        self.health = 70
+        self.resource_amount = random.randint(3, 6)
+        self.full_health = 80 + (random.randint(5, 7) * self.level)
+        self.health = self.full_health
+        self.death_experience = 70  * (1 + (self.level * self.death_experience * .0001))
+        self.level = 1
 
         self.frame_index = 0
         self.animation_speed = 0.3
@@ -908,6 +944,8 @@ class Enemy(Mob):
         self.chasing = False
         self.enemy = True
         self.attacking = False
+        self.death_experience = 500  * (1 + (self.level * self.death_experience * .0001))
+        self.level = 1
 
     def handle_player_proximity(self, dt, player_world_x, player_world_y, player=None, nearby_objects=None, nearby_mobs=None):
         dx = player_world_x - self.rect.centerx
@@ -1006,9 +1044,12 @@ class Crawler(Enemy):
         self.attack_damage = 3
         self.base_speed = 100
         self.speed = 1
-        self.health = 100
+        self.health = self.full_health = 150 + (random.randint(5, 7) * self.level)
+        self.health = self.full_health
         self.resource = "Hide"
         self.resource_amount = random.randint(4, 9)
+        self.death_experience = 500  * (1 + (self.level * self.death_experience * .0001))
+        self.level = 1
 
     
 
@@ -1092,6 +1133,8 @@ class Duskwretch(Enemy):
         self.animation_speed = 0.1
         self.direction = pygame.Vector2(0, 0)
         self.move_timer = 0
+        self.death_experience = 1200  * (1 + (self.level * self.death_experience * .0001))
+        self.level = 1
 
         self.last_direction = "right" 
         self.attacking = False
@@ -1103,8 +1146,8 @@ class Duskwretch(Enemy):
         self.attack_damage = 4
         self.base_speed = 150
         self.speed = 1
-        self.full_health = 150
-        self.health = 150
+        self.full_health = 180 + (random.randint(15, 22) * self.level)
+        self.health = self.full_health
         self.resource = "Hide"
         self.resource_amount = random.randint(4, 9)
 
@@ -1342,9 +1385,12 @@ class Pock(Enemy):
         self.attack_damage = 5
         self.base_speed = 120
         self.speed = 1
-        self.health = 80
+        self.full_health = 100 + (random.randint(12, 20) * self.level)
+        self.health = self.full_health
         self.resource = "Hide"
         self.resource_amount = random.randint(2, 5)
+        self.death_experience = 500  * (1 + (self.level * self.death_experience * .0001))
+        self.level = 1
 
     def draw(self, screen, cam_x):
         screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
@@ -1417,10 +1463,10 @@ class Deer(AggressiveMob):
         self.rect = self.image.get_rect(center=(x, y))
         self.base_speed = 180
         self.speed = 1
-        self.full_health = 60
-        self.health = 60
+        self.full_health = 150 + (random.randint(5, 7) * self.level)
+        self.health = self.full_health
         self.resource = "Venison"
-        self.resource_amount = 4
+        self.resource_amount = random.randint(4, 8)
         self.frame_index = 0
         self.animation_speed = 0.2
         self.direction = pygame.Vector2(0, 0)
@@ -1428,11 +1474,16 @@ class Deer(AggressiveMob):
         self.last_direction = "left"
         self.hoof_timer = 0
         self.is_moving = False
+        self.level = 1
 
         if self.is_buck:
+
+            self.death_experience = 300  * (1 + (self.level * self.death_experience * .0001))
             self.aggressive = False
             self.enemy = False
         else:
+
+            self.death_experience = 150  * (1 + (self.level * self.death_experience * .0001))
             self.aggressive = False
             self.enemy = False
 
@@ -1570,7 +1621,6 @@ class Deer(AggressiveMob):
                 sound_manager.play_sound(random.choice([f"hoofs{i}" for i in range(1, 7)]))
                 self.hoof_timer = random.uniform(0.3, 0.7)
         else:
-            # Reset timer when deer stops moving
             self.hoof_timer = random.uniform(0.5, 1.0)
         
         if not self.is_alive:
@@ -1596,10 +1646,12 @@ class BlackBear(AggressiveMob):
         self.rect = self.image.get_rect(center=(x, y))
         self.base_speed = 80
         self.speed = 1
-        self.full_health = 220
-        self.health = 220
+        self.full_health = 220 + (random.randint(7, 13) * self.level)
+        self.health = self.full_health
         self.resource = "Bear Hide"
         self.resource_amount = 8
+        self.death_experience = 600  * (1 + (self.level * self.death_experience * .0001))
+        self.level = 1
         
         self.frame_index = 0
         self.animation_speed = 0.1
@@ -1799,8 +1851,8 @@ class BrownBear(AggressiveMob):
         self.rect = self.image.get_rect(center=(x, y))
         self.base_speed = 85
         self.speed = 1
-        self.full_health = 300
-        self.health = 300
+        self.full_health = 300 + (random.randint(8, 20) * self.level)
+        self.health = self.full_health
         self.resource = "Bear Hide"
         self.resource_amount = 8
         
@@ -1813,6 +1865,8 @@ class BrownBear(AggressiveMob):
         self.attack_timer = 0
         self.attack_duration = 30
         self.attack_damage = 15
+        self.death_experience = 800 * (1 + (self.level * self.death_experience * .0001))
+        self.level = 1
         
         self.aggressive = False
         self.enemy = False
@@ -1950,10 +2004,12 @@ class Gila(AggressiveMob):
         self.rect = self.image.get_rect(center=(x, y))
         self.base_speed = 60
         self.speed = 1
-        self.full_health = 40
-        self.health = 40
+        self.full_health = 60 + (random.randint(5, 10) * self.level)
+        self.health = self.full_health
         self.resource = "Gila Meat"
         self.resource_amount = 2
+        self.death_experience = 500  * (1 + (self.level * self.death_experience * .0001))
+        self.level = 1
         
         self.frame_index = 0
         self.animation_speed = 0.15
@@ -1974,7 +2030,6 @@ class Gila(AggressiveMob):
             return pygame.Rect(rect.x - cam_x, rect.y + 30, rect.width, rect.height - 40)
 
     def handle_health(self, screen, cam_x, dt):
-        """Override to become aggressive immediately when attacked"""
         max_health = self.full_health
         health = self.health
         bar_width = 25
@@ -2083,10 +2138,12 @@ class Crow(Mob):
         self.rect = self.image.get_rect(center=(x, y))
         self.base_speed = 140
         self.speed = 1
-        self.full_health = 30
-        self.health = 30
+        self.full_health = 30 + (random.randint(5, 10) * self.level)
+        self.health = self.full_health
         self.resource = "Feathers"
         self.resource_amount = 1
+        self.death_experience = 400 * (1 + (self.level * self.death_experience * .0001))
+        self.level = 1
         
         self.frame_index = 0
         self.animation_speed = 0.25

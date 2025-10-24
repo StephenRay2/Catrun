@@ -10,6 +10,7 @@ running = True
 dt = 0
 size = 64
 world_x = 0.0
+absolute_cam_x = 0.0
 floor_y = 0
 shift_multiplier = 1
 dungeon_depth = 0
@@ -214,6 +215,7 @@ while running:
             dungeon_depth = 0
             dungeon_depth_high = 0
             cam_x = 0
+            absolute_cam_x = 0.0
             player_pos.x = width / 2
             player_pos.y = height / 2
        
@@ -249,7 +251,8 @@ while running:
             player.inventory = []
             player.score = 0
 
-            inventory.inventory_list = []
+            inventory.inventory_list = [None] * inventory.capacity
+            inventory.hotbar_slots = [None] * inventory.hotbar_size
 
             inventory_resources = []
             collection_messages = []
@@ -270,6 +273,24 @@ while running:
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_q:
                 inventory_in_use = not inventory_in_use
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if inventory_in_use:
+                    mouse_pos = pygame.mouse.get_pos()
+                    slot_index, is_hotbar = inventory.get_slot_at_mouse(mouse_pos, screen)
+                    
+                    if slot_index is not None:
+                        inventory.start_drag(slot_index, is_hotbar)
+            
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                if inventory_in_use and inventory.dragging:
+                    mouse_pos = pygame.mouse.get_pos()
+                    slot_index, is_hotbar = inventory.get_slot_at_mouse(mouse_pos, screen)
+                    
+                    if slot_index is not None:
+                        inventory.end_drag(slot_index, is_hotbar, screen)
+                    else:
+                        inventory.cancel_drag()
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
                 for obj in visible_objects:
@@ -304,26 +325,32 @@ while running:
                                 else:
                                     collected_item = "Items"
                                 
-                                if hasattr(obj, 'berry') or hasattr(obj, 'fruit'):
-                                    sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
-                                elif hasattr(obj, 'resource'):
-                                    if obj.resource == "Sticks":
-                                        sound_manager.play_sound("pickup_stick")
-                                    elif obj.resource == "Stone":
-                                        sound_manager.play_sound(random.choice(["collect_stone1", "collect_stone2"]))
-                                    elif obj.resource == "Fiber":
-                                        sound_manager.play_sound(random.choice(["pickup_grass1", "pickup_grass2", "pickup_grass3"]))
-                                    elif obj.resource == "Poisonous Mushrooms":
+                                if inventory.add(resource):
+                                    if hasattr(obj, 'berry') or hasattr(obj, 'fruit'):
                                         sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
-                                inventory_resources.extend(resource)
-                                collection_messages.insert(0, [
-                                    font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)),
-                                    pygame.Surface((font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_width() + 10, font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_height() + 10), pygame.SRCALPHA),
-                                    pygame.Rect(20, 500, font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_width(), font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_height()),
-                                    3.0,
-                                    1.0
-                                ])
-                                collection_messages[0][1].fill((0, 0, 0, 100))
+                                    elif hasattr(obj, 'resource'):
+                                        if obj.resource == "Sticks":
+                                            sound_manager.play_sound("pickup_stick")
+                                        elif obj.resource == "Stone":
+                                            sound_manager.play_sound(random.choice(["collect_stone1", "collect_stone2"]))
+                                        elif obj.resource == "Fiber":
+                                            sound_manager.play_sound(random.choice(["pickup_grass1", "pickup_grass2", "pickup_grass3"]))
+                                        elif obj.resource == "Poisonous Mushrooms":
+                                            sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
+                                    
+                                    collection_messages.insert(0, [
+                                        font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)),
+                                        pygame.Surface((font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_width() + 10, font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_height() + 10), pygame.SRCALPHA),
+                                        pygame.Rect(20, 500, font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_width(), font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_height()),
+                                        3.0,
+                                        1.0
+                                    ])
+                                    collection_messages[0][1].fill((0, 0, 0, 100))
+                                else:
+                                    if hasattr(obj, 'is_empty'):
+                                        obj.is_empty = False
+                                    obj.destroyed = False
+                                
                                 collect_cooldown = current_time
                                 break
 
@@ -372,19 +399,22 @@ while running:
                                         sound_manager.play_sound(random.choice(["gather_wood1", "gather_wood2", "gather_wood3"]))
                                     elif obj.resource == "Sticks":
                                         sound_manager.play_sound(random.choice(["break_bush1", "break_bush2"]))
-                                inventory_resources.extend(resource)
-                                resource_collect_text = font.render(f"Collected {len(resource)} {obj.resource}", True, (20, 255, 20))
-                                collection_messages.insert(0, [
-                                    resource_collect_text,
-                                    pygame.Surface((resource_collect_text.get_width() + 10, resource_collect_text.get_height() + 10), pygame.SRCALPHA),
-                                    pygame.Rect(20, 500, resource_collect_text.get_width(), resource_collect_text.get_height()),
-                                    3.0,
-                                    1.0
-                                ])
-                                collection_messages[0][1].fill((0, 0, 0, 100))
-                                harvest_cooldown = current_time
+                                
+                                if inventory.add(resource):
+                                    resource_collect_text = font.render(f"Collected {len(resource)} {obj.resource}", True, (20, 255, 20))
+                                    collection_messages.insert(0, [
+                                        resource_collect_text,
+                                        pygame.Surface((resource_collect_text.get_width() + 10, resource_collect_text.get_height() + 10), pygame.SRCALPHA),
+                                        pygame.Rect(20, 500, resource_collect_text.get_width(), resource_collect_text.get_height()),
+                                        3.0,
+                                        1.0
+                                    ])
+                                    collection_messages[0][1].fill((0, 0, 0, 100))
+
                                 if obj.destroyed:
                                     visible_objects.remove(obj)
+                                
+                                harvest_cooldown = current_time
                                 break
 
         dead_bushes = [db for db in dead_bushes if not db.destroyed]
@@ -429,9 +459,11 @@ while running:
         for mob in visible_mobs:
             if isinstance(mob, Cat) and random.random() < 0.001:
                 sound_manager.play_sound(random.choice([f"cat_meow{i}" for i in range(1,7)]))
+            if isinstance(mob, Squirrel) and random.random() < 0.001:
+                sound_manager.play_sound(random.choice([f"squirrel_chirp{i}" for i in range(1,4)]))
             elif isinstance(mob, Chicken) and random.random() < 0.001:
                 sound_manager.play_sound(random.choice([f"chicken_cluck{i}" for i in range(1,7)]))
-            elif isinstance(mob, Cow) and random.random() < 0.001:
+            elif isinstance(mob, Cow) and random.random() < 0.0005:
                 sound_manager.play_sound(random.choice(["cow_moo1", "cow_moo2"]))
             elif isinstance(mob, Crow) and random.random() < 0.001:
                 sound_manager.play_sound(random.choice([f"crow_caw{i}" for i in range(1,4)]))
@@ -446,6 +478,8 @@ while running:
         for mob in visible_objects:
             if mob.destroyed:
                 visible_mobs.remove(obj)
+            if hasattr(mob, "death_experience"):
+                mob.give_experience(player)
 
         for col in visible_objects:
             if col.destroyed:
@@ -472,7 +506,7 @@ while running:
                     if abs(mob.rect.x - (player_pos.x + cam_x)) < 3000
                     and abs(mob.rect.y - player_pos.y) < 800]
         
-        screen.blit(hotbar_image, (width//2 - hotbar_image.get_width()//2, height - 100))
+        inventory.draw_hotbar(screen)
         
 
 
@@ -511,26 +545,32 @@ while running:
                                 else:
                                     collected_item = "Items"
                                 
-                                if hasattr(obj, 'berry') or hasattr(obj, 'fruit'):
-                                    sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
-                                elif hasattr(obj, 'resource'):
-                                    if obj.resource == "Sticks":
-                                        sound_manager.play_sound("pickup_stick")
-                                    elif obj.resource == "Stone":
-                                        sound_manager.play_sound(random.choice(["collect_stone1", "collect_stone2"]))
-                                    elif obj.resource == "Fiber":
-                                        sound_manager.play_sound(random.choice(["pickup_grass1", "pickup_grass2", "pickup_grass3"]))
-                                    elif obj.resource == "Poisonous Mushrooms":
+                                if inventory.add(resource):
+                                    if hasattr(obj, 'berry') or hasattr(obj, 'fruit'):
                                         sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
-                                inventory_resources.extend(resource)
-                                collection_messages.insert(0, [
-                                    font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)),
-                                    pygame.Surface((font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_width() + 10, font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_height() + 10), pygame.SRCALPHA),
-                                    pygame.Rect(20, 500, font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_width(), font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_height()),
-                                    3.0,
-                                    1.0
-                                ])
-                                collection_messages[0][1].fill((0, 0, 0, 100))
+                                    elif hasattr(obj, 'resource'):
+                                        if obj.resource == "Sticks":
+                                            sound_manager.play_sound("pickup_stick")
+                                        elif obj.resource == "Stone":
+                                            sound_manager.play_sound(random.choice(["collect_stone1", "collect_stone2"]))
+                                        elif obj.resource == "Fiber":
+                                            sound_manager.play_sound(random.choice(["pickup_grass1", "pickup_grass2", "pickup_grass3"]))
+                                        elif obj.resource == "Poisonous Mushrooms":
+                                            sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
+                                    
+                                    collection_messages.insert(0, [
+                                        font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)),
+                                        pygame.Surface((font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_width() + 10, font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_height() + 10), pygame.SRCALPHA),
+                                        pygame.Rect(20, 500, font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_width(), font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_height()),
+                                        3.0,
+                                        1.0
+                                    ])
+                                    collection_messages[0][1].fill((0, 0, 0, 100))
+                                else:
+                                    if hasattr(obj, 'is_empty'):
+                                        obj.is_empty = False
+                                    obj.destroyed = False
+                                
                                 collect_cooldown = current_time
                                 break
 
@@ -540,7 +580,6 @@ while running:
             for tree in trees:
                 tree.update(dt)
 
-            # Mark visibility for mobs to control sound effects
             visible_mob_set = set(visible_mobs)
             for mob in nearby_mobs:
                 mob.is_visible = mob in visible_mob_set
@@ -724,7 +763,7 @@ while running:
                 
                 if keys[pygame.K_a] and 0 < dungeon_depth < 50000:
                     if not left_collision:
-                        cam_x -= player_speed * dt * shift_multiplier
+                        absolute_cam_x -= player_speed * dt * shift_multiplier
                         dungeon_depth = max(0, dungeon_depth - dungeon_traversal_speed * shift_multiplier)
                 elif keys[pygame.K_a] and dungeon_depth <= 0:
                     if not left_collision:
@@ -738,7 +777,7 @@ while running:
                 
                 if keys[pygame.K_d] and 0 < dungeon_depth < 50000:
                     if not right_collision:
-                        cam_x += player_speed * dt * shift_multiplier
+                        absolute_cam_x += player_speed * dt * shift_multiplier
                         dungeon_depth += dungeon_traversal_speed * shift_multiplier
                 elif keys[pygame.K_d] and dungeon_depth <= 0:
                     if not right_collision:
@@ -748,6 +787,8 @@ while running:
                     if not right_collision:
                         player_pos.x += player_speed * dt * shift_multiplier
                         dungeon_depth += dungeon_traversal_speed * shift_multiplier
+
+                cam_x = int(absolute_cam_x)
 
                 if keys[pygame.K_d] and pygame.mouse.get_pressed()[0] and not player.exhausted:
                     player.last_direction = "right"
@@ -918,6 +959,15 @@ while running:
             screen.blit(temp_surface, (x - 5, y - 5))
             screen.blit(tired_text, (x, y))
             stamina_depleted_message_timer -= dt
+        if inventory.inventory_full_message_timer > 0:
+            full_text = font.render("Inventory Full! Cannot pick up items.", True, (255, 50, 50))
+            x = screen.get_width()//2 - full_text.get_width()//2
+            y = 50
+            temp_surface = pygame.Surface((full_text.get_width() + 10, full_text.get_height() + 10), pygame.SRCALPHA)
+            temp_surface.fill((0, 0, 0, 150))
+            screen.blit(temp_surface, (x - 5, y - 5))
+            screen.blit(full_text, (x, y))
+            inventory.inventory_full_message_timer -= dt
 
 
 
@@ -926,7 +976,8 @@ while running:
             inventory.draw_inventory(screen)
             if inventory.state == "inventory":
                 inventory.draw_items(screen)
-            screen.blit(hotbar_image, (width//2 - hotbar_image.get_width()//2, height - 100))
+                inventory.draw_hotbar(screen)
+            inventory.draw_dragged_item(screen)
             if inventory_tab_unused.is_clicked(event):
                 inventory.state = "inventory"
             elif crafting_tab_unused.is_clicked(event):
@@ -952,22 +1003,22 @@ while running:
 
         if keys[pygame.K_i]:
             dungeon_depth = 10000
-            cam_x = 500000
+            absolute_cam_x = 500000
             player_pos.x = width / 2
 
         if keys[pygame.K_o]:
             dungeon_depth = 5000
-            cam_x = 250000
+            absolute_cam_x = 250000
             player_pos.x = width / 2
 
         if keys[pygame.K_p]:
             dungeon_depth = 1600
-            cam_x = 75000
+            absolute_cam_x = 75000
             player_pos.x = width / 2
 
         if keys[pygame.K_l]:
             dungeon_depth = 6300
-            cam_x = 315000
+            absolute_cam_x = 315000
             player_pos.x = width / 2
 
         pygame.display.flip()
