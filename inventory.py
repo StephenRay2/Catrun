@@ -13,9 +13,10 @@ image_path = "assets/sprites/items"
 items_list = [
     # Fruits & Vegetables
     {"item_name" : "Apples", "icon": "Apple.png", "stack_size": 100, "weight": .25},
-    {"item_name" : "Baked Apple", "icon": "BakedApple.png", "stack_size": 100, "weight": .3},
-    {"item_name" : "Orange", "icon": "Orange.png", "stack_size": 100, "weight": .3},
+    {"item_name" : "Baked Apples", "icon": "BakedApple.png", "stack_size": 100, "weight": .3},
+    {"item_name" : "Oranges", "icon": "Orange.png", "stack_size": 100, "weight": .3},
     {"item_name" : "Orange Juice", "icon": "OrangeJuice.png", "stack_size": 100, "weight": .2},
+    {"item_name" : "Coconuts", "icon": "Coconut.png", "stack_size": 100, "weight": .4},
 
     # Wood Types
     {"item_name" : "Apple Wood", "icon": "AppleWood.png", "stack_size": 100, "weight": .5},
@@ -57,7 +58,7 @@ items_list = [
     {"item_name" : "Raw Gold", "icon": "RawGold.png", "stack_size": 100, "weight": 1.2},
     {"item_name" : "Gold Ingot", "icon": "GoldIngot.png", "stack_size": 100, "weight": 0.95},
     {"item_name" : "Sticks", "icon": "Stick.png", "stack_size": 100, "weight": .2},
-    {"item_name" : "Poisonous Mushrooms", "icon": "PoisonousMushroom.png", "stack_size": 100, "weight": .05},
+    {"item_name" : "Poisonous Mushroom", "icon": "PoisonousMushroom.png", "stack_size": 100, "weight": .05},
     {"item_name" : "Fiber", "icon": "Fiber.png", "stack_size": 100, "weight": .05},
     {"item_name" : "Hide", "icon": "Hide.png", "stack_size": 100, "weight": .3},
     {"item_name" : "Buck Antlers", "icon": "BuckAntlers.png", "stack_size": 50, "weight": 0.4},
@@ -95,6 +96,7 @@ items_list = [
     {"item_name" : "Medium Glass Orange Juice", "icon": "MediumGlassOrangeJuice.png", "stack_size": 30, "weight": 0.3},
     {"item_name" : "Medium Glass Health Brew", "icon": "MediumGlassHealthBrew.png", "stack_size": 30, "weight": 0.3},
     {"item_name" : "Medium Glass Stamina Brew", "icon": "MediumGlassStaminaBrew.png", "stack_size": 30, "weight": 0.3},
+    {"item_name" : "Medium Bright Brew", "icon": "MediumBrightBrew.png", "stack_size": 30, "weight": 0.3},
     {"item_name" : "Medium Glass Bright Brew", "icon": "MediumGlassBrightBrew.png", "stack_size": 30, "weight": 0.3},
     {"item_name" : "Medium Glass Chill Brew", "icon": "MediumGlassChillBrew.png", "stack_size": 30, "weight": 0.3},
     {"item_name" : "Medium Glass Heat Brew", "icon": "MediumGlassHeatBrew.png", "stack_size": 30, "weight": 0.3},
@@ -125,6 +127,95 @@ items_list = [
     
     # Misc
     {"item_name" : "Empty Cage", "icon": "EmptyCage.png", "stack_size": 1, "weight": 8},
+    
+    # New Items - Crafting & Building
+    {"item_name" : "Alchemy Bench", "icon": "AlchemyBench.png", "stack_size": 1, "weight": 25},
+    {"item_name" : "Campfire", "icon": "Campfire1.png", "stack_size": 1, "weight": 10},
+    {"item_name" : "Campfire Active 2", "icon": "Campfire2.png", "stack_size": 1, "weight": 10},
+    {"item_name" : "Campfire Active 3", "icon": "Campfire3.png", "stack_size": 1, "weight": 10},
+    {"item_name" : "Campfire Active 4", "icon": "Campfire4.png", "stack_size": 1, "weight": 10},
+    {"item_name" : "Campfire Active 5", "icon": "Campfire5.png", "stack_size": 1, "weight": 10},
+    {"item_name" : "Cooking Pot", "icon": "CookingPot1.png", "stack_size": 1, "weight": 2.0},
+    {"item_name" : "Cooking Pot Active 2", "icon": "CookingPot2.png", "stack_size": 1, "weight": 2.0},
+    {"item_name" : "Cooking Pot Active 3", "icon": "CookingPot3.png", "stack_size": 1, "weight": 2.0},
+    {"item_name" : "Cooking Pot Active 4", "icon": "CookingPot4.png", "stack_size": 1, "weight": 2.0},
+    {"item_name" : "Cooking Pot Active 5", "icon": "CookingPot5.png", "stack_size": 1, "weight": 2.0},
+    {"item_name" : "Dead Campfire", "icon": "DeadCampfire.png", "stack_size": 1, "weight": 10},
+    {"item_name" : "Dead Cooking Pot", "icon": "DeadCookingPot.png", "stack_size": 1, "weight": 2.0},
+    {"item_name" : "Oil Lamp", "icon": "OilLamp1.png", "stack_size": 5, "weight": 0.5},
+    {"item_name" : "Oil Lamp Lit 2", "icon": "OilLamp2.png", "stack_size": 5, "weight": 0.5},
+    {"item_name" : "Oil Lamp Lit 3", "icon": "OilLamp3.png", "stack_size": 5, "weight": 0.5},
+    {"item_name" : "Empty Oil Lamp", "icon": "EmptyOilLamp.png", "stack_size": 10, "weight": 0.3},
+    
+    # New Items - Decorative & Special Materials
+    {"item_name" : "Bone", "icon": "Bone.png", "stack_size": 100, "weight": 0.2},
+    {"item_name" : "Fur", "icon": "Fur.png", "stack_size": 100, "weight": 0.1},
+    {"item_name" : "Venom Sac", "icon": "VenomSac.png", "stack_size": 50, "weight": 0.15},
+    
+    # New Items - Gems & Jewelry
+    {"item_name" : "Amethyst", "icon": "Amethyst.png", "stack_size": 50, "weight": 0.3},
+    {"item_name" : "Aquamarine", "icon": "Aquamarine.png", "stack_size": 50, "weight": 0.3},
+    {"item_name" : "Diamond", "icon": "Diamond.png", "stack_size": 50, "weight": 0.35},
+    {"item_name" : "Emerald", "icon": "Emerald.png", "stack_size": 50, "weight": 0.3},
+    {"item_name" : "Opal", "icon": "Opal.png", "stack_size": 50, "weight": 0.25},
+    {"item_name" : "Pearl", "icon": "Pearl.png", "stack_size": 50, "weight": 0.15},
+    {"item_name" : "Ruby", "icon": "Ruby.png", "stack_size": 50, "weight": 0.3},
+    {"item_name" : "Sapphire", "icon": "Sapphire.png", "stack_size": 50, "weight": 0.3},
+    {"item_name" : "Topaz", "icon": "Topaz.png", "stack_size": 50, "weight": 0.25},
+    
+    # New Items - Rings & Amulets
+    {"item_name" : "Small Metal Ring", "icon": "SmallMetalRing.png", "stack_size": 20, "weight": 0.1},
+    {"item_name" : "Small Gold Ring", "icon": "SmallGoldRing.png", "stack_size": 20, "weight": 0.12},
+    {"item_name" : "Metal Ring", "icon": "MetalRing.png", "stack_size": 20, "weight": 0.15},
+    {"item_name" : "Gold Ring", "icon": "GoldRing.png", "stack_size": 20, "weight": 0.18},
+    {"item_name" : "Small Metal Amulet", "icon": "SmallMetalAmulet.png", "stack_size": 10, "weight": 0.2},
+    {"item_name" : "Small Gold Amulet", "icon": "SmallGoldAmulet.png", "stack_size": 10, "weight": 0.25},
+    {"item_name" : "Medium Metal Amulet", "icon": "MediumMetalAmulet.png", "stack_size": 5, "weight": 0.4},
+    {"item_name" : "Medium Gold Amulet", "icon": "MediumGoldAmulet.png", "stack_size": 5, "weight": 0.45},
+    {"item_name" : "Large Metal Amulet", "icon": "LargeMetalAmulet.png", "stack_size": 3, "weight": 0.6},
+    {"item_name" : "Large Gold Amulet", "icon": "LargeGoldAmulet.png", "stack_size": 3, "weight": 0.65},
+    
+    # New Items - Additional Beverages
+    {"item_name" : "Small Olive Oil", "icon": "SmallOliveOIl.png", "stack_size": 50, "weight": 0.15},
+    {"item_name" : "Medium Glass Olive Oil", "icon": "MediumGlassOliveOil.png", "stack_size": 30, "weight": 0.3},
+    {"item_name" : "Large Metal Olive Oil", "icon": "LargeMetalOliveOil.png", "stack_size": 20, "weight": 0.6},
+    
+    # New Items - Torch Variants
+    {"item_name" : "Torch (Lit)", "icon": "Torch2.png", "stack_size": 100, "weight": 0.12},
+    {"item_name" : "Torch (Lit 2)", "icon": "Torch3.png", "stack_size": 100, "weight": 0.12},
+    {"item_name" : "Torch (Lit 3)", "icon": "Torch4.png", "stack_size": 100, "weight": 0.12},
+    
+    # New Items - Lantern Variants
+    {"item_name" : "Lantern (Lit)", "icon": "Lantern2.png", "stack_size": 10, "weight": 0.9},
+    {"item_name" : "Lantern (Lit 2)", "icon": "Lantern3.png", "stack_size": 10, "weight": 0.9},
+    {"item_name" : "Lantern (Lit 3)", "icon": "Lantern4.png", "stack_size": 10, "weight": 0.9},
+    
+    # New Items - Fence Variants
+    {"item_name" : "Fence Corner Left Bottom", "icon": "FenceCornerLeftBottom.png", "stack_size": 100, "weight": 6},
+    {"item_name" : "Fence Corner Right Bottom", "icon": "FenceCornerRightBottom.png", "stack_size": 100, "weight": 6},
+    {"item_name" : "Fence End Left Top", "icon": "FenceEndLeftTop.png", "stack_size": 100, "weight": 6},
+    {"item_name" : "Fence End Right Top", "icon": "FenceEndRightTop.png", "stack_size": 100, "weight": 6},
+    {"item_name" : "Fence Front", "icon": "FenceFront.png", "stack_size": 100, "weight": 6},
+    {"item_name" : "Fence Left Side", "icon": "FenceLeftSide.png", "stack_size": 100, "weight": 6},
+    {"item_name" : "Fence Right Side", "icon": "FenceRightSide.png", "stack_size": 100, "weight": 6},
+    
+    # New Items - Keys & Special Items
+    {"item_name" : "Cage Key", "icon": "CageKey.png", "stack_size": 10, "weight": 0.1},
+    {"item_name" : "Chest Key", "icon": "ChestKey.png", "stack_size": 10, "weight": 0.1},
+    {"item_name" : "Resurrection Coin", "icon": "ResurrectionCoin.png", "stack_size": 1, "weight": 0.05},
+    
+    # New Items - Weapons & Tools
+    {"item_name" : "Throwing Knife", "icon": "ThrowingKnife.png", "stack_size": 50, "weight": 0.2},
+    {"item_name" : "Throwing Star", "icon": "ThrowingStar.png", "stack_size": 50, "weight": 0.15},
+    
+    # New Items - Fruits & Vegetables
+    {"item_name" : "Pineapple", "icon": "Pineapple.png", "stack_size": 100, "weight": 1},
+    {"item_name" : "Watermelon", "icon": "Watermelon.png", "stack_size": 100, "weight": 1.2},
+    {"item_name" : "Olives", "icon": "Olives.png", "stack_size": 100, "weight": 0.1},
+    
+    # New Items - Plant Materials
+    {"item_name" : "Fire Fern Leaf", "icon": "FireFernLeaf.png", "stack_size": 100, "weight": 0.05},
+    {"item_name" : "Frost Fern Leaf", "icon": "FrostFernLeaf.png", "stack_size": 100, "weight": 0.05},
 ]
 
 for item in items_list:

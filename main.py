@@ -13,7 +13,7 @@ world_x = 0.0
 absolute_cam_x = 0.0
 floor_y = 0
 shift_multiplier = 1
-dungeon_depth = 0
+dungeon_depth = absolute_cam_x
 dungeon_depth_high = 0
 font = pygame.font.SysFont(None, 24)
 scroll = 0
@@ -78,8 +78,8 @@ while running:
         screen.blit(menu_image, (0, 0), menu_screen)
 
         
-        collectibles = sticks + stones + grasses + savannah_grasses + mushrooms
-        all_objects = rocks + trees + boulders + berry_bushes + dead_bushes
+        collectibles = sticks + stones + grasses + savannah_grasses + mushrooms 
+        all_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants
 
         visible_collectibles = [col for col in collectibles if col.rect.x- cam_x > -1000 and col.rect.y - cam_x < width + 1000]
         visible_objects = [obj for obj in all_objects if obj.rect.x - cam_x > -1000 and obj.rect.x - cam_x < width + 1000]
@@ -127,6 +127,7 @@ while running:
         dt = clock.tick(60) / 1000
 
     elif state == "game":
+        dungeon_depth = absolute_cam_x
         
         if game_just_started:
             generate_world()
@@ -335,7 +336,7 @@ while running:
                                             sound_manager.play_sound(random.choice(["collect_stone1", "collect_stone2"]))
                                         elif obj.resource == "Fiber":
                                             sound_manager.play_sound(random.choice(["pickup_grass1", "pickup_grass2", "pickup_grass3"]))
-                                        elif obj.resource == "Poisonous Mushrooms":
+                                        elif obj.resource == "Mushroom" or obj.resource == "Poisonous Mushroom" or obj.resource == "Duskshroom" or obj.resource == "Dawnshroom":
                                             sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
                                     
                                     collection_messages.insert(0, [
@@ -395,7 +396,7 @@ while running:
                                 if hasattr(obj, 'resource'):
                                     if obj.resource == "Stone":
                                         sound_manager.play_sound(random.choice([f"harvest_stone{i}" for i in range(1, 7)]))
-                                    elif obj.resource in ["Apple Wood", "Dusk Wood", "Fir Wood", "Oak Wood", "Orange Wood"]:
+                                    elif obj.resource in ["Apple Wood", "Dusk Wood", "Fir Wood", "Oak Wood", "Orange Wood", "Olive Wood", "Willow Wood", "Palm Wood"]:
                                         sound_manager.play_sound(random.choice(["gather_wood1", "gather_wood2", "gather_wood3"]))
                                     elif obj.resource == "Sticks":
                                         sound_manager.play_sound(random.choice(["break_bush1", "break_bush2"]))
@@ -427,6 +428,8 @@ while running:
         trees = [t for t in trees if not t.destroyed]
         boulders = [b for b in boulders if not b.destroyed]
         berry_bushes = [bush for bush in berry_bushes if not bush.destroyed]
+        ferns = [f for f in ferns if not f.destroyed]
+        fruit_plants = [fp for fp in fruit_plants if not fp.destroyed]
 
         cats = [cat for cat in cats if not cat.destroyed]
         squirrels = [squirrel for squirrel in squirrels if not squirrel.destroyed]
@@ -450,7 +453,7 @@ while running:
         keys = pygame.key.get_pressed()
 
         collectibles = sticks + stones + grasses + savannah_grasses + mushrooms
-        all_objects = rocks + trees + boulders + berry_bushes + dead_bushes
+        all_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants
         mobs = cats + squirrels + cows + chickens + crawlers + duskwretches + pocks + deers + black_bears + brown_bears + gilas + crows
 
         visible_collectibles = [col for col in collectibles if col.rect.x- cam_x > -256 and col.rect.x - cam_x < width + 256]
@@ -475,14 +478,15 @@ while running:
         visible_objects.extend(visible_collectibles)
         visible_objects.sort(key=lambda obj: obj.rect.y + obj.rect.height)
 
-        for mob in visible_objects:
+        for mob in list(visible_mobs):
             if mob.destroyed:
-                visible_mobs.remove(obj)
+                visible_mobs.remove(mob)
+                mobs.remove(mob)
             if hasattr(mob, "death_experience"):
                 mob.give_experience(player)
 
-        for col in visible_objects:
-            if col.destroyed:
+        for col in list(visible_collectibles):
+            if col.destroyed and col in collectibles:
                 collectibles.remove(col)
 
         player_drawn = False
@@ -555,7 +559,7 @@ while running:
                                             sound_manager.play_sound(random.choice(["collect_stone1", "collect_stone2"]))
                                         elif obj.resource == "Fiber":
                                             sound_manager.play_sound(random.choice(["pickup_grass1", "pickup_grass2", "pickup_grass3"]))
-                                        elif obj.resource == "Poisonous Mushrooms":
+                                        elif obj.resource == "Mushroom" or obj.resource == "Poisonous Mushroom" or obj.resource == "Duskshroom" or obj.resource == "Dawnshroom":
                                             sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
                                     
                                     collection_messages.insert(0, [
@@ -579,6 +583,9 @@ while running:
             
             for tree in trees:
                 tree.update(dt)
+            
+            for plant in fruit_plants:
+                plant.update(dt)
 
             visible_mob_set = set(visible_mobs)
             for mob in nearby_mobs:
@@ -761,31 +768,15 @@ while running:
                         player_pos.y += player_speed * dt * shift_multiplier
 
                 
-                if keys[pygame.K_a] and 0 < dungeon_depth < 50000:
+                if keys[pygame.K_a]:
                     if not left_collision:
                         absolute_cam_x -= player_speed * dt * shift_multiplier
                         dungeon_depth = max(0, dungeon_depth - dungeon_traversal_speed * shift_multiplier)
-                elif keys[pygame.K_a] and dungeon_depth <= 0:
-                    if not left_collision:
-                        player_pos.x -= player_speed * dt * shift_multiplier
-                        dungeon_depth -= dungeon_traversal_speed * shift_multiplier
-                elif keys[pygame.K_a] and dungeon_depth >= 50000:
-                    if not left_collision:
-                        player_pos.x -= player_speed * dt * shift_multiplier
-                        dungeon_depth -= dungeon_traversal_speed * shift_multiplier
 
                 
-                if keys[pygame.K_d] and 0 < dungeon_depth < 50000:
+                if keys[pygame.K_d]:
                     if not right_collision:
                         absolute_cam_x += player_speed * dt * shift_multiplier
-                        dungeon_depth += dungeon_traversal_speed * shift_multiplier
-                elif keys[pygame.K_d] and dungeon_depth <= 0:
-                    if not right_collision:
-                        player_pos.x += player_speed * dt * shift_multiplier
-                        dungeon_depth += dungeon_traversal_speed * shift_multiplier
-                elif keys[pygame.K_d] and dungeon_depth >= 50000:
-                    if not right_collision:
-                        player_pos.x += player_speed * dt * shift_multiplier
                         dungeon_depth += dungeon_traversal_speed * shift_multiplier
 
                 cam_x = int(absolute_cam_x)
@@ -1001,25 +992,16 @@ while running:
         screen.blit(depth_text, (depth_rect.x + 5, depth_rect.y + 5))
 
 
-        if keys[pygame.K_i]:
-            dungeon_depth = 10000
-            absolute_cam_x = 500000
-            player_pos.x = width / 2
-
         if keys[pygame.K_o]:
-            dungeon_depth = 5000
-            absolute_cam_x = 250000
+            dungeon_depth -= 500
+            absolute_cam_x -= 500
             player_pos.x = width / 2
 
         if keys[pygame.K_p]:
-            dungeon_depth = 1600
-            absolute_cam_x = 75000
+            dungeon_depth += 500
+            absolute_cam_x += 500
             player_pos.x = width / 2
 
-        if keys[pygame.K_l]:
-            dungeon_depth = 6300
-            absolute_cam_x = 315000
-            player_pos.x = width / 2
 
         pygame.display.flip()
         dt = clock.tick(60) / 1000

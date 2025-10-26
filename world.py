@@ -8,17 +8,39 @@ height = screen.get_height()
 clock = pygame.time.Clock()
 state = "menu"
 
+def collect_multiple_resources(resource_list, player=None):
+    all_resources = []
+    for resource_data in resource_list:
+        if isinstance(resource_data, dict):
+            resource_name = resource_data["name"]
+            amount = resource_data["amount"]
+            all_resources.extend([resource_name] * amount)
+        else:
+            all_resources.append(resource_data)
+    
+    if player:
+        total_exp = len(all_resources) * collect_experience
+        player.experience += total_exp
+        player.exp_total += total_exp
+    
+    return all_resources
+
+
 num_rocks = 1500
 num_boulders = 200
 num_bushes = 400
 num_grassland_trees = 400
 num_savannah_trees = 50
+num_beach_trees = 50
 num_grasses = 1000
 num_sticks = 500
 num_stones = 500
 num_savannah_grasses = 1600
-num_mushrooms = 50
+num_mushrooms = 200
 num_dead_bushes = 300
+num_fruit_plants = 300
+num_fire_ferns = 50
+num_frost_ferns = 50
 
 rocks = []
 dead_bushes = []
@@ -30,6 +52,8 @@ trees = []
 sticks = []
 savannah_grasses = []
 mushrooms = []
+fruit_plants = []
+ferns = []
 
 
 rock_images = ["/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock1.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock2.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock3.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock4.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock6.png"]
@@ -40,9 +64,16 @@ grassland_tree_types = [
     {"type": "Duskwood Tree", "image": "assets/sprites/biomes/grassland/DuskwoodTree.png", "bare_image": None, "fruit": None, "wood": "Dusk Wood", "width" : 64, "height" : 128},
     {"type": "Fir Tree", "image": "assets/sprites/biomes/grassland/FirTree.png", "bare_image": None, "fruit": None, "wood": "Fir Wood", "width" : 64, "height" : 128},
     {"type": "Oak Tree", "image": "assets/sprites/biomes/grassland/OakTree.png", "bare_image": None, "fruit": None, "wood": "Oak Wood", "width" : 64, "height" : 128}, 
+    {"type": "Willow Tree", "image": "assets/sprites/biomes/grassland/WillowTree.png", "bare_image": None, "fruit": None, "wood": "Willow Wood", "width" : 128, "height" : 128}
 ]
 
-savannah_tree_types = [{"type": "Orange Tree", "image": "assets/sprites/biomes/grassland/OrangeTree.png", "bare_image": "assets/sprites/biomes/grassland/BareOrangeTree.png", "fruit": "Oranges", "wood": "Orange Wood", "width" : 96, "height" : 96}]
+savannah_tree_types = [{"type": "Orange Tree", "image": "assets/sprites/biomes/grassland/OrangeTree.png", "bare_image": "assets/sprites/biomes/grassland/BareOrangeTree.png", "fruit": "Oranges", "wood": "Orange Wood", "width" : 96, "height" : 96}, 
+{"type": "Olive Tree", "image": "assets/sprites/biomes/grassland/OliveTree.png", "bare_image": "assets/sprites/biomes/grassland/BareOliveTree.png", "fruit": "Olives", "wood": "Olive Wood", "width" : 96, "height" : 128}]
+
+beach_tree_types = [{"type": "Palm Tree", "image": "assets/sprites/biomes/beach/PalmTree.png", "bare_image": "assets/sprites/biomes/beach/BarePalmTree.png", "fruit": "Coconuts", "wood": "Palm Wood", "width" : 64, "height" : 128}]
+
+fruit_plant_types = [{"type": "Pineapple", "image": "assets/sprites/biomes/grassland/PineapplePlant.png", "bare_image": "assets/sprites/biomes/grassland/BarePineapplePlant.png", "fruit": "Pineapple", "resource": "Fiber", "width" : 64, "height" : 64},
+{"type": "Watermelon", "image": "assets/sprites/biomes/grassland/WatermelonPlant.png", "bare_image": "assets/sprites/biomes/grassland/BareWatermelonPlant.png", "fruit": "Watermelon", "resource": "Fiber", "width" : 32, "height" : 32}]
 
 boulder_images = ["assets/sprites/biomes/grassland/Boulder1.png", "assets/sprites/biomes/grassland/Boulder2.png", "assets/sprites/biomes/grassland/Boulder3.png", "assets/sprites/biomes/grassland/Boulder4.png", "assets/sprites/biomes/grassland/Boulder5.png", "assets/sprites/biomes/grassland/Boulder6.png", "assets/sprites/biomes/grassland/Boulder7.png", ]
 
@@ -101,7 +132,10 @@ stone_data = [
 ]
 
 mushroom_data = [
-    {"resource": "Poisonous Mushroom", "icon": "assets/sprites/items/PoisonousMushroom.png", "image1": "assets/sprites/biomes/grassland/PoisonousMushroom.png"}
+    {"resource": "Poisonous Mushroom", "icon": "assets/sprites/items/PoisonousMushroom.png", "image1": "assets/sprites/biomes/grassland/PoisonousMushroom.png"}, 
+    {"resource": "Mushroom", "icon": "assets/sprites/items/Mushroom.png", "image1": "assets/sprites/biomes/grassland/Mushroom.png"}, 
+    {"resource": "Dawnshroom", "icon": "assets/sprites/items/Dawnshroom.png", "image1": "assets/sprites/biomes/grassland/Dawnshroom.png"}, 
+    {"resource": "Duskshroom", "icon": "assets/sprites/items/Duskshroom.png", "image1": "assets/sprites/biomes/grassland/Duskshroom.png"}
 ]
 
 grass_data = [
@@ -117,6 +151,9 @@ savannah_grass_data = [
     {"resource": "Fiber", "icon": "assets/sprites/items/SavannahGrass.png", "image3": "assets/sprites/biomes/grassland/SavannahGrass3.png"},
     {"resource": "Fiber", "icon": "assets/sprites/items/SavannahGrass.png", "image4": "assets/sprites/biomes/grassland/SavannahGrass4.png"}
 ]
+
+fern_data = [{"image": "assets/sprites/biomes/lavastone/FireFern.png", "resource": "Fire Fern Leaf", "biome" : "lavastone"}, 
+{"image": "assets/sprites/biomes/snow/FrostFern.png", "resource": "Frost Fern Leaf", "biome" : "snow"}]
 
 collect_experience = 1
 harvest_experience = 1.5
@@ -194,30 +231,44 @@ class BerryBush(pygame.sprite.Sprite):
         self.berry = bush_type["berry"]
         self.amount = random.randint(3, 9)
 
-        self.regrow_time = 200 #(seconds)
+        self.regrow_time = 200
         self.timer = 0
         self.is_empty = False
         self.destroyed = False
         self.resource = "Sticks"
 
-    def collect(self, player = None):
+    def collect(self, player=None):
+        """Collect berries and sometimes get sticks too"""
         if not self.is_empty and self.amount > 0:
             berry_count = self.amount
             self.amount = 0
             self.image = self.bare_image
             self.is_empty = True
             self.timer = 0
-            player.experience += collect_experience * berry_count
-            player.exp_total += collect_experience * berry_count
-            return [self.berry] * berry_count
+            
+            # Collect berries
+            resources = [self.berry] * berry_count
+            
+            # 30% chance to also get 1-3 sticks when collecting berries
+            if random.random() < 0.3:
+                stick_count = random.randint(1, 3)
+                resources.extend(["Sticks"] * stick_count)
+            
+            if player:
+                player.experience += collect_experience * len(resources)
+                player.exp_total += collect_experience * len(resources)
+            
+            return resources
         return []
 
     def harvest(self, player=None):
+        """Harvest the bush for sticks (destroys it)"""
         if not self.destroyed:
             resource_collected = random.randint(3, 9)
             self.destroyed = True
-            player.experience += harvest_experience * resource_collected
-            player.exp_total += harvest_experience * resource_collected
+            if player:
+                player.experience += harvest_experience * resource_collected
+                player.exp_total += harvest_experience * resource_collected
             return [self.resource] * resource_collected
         return []
 
@@ -235,20 +286,11 @@ class BerryBush(pygame.sprite.Sprite):
     def get_collision_rect(self, cam_x):
         return pygame.Rect(
             self.rect.x - cam_x + 15,
-            self.rect.y + (self.rect.height * .4),
+            self.rect.y + (self.rect.height * .35),
             self.rect.width - 35,
             self.rect.height - 40
         )
-    
-    def harvest(self, player=None):
-        if not self.destroyed:
-            resource_collected = random.randint(3, 9)
-            self.destroyed = True
-            player.experience += harvest_experience * resource_collected
-            player.exp_total += harvest_experience * resource_collected
-            return [self.resource] * resource_collected
-        return []
-    
+
 class DeadBush(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
@@ -308,7 +350,10 @@ class Tree(pygame.sprite.Sprite):
         self.rect = pygame.Rect(self.rect.x, self.rect.y + collision_y_offset, tree_type["width"], collision_height)
         
         self.fruit = tree_type["fruit"]
-        self.amount = random.randint(5, 15) if self.fruit else 0
+        if tree_type["type"] == "Palm Tree":
+            self.amount = random.randint(2, 4) if self.fruit else 0
+        else:
+            self.amount = random.randint(5, 15) if self.fruit else 0
         self.regrow_time = 400 #(seconds)
         self.timer = 0
         self.is_empty = False
@@ -358,6 +403,118 @@ class Tree(pygame.sprite.Sprite):
             self.rect.x - cam_x + x_offset, self.rect.y + 15, collision_width, self.rect.height - 30
         )
     
+class Fern(pygame.sprite.Sprite):
+    def __init__(self, x, y, fern_type):
+        super().__init__()
+        self.biome = fern_type["biome"]
+        self.type = fern_type
+        self.full_image = pygame.transform.scale(
+            pygame.image.load(fern_type["image"]).convert_alpha(), (64, 64)
+        )
+        self.image = self.full_image
+        self.rect = self.image.get_rect(topleft=(x, y))
+
+        self.amount = random.randint(3, 6)
+        self.timer = 0
+        self.destroyed = False
+        self.resource = fern_type["resource"]
+
+
+    def harvest(self, player=None):
+        if not self.destroyed:
+            resource_collected = min(self.amount, random.randint((1 * player.attack), (2 * player.attack)))
+            self.amount -= resource_collected
+            if self.amount <= 0:
+                self.destroyed = True
+            player.experience += harvest_experience * resource_collected
+            player.exp_total += harvest_experience * resource_collected
+            return [self.resource] * resource_collected
+        return []
+
+
+    def draw(self, screen, cam_x):
+        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
+    
+    def get_collision_rect(self, cam_x):
+        return pygame.Rect(
+            self.rect.x - cam_x + 15,
+            self.rect.y + (self.rect.height * .4),
+            self.rect.width - 35,
+            self.rect.height - 40
+        )
+
+class FruitPlant(pygame.sprite.Sprite):
+    def __init__(self, x, y, plant_type):
+        super().__init__()
+        self.type = plant_type
+        self.full_image = pygame.transform.scale(
+            pygame.image.load(plant_type["image"]).convert_alpha(), (plant_type["width"], plant_type["height"])
+        )
+        if plant_type["bare_image"] is not None:
+            self.bare_image = pygame.transform.scale(
+                pygame.image.load(plant_type["bare_image"]).convert_alpha(), (plant_type["width"], plant_type["height"])
+            )
+        else:
+            self.bare_image = self.full_image
+        self.image = self.full_image
+        self.rect = self.image.get_rect(topleft=(x, y))
+        self.image_rect = self.rect.copy()
+        collision_height = plant_type["height"] // 2
+        collision_y_offset = plant_type["height"] - collision_height
+        self.rect = pygame.Rect(self.rect.x, self.rect.y + collision_y_offset, plant_type["width"], collision_height)
+        
+        self.fruit = plant_type["fruit"]
+        self.amount = 1 if self.fruit else 0
+        self.regrow_time = 400 #(seconds)
+        self.timer = 0
+        self.is_empty = False
+        self.destroyed = False
+        self.resource = plant_type["resource"]
+        self.resource_amount = random.randint(3, 6)
+        
+    def harvest(self, player=None):
+        if not self.destroyed:
+            resource_collected = min(self.resource_amount, random.randint((1 * player.attack), (2 * player.attack)))
+            self.resource_amount -= resource_collected
+            if self.resource_amount <= 0:
+                self.destroyed = True
+            player.experience += harvest_experience * resource_collected
+            player.exp_total += harvest_experience * resource_collected
+            return [self.resource] * resource_collected
+        return []
+        
+    def collect(self, player = None):
+        if not self.is_empty and self.amount > 0:
+            fruit_count = self.amount
+            self.amount = 0
+            self.image = self.bare_image
+            self.is_empty = True
+            self.timer = 0
+            player.experience += collect_experience * fruit_count
+            player.exp_total += collect_experience * fruit_count
+            return [self.fruit] * fruit_count
+        return []
+        
+    def update(self, dt):
+        if self.is_empty:
+            self.timer += dt
+            if self.timer >= self.regrow_time:
+                self.amount = 1
+                self.image = self.full_image
+                self.is_empty = False
+                
+    def draw(self, screen, cam_x):
+        screen.blit(self.image, (self.image_rect.x - cam_x, self.image_rect.y))
+        
+    def get_collision_rect(self, cam_x):
+        collision_width = int(self.rect.width * 0.5)
+        x_offset = (self.rect.width - collision_width) // 2
+        
+        return pygame.Rect(
+            self.rect.x - cam_x + x_offset, self.rect.y - 15, collision_width, self.rect.height - 10
+        )
+    
+
 class Collectible(pygame.sprite.Sprite):
     def __init__(self, x, y, image, resource, size=(48, 48)):
         super().__init__()
@@ -416,9 +573,14 @@ class SavannahGrass(Collectible):
         image_path = f"assets/sprites/biomes/grassland/SavannahGrass{image_index}.png"
         super().__init__(x, y, image_path, "Fiber", size=(64, 64))
 
-class PoisonousMushroom(Collectible):
+class Mushroom(Collectible):
     def __init__(self, x, y):
-        super().__init__(x, y, "assets/sprites/biomes/grassland/PoisonousMushroom.png", "Poisonous Mushrooms", size=(20, 20))
+        mushroom_type = random.choice(mushroom_data)
+        resource = mushroom_type["resource"]
+        image_path = mushroom_type["image1"]
+        super().__init__(x, y, image_path, resource, size=(20, 20))
+
+
 
 bg_green = pygame.Surface((width, height))
 bg_grass = pygame.image.load("assets/sprites/biomes/backgrounds/bg_grass.png").convert()
@@ -519,9 +681,9 @@ for tile_x, tile_image in tiles:
     weighted_rock_tiles.extend([(tile_x, tile_image)] * weight)
 
 
-
 grassland_tree_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah]
 savannah_tree_tiles = [bg_savannah]
+beach_tree_tiles = [bg_sand]
 
 grassland_tree_weights = {
     bg_grass: 30,
@@ -555,6 +717,22 @@ savannah_tree_weights = {
     bg_redrock: 0
 }
 
+beach_tree_weights = {
+    bg_grass: 0,
+    bg_dirt: 0,
+    bg_compact: 0,
+    bg_sand: 3,
+    bg_savannah: 0,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 0,
+    bg_lavastone: 0,
+    bg_snow: 0,
+    bg_wasteland: 0,
+    bg_blackstone: 0,
+    bg_redrock: 0
+}
+
 weighted_grassland_tiles = []
 for tile_x, tile_image in tiles:
     if tile_image in grassland_tree_tiles:
@@ -567,7 +745,11 @@ for tile_x, tile_image in tiles:
         weight = savannah_tree_weights.get(tile_image, 1)
         weighted_savannah_tiles.extend([(tile_x, tile_image)] * weight)
 
-
+weighted_beach_tiles = []
+for tile_x, tile_image in tiles:
+    if tile_image in beach_tree_tiles:
+        weight = beach_tree_weights.get(tile_image, 1)
+        weighted_beach_tiles.extend([(tile_x, tile_image)] * weight)
 
 
 allowed_berry_bush_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah]
@@ -648,7 +830,6 @@ weighted_stick_tiles = []
 for tile_x, tile_image in tiles:
     weight = stick_weights.get(tile_image, 1)
     weighted_stick_tiles.extend([(tile_x, tile_image)] * weight)
-
 
 
 
@@ -777,9 +958,77 @@ for tile_x, tile_image in tiles:
     weighted_dead_bush_tiles.extend([(tile_x, tile_image)] * weight)
 
 
+fruit_plant_weights = {
+    bg_grass: 2,
+    bg_dirt: 1,
+    bg_compact: 0,
+    bg_sand: 0,
+    bg_savannah: 5,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 0,
+    bg_lavastone: 0,
+    bg_snow: 0,
+    bg_wasteland: 0,
+    bg_blackstone: 0,
+    bg_redrock: 0
+}
+
+weighted_fruit_plant_tiles = []
+for tile_x, tile_image in tiles:
+    weight = fruit_plant_weights.get(tile_image, 0)
+    if weight > 0:
+        weighted_fruit_plant_tiles.extend([(tile_x, tile_image)] * weight)
+
+
+# Fire Fern spawning weights
+fire_fern_weights = {
+    bg_grass: 0,
+    bg_dirt: 0,
+    bg_compact: 0,
+    bg_sand: 0,
+    bg_savannah: 0,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 0,
+    bg_lavastone: 5,
+    bg_snow: 0,
+    bg_wasteland: 1,
+    bg_blackstone: 0,
+    bg_redrock: 0
+}
+
+weighted_fire_fern_tiles = []
+for tile_x, tile_image in tiles:
+    weight = fire_fern_weights.get(tile_image, 0)
+    if weight > 0:
+        weighted_fire_fern_tiles.extend([(tile_x, tile_image)] * weight)
+
+frost_fern_weights = {
+    bg_grass: 0,
+    bg_dirt: 0,
+    bg_compact: 0,
+    bg_sand: 0,
+    bg_savannah: 0,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 0,
+    bg_lavastone: 0,
+    bg_snow: 5,
+    bg_wasteland: 0,
+    bg_blackstone: 0,
+    bg_redrock: 0
+}
+
+weighted_frost_fern_tiles = []
+for tile_x, tile_image in tiles:
+    weight = frost_fern_weights.get(tile_image, 0)
+    if weight > 0:
+        weighted_frost_fern_tiles.extend([(tile_x, tile_image)] * weight)
+
 
 def generate_world():
-    global rocks, dead_bushes, grasses, stones, boulders, berry_bushes, trees, sticks, savannah_grasses, mushrooms
+    global rocks, dead_bushes, grasses, stones, boulders, berry_bushes, trees, sticks, savannah_grasses, mushrooms, fruit_plants, ferns
     
     rocks.clear()
     dead_bushes.clear()
@@ -791,6 +1040,9 @@ def generate_world():
     sticks.clear()
     savannah_grasses.clear()
     mushrooms.clear()
+    fruit_plants.clear()
+    ferns.clear()
+
     for _ in range(num_rocks):
         tile_x, tile_image = random.choice(weighted_rock_tiles)
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
@@ -832,6 +1084,7 @@ def generate_world():
 
     spawn_trees(trees, grassland_tree_types, weighted_grassland_tiles, num_grassland_trees, height)
     spawn_trees(trees, savannah_tree_types, weighted_savannah_tiles, num_savannah_trees, height)
+    spawn_trees(trees, beach_tree_types, weighted_beach_tiles, num_beach_trees, height)
     
     
     for _ in range(num_sticks):
@@ -864,7 +1117,7 @@ def generate_world():
         tile_x, tile_image = random.choice(weighted_mushroom_tiles)
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
-        mushrooms.append(PoisonousMushroom(x, y))
+        mushrooms.append(Mushroom(x, y))
     
     
     for _ in range(num_dead_bushes):
@@ -873,6 +1126,27 @@ def generate_world():
         y = random.randint(0, height - 64)
         dead_bushes.append(DeadBush(x, y))
 
+    if weighted_fruit_plant_tiles:
+        for _ in range(num_fruit_plants):
+            tile_x, tile_image = random.choice(weighted_fruit_plant_tiles)
+            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            y = random.randint(0, height - 64)
+            plant_type = random.choice(fruit_plant_types)
+            fruit_plants.append(FruitPlant(x, y, plant_type))
+    
+    if weighted_fire_fern_tiles:
+        for _ in range(num_fire_ferns):
+            tile_x, tile_image = random.choice(weighted_fire_fern_tiles)
+            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            y = random.randint(0, height - 64)
+            ferns.append(Fern(x, y, fern_data[0]))
+
+    if weighted_frost_fern_tiles:
+        for _ in range(num_frost_ferns):
+            tile_x, tile_image = random.choice(weighted_frost_fern_tiles)
+            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            y = random.randint(0, height - 64)
+            ferns.append(Fern(x, y, fern_data[1]))
     
     
-    return rocks, boulders, berry_bushes, trees, sticks, stones, grasses, savannah_grasses, mushrooms, dead_bushes
+    return rocks, boulders, berry_bushes, trees, sticks, stones, grasses, savannah_grasses, mushrooms, dead_bushes, fruit_plants, ferns

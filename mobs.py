@@ -705,14 +705,35 @@ class Mob(pygame.sprite.Sprite):
 
     def harvest(self, player=None):
         if not self.destroyed and not self.is_alive:
+            resources = []
+            
+            # Get primary resource (hide/meat)
             resource_collected = min(self.resource_amount, (1 * player.attack))
             self.resource_amount -= resource_collected
             
+            if resource_collected > 0:
+                resources.extend([self.resource] * resource_collected)
+            
+            # Add meat/secondary resources based on mob type
+            if hasattr(self, 'meat_resource'):
+                meat_amount = random.randint(1, 3)
+                resources.extend([self.meat_resource] * meat_amount)
+            
+            # Special drops for certain mobs
+            if hasattr(self, 'special_drops'):
+                for drop in self.special_drops:
+                    if random.random() < drop['chance']:
+                        amount = random.randint(drop['min'], drop['max'])
+                        resources.extend([drop['item']] * amount)
+            
             if self.resource_amount <= 0:
                 self.destroyed = True
-            player.experience += harvest_experience * resource_collected
-            player.exp_total += harvest_experience * resource_collected
-            return [self.resource] * resource_collected
+            
+            if player and resources:
+                player.experience += harvest_experience * len(resources)
+                player.exp_total += harvest_experience * len(resources)
+            
+            return resources
         return []
     
     def flee(self, player_world_x, player_world_y, dt):
@@ -873,7 +894,8 @@ class Cow(Mob):
         self.health = self.full_health
         self.base_speed = 70
         self.speed = 1
-        self.resource = "Raw Beef"
+        self.meat_resource = "Raw Beef"
+        self.resource = "Hide"
         self.resource_amount = 5
         self.cow = "moo"
         self.death_experience = 100  * (1 + (self.level * self.death_experience * .0001))
@@ -909,7 +931,9 @@ class Chicken(Mob):
         self.rect = self.image.get_rect(center=(x, y))
         self.base_speed = 120
         self.speed = 1
-        self.resource = "Chicken"
+        self.meat_resource = "Raw Chicken"
+        self.special_drops = [{'item': 'Feathers', 'chance': 0.5, 'min': 1, 'max': 3}
+]
         self.resource_amount = random.randint(3, 6)
         self.full_health = 80 + (random.randint(5, 7) * self.level)
         self.health = self.full_health
@@ -942,6 +966,7 @@ class Enemy(Mob):
     def __init__(self, x, y, name):
         super().__init__(x, y, name)
         self.chasing = False
+        self.special_drops = [{'item': 'Bone', 'chance': 0.3, 'min': 1, 'max': 3}]
         self.enemy = True
         self.attacking = False
         self.death_experience = 500  * (1 + (self.level * self.death_experience * .0001))
@@ -1149,6 +1174,9 @@ class Duskwretch(Enemy):
         self.full_health = 180 + (random.randint(15, 22) * self.level)
         self.health = self.full_health
         self.resource = "Hide"
+        self.meat_resource = "Dusk Meat"
+        self.special_drops.append({'item': 'Duskwretch Claws', 'chance': 0.7, 'min': 1, 'max': 2}
+)
         self.resource_amount = random.randint(4, 9)
 
         self.state = "idle"
@@ -1465,7 +1493,12 @@ class Deer(AggressiveMob):
         self.speed = 1
         self.full_health = 150 + (random.randint(5, 7) * self.level)
         self.health = self.full_health
-        self.resource = "Venison"
+        self.meat_resource = "Raw Venison"
+        if self.is_buck:
+            self.special_drops = [
+        {'item': 'Buck Antlers', 'chance': 0.8, 'min': 1, 'max': 2}]
+        else:
+            self.special_drops = []
         self.resource_amount = random.randint(4, 8)
         self.frame_index = 0
         self.animation_speed = 0.2
@@ -1648,7 +1681,8 @@ class BlackBear(AggressiveMob):
         self.speed = 1
         self.full_health = 220 + (random.randint(7, 13) * self.level)
         self.health = self.full_health
-        self.resource = "Bear Hide"
+        self.meat_resource = "Bear Meat"
+        self.special_drops = [{'item': 'Fur', 'chance': 0.6, 'min': 2, 'max': 4}]
         self.resource_amount = 8
         self.death_experience = 600  * (1 + (self.level * self.death_experience * .0001))
         self.level = 1
@@ -1853,7 +1887,8 @@ class BrownBear(AggressiveMob):
         self.speed = 1
         self.full_health = 300 + (random.randint(8, 20) * self.level)
         self.health = self.full_health
-        self.resource = "Bear Hide"
+        self.meat_resource = "Bear Meat"
+        self.special_drops = [{'item': 'Fur', 'chance': 0.6, 'min': 2, 'max': 4}]
         self.resource_amount = 8
         
         self.frame_index = 0
@@ -2007,6 +2042,8 @@ class Gila(AggressiveMob):
         self.full_health = 60 + (random.randint(5, 10) * self.level)
         self.health = self.full_health
         self.resource = "Gila Meat"
+        self.special_drops = [{'item': 'Venom Sac', 'chance': 0.4, 'min': 1, 'max': 2}
+]
         self.resource_amount = 2
         self.death_experience = 500  * (1 + (self.level * self.death_experience * .0001))
         self.level = 1
@@ -2246,7 +2283,7 @@ class Crow(Mob):
                 frames = self.start_fly_right_images if self.last_direction == "right" else self.start_fly_left_images
                 self.frame_index += self.animation_speed
                 if self.frame_index >= len(self.start_fly_left_images):
-                    self.frame_index = 0  # Reset for main flying loop
+                    self.frame_index = 0
                 self.image = frames[int(min(self.frame_index, len(frames) - 1))]
             else:
                 frames = self.fly_right_images if self.last_direction == "right" else self.fly_left_images
