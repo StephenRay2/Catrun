@@ -11,13 +11,19 @@ player_inventory_image = pygame.transform.scale(player_inventory_image, (500, 50
 image_path = "assets/sprites/items"
 
 items_list = [
+    # Fruits & Vegetables
     {"item_name" : "Apples", "icon": "Apple.png", "stack_size": 100, "weight": .25},
+    {"item_name" : "Baked Apple", "icon": "BakedApple.png", "stack_size": 100, "weight": .3},
+    {"item_name" : "Orange", "icon": "Orange.png", "stack_size": 100, "weight": .3},
+    {"item_name" : "Orange Juice", "icon": "OrangeJuice.png", "stack_size": 100, "weight": .2},
 
+    # Wood Types
     {"item_name" : "Apple Wood", "icon": "AppleWood.png", "stack_size": 100, "weight": .5},
     {"item_name" : "Dusk Wood", "icon": "DuskWood.png", "stack_size": 100, "weight": .5},
     {"item_name" : "Fir Wood", "icon": "FirWood.png", "stack_size": 100, "weight": .5},
     {"item_name" : "Oak Wood", "icon": "OakWood.png", "stack_size": 100, "weight": .5},
 
+    # Berries & Mushrooms
     {"item_name" : "Blood Berries", "icon": "BloodBerries.png", "stack_size": 100, "weight": .01},
     {"item_name" : "Dawn Berries", "icon": "DawnBerries.png", "stack_size": 100, "weight": .01},
     {"item_name" : "Dusk Berries", "icon": "DuskBerries.png", "stack_size": 100, "weight": .01},
@@ -25,17 +31,99 @@ items_list = [
     {"item_name" : "Teal Berries", "icon": "TealBerries.png", "stack_size": 100, "weight": .01},
     {"item_name" : "Twilight Drupes", "icon": "TwilightDrupes.png", "stack_size": 100, "weight": .01},
     {"item_name" : "Vio Berries", "icon": "VioBerries.png", "stack_size": 100, "weight": .01},
-    {"item_name" : "Raw Beef", "icon": "RawBeef.png", "stack_size": 100, "weight": .25},
+    {"item_name" : "Mushroom", "icon": "Mushroom.png", "stack_size": 100, "weight": .05},
+    {"item_name" : "Dawnshroom", "icon": "Dawnshroom.png", "stack_size": 100, "weight": .05},
+    {"item_name" : "Duskshroom", "icon": "Duskshroom.png", "stack_size": 100, "weight": .05},
     
+    # Raw Meat & Fish
+    {"item_name" : "Raw Beef", "icon": "RawBeef.png", "stack_size": 100, "weight": .25},
+    {"item_name" : "Raw Chicken", "icon": "RawChicken.png", "stack_size": 100, "weight": .2},
+    {"item_name" : "Fish", "icon": "Fish.png", "stack_size": 100, "weight": .15},
+    {"item_name" : "Raw Venison", "icon": "RawVenison.png", "stack_size": 100, "weight": .3},
+    {"item_name" : "Gila Meat", "icon": "GilaMeat.png", "stack_size": 100, "weight": .35},
+
+    # Cooked Food
+    {"item_name" : "Cooked Beef", "icon": "CookedBeef.png", "stack_size": 100, "weight": .28},
+    {"item_name" : "Cooked Chicken", "icon": "CookedChicken.png", "stack_size": 100, "weight": .22},
+    {"item_name" : "Cooked Fish", "icon": "CookedFish.png", "stack_size": 100, "weight": .18},
+    {"item_name" : "Cooked Venison", "icon": "CookedVenison.png", "stack_size": 100, "weight": .32},
+    {"item_name" : "Cooked Gila Meat", "icon": "CookedGilaMeat.png", "stack_size": 100, "weight": .38},
+    {"item_name" : "Mushroom Stew", "icon": "MushroomStew.png", "stack_size": 100, "weight": .4},
+    
+    # Raw Materials & Resources
     {"item_name" : "Stone", "icon": "Stone.png", "stack_size": 100, "weight": .5},
     {"item_name" : "Raw Metal", "icon": "RawMetal.png", "stack_size": 100, "weight": 1},
+    {"item_name" : "Metal Ingot", "icon": "MetalIngot.png", "stack_size": 100, "weight": 0.8},
+    {"item_name" : "Raw Gold", "icon": "RawGold.png", "stack_size": 100, "weight": 1.2},
+    {"item_name" : "Gold Ingot", "icon": "GoldIngot.png", "stack_size": 100, "weight": 0.95},
     {"item_name" : "Sticks", "icon": "Stick.png", "stack_size": 100, "weight": .2},
     {"item_name" : "Poisonous Mushrooms", "icon": "PoisonousMushroom.png", "stack_size": 100, "weight": .05},
     {"item_name" : "Fiber", "icon": "Fiber.png", "stack_size": 100, "weight": .05},
     {"item_name" : "Hide", "icon": "Hide.png", "stack_size": 100, "weight": .3},
+    {"item_name" : "Buck Antlers", "icon": "BuckAntlers.png", "stack_size": 50, "weight": 0.4},
+    {"item_name" : "Duskwretch Claws", "icon": "DuskwretchClaws.png", "stack_size": 50, "weight": 0.35},
+    
+    # Crafted Materials
+    {"item_name" : "Rope", "icon": "Rope.png", "stack_size": 100, "weight": .15},
+    {"item_name" : "Twine", "icon": "Twine.png", "stack_size": 100, "weight": .08},
+    {"item_name" : "Ball Of Twine", "icon": "BallOfTwine.png", "stack_size": 50, "weight": .1},
+    {"item_name" : "Flint", "icon": "Flint.png", "stack_size": 100, "weight": .1},
+    {"item_name" : "Glass", "icon": "Glass.png", "stack_size": 100, "weight": .2},
 
+    # Tools & Equipment
+    {"item_name" : "Fishing Pole", "icon": "FishingPole.png", "stack_size": 5, "weight": 1.5},
+    {"item_name" : "Flint And Steel", "icon": "FlintAndSteel.png", "stack_size": 5, "weight": 0.5},
+    {"item_name" : "Mortar And Pestle", "icon": "MortarAndPestle.png", "stack_size": 1, "weight": 1.0},
+    {"item_name" : "Metal Bucket", "icon": "MetalBucket.png", "stack_size": 10, "weight": 2.0},
+    
+    # Lighting
+    {"item_name" : "Torch", "icon": "Torch1.png", "stack_size": 100, "weight": 0.1},
+    {"item_name" : "Lantern", "icon": "Lantern1.png", "stack_size": 10, "weight": 0.8},
 
+    # Beverages & Potions
+    {"item_name" : "Small Water", "icon": "SmallWater.png", "stack_size": 50, "weight": 0.15},
+    {"item_name" : "Small Milk", "icon": "SmallMilk.png", "stack_size": 50, "weight": 0.15},
+    {"item_name" : "Small Orange Juice", "icon": "SmallOrangeJuice.png", "stack_size": 50, "weight": 0.15},
+    {"item_name" : "Small Health Brew", "icon": "SmallHealthBrew.png", "stack_size": 50, "weight": 0.15},
+    {"item_name" : "Small Stamina Brew", "icon": "SmallStaminaBrew.png", "stack_size": 50, "weight": 0.15},
+    {"item_name" : "Small Bright Brew", "icon": "SmallBrightBrew.png", "stack_size": 50, "weight": 0.15},
+    {"item_name" : "Small Chill Brew", "icon": "SmallChillBrew.png", "stack_size": 50, "weight": 0.15},
+    {"item_name" : "Small Heat Brew", "icon": "SmallHeatBrew.png", "stack_size": 50, "weight": 0.15},
+    
+    {"item_name" : "Medium Glass Water", "icon": "MediumGlassWater.png", "stack_size": 30, "weight": 0.3},
+    {"item_name" : "Medium Glass Milk", "icon": "MediumGlassMilk.png", "stack_size": 30, "weight": 0.3},
+    {"item_name" : "Medium Glass Orange Juice", "icon": "MediumGlassOrangeJuice.png", "stack_size": 30, "weight": 0.3},
+    {"item_name" : "Medium Glass Health Brew", "icon": "MediumGlassHealthBrew.png", "stack_size": 30, "weight": 0.3},
+    {"item_name" : "Medium Glass Stamina Brew", "icon": "MediumGlassStaminaBrew.png", "stack_size": 30, "weight": 0.3},
+    {"item_name" : "Medium Glass Bright Brew", "icon": "MediumGlassBrightBrew.png", "stack_size": 30, "weight": 0.3},
+    {"item_name" : "Medium Glass Chill Brew", "icon": "MediumGlassChillBrew.png", "stack_size": 30, "weight": 0.3},
+    {"item_name" : "Medium Glass Heat Brew", "icon": "MediumGlassHeatBrew.png", "stack_size": 30, "weight": 0.3},
+    
+    {"item_name" : "Large Metal Water", "icon": "LargeMetalWater.png", "stack_size": 1, "weight": 0.6},
+    {"item_name" : "Large Metal Milk", "icon": "LargeMetalMilk.png", "stack_size": 20, "weight": 0.6},
+    {"item_name" : "Large Metal Orange Juice", "icon": "LargeMetalOrangeJuice.png", "stack_size": 20, "weight": 0.6},
+    {"item_name" : "Large Metal Canteen", "icon": "LargeMetalCanteen.png", "stack_size": 20, "weight": 0.6},
+    {"item_name" : "Large Metal Health Brew", "icon": "LargeMetalHealthBrew.png", "stack_size": 20, "weight": 0.6},
+    {"item_name" : "Large Metal Stamina Brew", "icon": "LargeMetalStaminaBrew.png", "stack_size": 20, "weight": 0.6},
+    {"item_name" : "Large Metal Bright Brew", "icon": "LargeMetalBrightBrew.png", "stack_size": 20, "weight": 0.6},
+    {"item_name" : "Large Metal Chill Brew", "icon": "LargeMetalChillBrew.png", "stack_size": 20, "weight": 0.6},
+    {"item_name" : "Large Metal Heat Brew", "icon": "LargeMetalHeatBrew.png", "stack_size": 20, "weight": 0.6},
+
+    # Containers & Special
+    {"item_name" : "Glass Bottle", "icon": "GlassBottle.png", "stack_size": 50, "weight": 0.1},
+    {"item_name" : "Wooden Bowl", "icon": "WoodenBowl.png", "stack_size": 20, "weight": 0.2},
+    {"item_name" : "Wooden Cup", "icon": "WoodenCup.png", "stack_size": 50, "weight": 0.1},
+    {"item_name" : "Pock Eye", "icon": "PockEye.png", "stack_size": 50, "weight": 0.05},
+
+    # Building & Furniture
     {"item_name" : "Fence", "icon": "Fence.png", "stack_size": 100, "weight": 6},
+    {"item_name" : "Chest Closed", "icon": "ChestClosed.png", "stack_size": 5, "weight": 8},
+    {"item_name" : "Chest Open", "icon": "ChestOpen.png", "stack_size": 5, "weight": 8},
+    {"item_name" : "Tent", "icon": "Tent.png", "stack_size": 5, "weight": 4},
+    {"item_name" : "Workbench", "icon": "Workbench.png", "stack_size": 1, "weight": 20},
+    {"item_name" : "Smelter", "icon": "Smelter.png", "stack_size": 1, "weight": 25},
+    
+    # Misc
     {"item_name" : "Empty Cage", "icon": "EmptyCage.png", "stack_size": 1, "weight": 8},
 ]
 
