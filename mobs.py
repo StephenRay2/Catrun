@@ -156,17 +156,31 @@ class Player(pygame.sprite.Sprite):
         self.max_hunger = 100 * self.hunger_leveler
         self.hunger = 100
         self.full_timer = 60
-        self.water_leveler = 1
-        self.max_water = 100 * self.water_leveler
-        self.water = 100
-        self.water_full_timer = 60
-        self.warmth_leveler = 1
-        self.max_warmth = 100
-        self.warmth = 100
+        self.thirst_leveler = 1
+        self.max_thirst = 100 * self.thirst_leveler
+        self.thirst = 100
+        self.thirst_full_timer = 60
+        self.weather_resistance_leveler = 1
+        self.max_heat_resistance = 100 * self.weather_resistance_leveler
+        self.temp_heat_resistance_increase = 1
+        self.temp_heat_resistance_timer = 0
+        self.heat_resistance = 100 * self.temp_heat_resistance_increase
+        self.max_cold_resistance = 100 * self.weather_resistance_leveler
+        self.temp_cold_resistance_increase = 1
+        self.temp_cold_resistance_timer = 0
+        self.cold_resistance = 100 * self.temp_cold_resistance_increase
+        self.max_torpidity = 100
+        self.torpidity = 0
+        self.temp_weight_increase = 1
         self.weight = 0
-        self.max_weight = 100
-        self.damage = 5
+        self.max_weight = 100 * self.temp_weight_increase
+        self.glow = False
+        self.glow_time = 0
+        self.poison = False
+        self.poison_time = 0
+        self.damage = 50
         self.attack = 1
+        self.temp_attack_boost = 1
         self.base_speed = 275
         self.speed = 1
         self.defense = 1
@@ -346,24 +360,24 @@ class Player(pygame.sprite.Sprite):
             return
         
         if self.stamina < self.max_stamina:
-            if self.water == self.max_water:
+            if self.thirst == self.max_thirst:
                 self.stamina += dt * 16
-            elif self.water > self.max_water * 0.7:
+            elif self.thirst > self.max_thirst * 0.7:
                 self.stamina += dt * 10
-            elif self.water > self.max_water * 0.4:
+            elif self.thirst > self.max_thirst * 0.4:
                 self.stamina += dt * 6
-            elif self.water > self.max_water * 0.1:
+            elif self.thirst > self.max_thirst * 0.1:
                 self.stamina += dt * 2
             else:
                 self.stamina -= dt / 12
                 self.health -= dt / 12
 
-        if self.water == 100:
-            self.water_full_timer -= dt
-            if self.water_full_timer <= 0:
-                self.water -= dt / 100
-        elif self.water > 0:
-            self.water -= dt / 60
+        if self.thirst == 100:
+            self.thirst_full_timer -= dt
+            if self.thirst_full_timer <= 0:
+                self.thirst -= dt / 100
+        elif self.thirst > 0:
+            self.thirst -= dt / 60
 
         if self.stamina > 10 and self.speed < 1:
             self.speed = 1
@@ -405,15 +419,15 @@ class Player(pygame.sprite.Sprite):
                 self.full_timer = 60
             
 
-    def lose_water(self, dt):
-        if self.water > 0:
-            if self.water == 100:
-                self.water_full_timer -= dt
-                if self.water_full_timer <= 0:
-                    self.water -= dt/100
+    def lose_thirst(self, dt):
+        if self.thirst > 0:
+            if self.thirst == 100:
+                self.thirst_full_timer -= dt
+                if self.thirst_full_timer <= 0:
+                    self.thirst -= dt/100
             else:
-                self.water -= dt / 100
-                self.water_full_timer = 60
+                self.thirst -= dt / 100
+                self.thirst_full_timer = 60
 
     def take_damage(self, damage):
         self.health -= damage
@@ -498,26 +512,26 @@ class Player(pygame.sprite.Sprite):
         
         screen.blit(text_surface, (text_x, text_y))
 
-    def water_bar(self, screen):
-        max_water = self.max_water
-        water = self.water
-        bar_width = self.max_water * 2
+    def thirst_bar(self, screen):
+        max_thirst = self.max_thirst
+        thirst = self.thirst
+        bar_width = self.max_thirst * 2
         bar_height = 18
         x = 43
         y = 118
 
-        water_ratio = water / max_water
-        water_width = int(bar_width * water_ratio)
+        thirst_ratio = thirst / max_thirst
+        thirst_width = int(bar_width * thirst_ratio)
 
         pygame.draw.rect(screen, (60, 60, 60), pygame.Rect(x, y, bar_width, bar_height), border_radius=5)
-        if water_ratio > .4:
-            pygame.draw.rect(screen, (0, 40, 255), pygame.Rect(x, y, water_width, bar_height), border_radius=5)
+        if thirst_ratio > .4:
+            pygame.draw.rect(screen, (0, 40, 255), pygame.Rect(x, y, thirst_width, bar_height), border_radius=5)
         else:
-            pygame.draw.rect(screen, (100, 100, 255), pygame.Rect(x, y, water_width, bar_height), border_radius=5)
+            pygame.draw.rect(screen, (100, 100, 255), pygame.Rect(x, y, thirst_width, bar_height), border_radius=5)
         pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=2, border_radius=5)
 
-        water_text = f"{int(water)} / {max_water}"
-        text_surface = font.render(water_text, True, (255, 255, 255))
+        thirst_text = f"{int(thirst)} / {max_thirst}"
+        text_surface = font.render(thirst_text, True, (255, 255, 255))
         text_x = x + (bar_width / 2) - (text_surface.get_width() / 2)
         text_y = y + (bar_height / 2) - (text_surface.get_height() / 2)
         
@@ -802,6 +816,8 @@ class Cat(Mob):
         self.death_experience = 200  * (1 + (self.level * self.death_experience * .0001))
         self.level = 1
         self.tamed_boost = 1.1
+        self.meat_resource = "Cat Meat"
+        self.special_drops = [{'item': 'Fur', 'chance': 0.1, 'min': 1, 'max': 2}]
 
         self.full_health = 100 + (random.randint(5, 7) * self.level) * self.tamed_boost
         self.health = self.full_health
@@ -844,6 +860,9 @@ class Squirrel(Mob):
         self.health = self.full_health
         self.level = 1
         self.death_experience = 75 * (1 + (self.level * self.death_experience * .0001))
+        self.resource = "Hide"
+        self.meat_resource = "Squirrel Meat"
+        self.special_drops = [{'item': 'Fur', 'chance': 0.1, 'min': 1, 'max': 2}]
         
 
         self.frame_index = 0
@@ -932,7 +951,7 @@ class Chicken(Mob):
         self.base_speed = 120
         self.speed = 1
         self.meat_resource = "Raw Chicken"
-        self.special_drops = [{'item': 'Feathers', 'chance': 0.5, 'min': 1, 'max': 3}
+        self.special_drops = [{'item': 'Feathers', 'chance': 0.5, 'min': 1, 'max': 2}
 ]
         self.resource_amount = random.randint(3, 6)
         self.full_health = 80 + (random.randint(5, 7) * self.level)
@@ -1175,7 +1194,7 @@ class Duskwretch(Enemy):
         self.health = self.full_health
         self.resource = "Hide"
         self.meat_resource = "Dusk Meat"
-        self.special_drops.append({'item': 'Duskwretch Claws', 'chance': 0.7, 'min': 1, 'max': 2}
+        self.special_drops.append({'item': 'Duskwretch Claws', 'chance': 0.4, 'min': 1, 'max': 2}
 )
         self.resource_amount = random.randint(4, 9)
 
@@ -1496,7 +1515,7 @@ class Deer(AggressiveMob):
         self.meat_resource = "Raw Venison"
         if self.is_buck:
             self.special_drops = [
-        {'item': 'Buck Antlers', 'chance': 0.8, 'min': 1, 'max': 2}]
+        {'item': 'Buck Antlers', 'chance': 0.1, 'min': 1, 'max': 2}]
         else:
             self.special_drops = []
         self.resource_amount = random.randint(4, 8)
@@ -1522,8 +1541,13 @@ class Deer(AggressiveMob):
 
 
     def get_collision_rect(self, cam_x):
-            rect = self.rect
-            return pygame.Rect(rect.x - cam_x + 15, rect.y + 50, rect.width - 30, rect.height - 55)
+            if self.is_buck:
+                rect = self.rect
+                return pygame.Rect(rect.x - cam_x + 15, rect.y + 50, rect.width - 30, rect.height - 55)
+            else:
+                rect = self.rect
+                return pygame.Rect(rect.x - cam_x + 5, rect.y + 20, rect.width - 20, rect.height - 35)
+
 
     def draw(self, screen, cam_x):
         screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
@@ -2042,7 +2066,7 @@ class Gila(AggressiveMob):
         self.full_health = 60 + (random.randint(5, 10) * self.level)
         self.health = self.full_health
         self.resource = "Gila Meat"
-        self.special_drops = [{'item': 'Venom Sac', 'chance': 0.4, 'min': 1, 'max': 2}
+        self.special_drops = [{'item': 'Venom Sac', 'chance': 0.1, 'min': 1, 'max': 2}
 ]
         self.resource_amount = 2
         self.death_experience = 500  * (1 + (self.level * self.death_experience * .0001))
@@ -2178,7 +2202,7 @@ class Crow(Mob):
         self.full_health = 30 + (random.randint(5, 10) * self.level)
         self.health = self.full_health
         self.resource = "Feathers"
-        self.resource_amount = 1
+        self.resource_amount = 4
         self.death_experience = 400 * (1 + (self.level * self.death_experience * .0001))
         self.level = 1
         

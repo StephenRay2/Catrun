@@ -23,10 +23,7 @@ stamina_depleted_message_timer = 0
 player_world_x = player_pos.x + cam_x
 player_world_y = player_pos.y
 
-collection_message = None
-collection_timer = 0
 collection_messages = []
-collection_message_num = 0
 
 paused = False
 inventory_in_use = False
@@ -62,6 +59,23 @@ def get_footstep_sounds(background):
         return [f"footstep_sand{i}" for i in range(1, 7)]
     else:
         return [f"footstep_grass{i}" for i in range(1, 7)]
+
+def group_resources_by_type(resource_list):
+    resource_counts = {}
+    for resource in resource_list:
+        if resource in resource_counts:
+            resource_counts[resource] += 1
+        else:
+            resource_counts[resource] = 1
+    return resource_counts
+
+def add_collection_message(resource_name, count):
+    text_surface = font.render(f"Collected {count} {resource_name}", True, (20, 255, 20))
+    bg_surface = pygame.Surface((text_surface.get_width() + 10, text_surface.get_height() + 10), pygame.SRCALPHA)
+    bg_surface.fill((0, 0, 0, 100))
+    rect = pygame.Rect(20, 20, text_surface.get_width(), text_surface.get_height())
+    
+    collection_messages.insert(0, [text_surface, bg_surface, rect, 3.0, 3.0])
 
 while running:
     if state != previous_state:
@@ -223,7 +237,7 @@ while running:
             player.health = player.max_health
             player.stamina = player.max_stamina
             player.hunger = player.max_hunger
-            player.water = player.max_water
+            player.thirst = player.max_thirst
             player.dead = False
 
             player.experience = 0
@@ -235,15 +249,15 @@ while running:
             player.health_leveler = 1
             player.stamina_leveler = 1
             player.hunger_leveler = 1
-            player.water_leveler = 1
+            player.thirst_leveler = 1
             player.warmth_leveler = 1
             player.max_health = 100 * player.health_leveler
             player.max_stamina = 100 * player.stamina_leveler
             player.max_hunger = 100 * player.hunger_leveler
-            player.max_water = 100 * player.water_leveler
+            player.max_thirst = 100 * player.thirst_leveler
             player.max_warmth = 100
 
-            player.damage = 5
+            player.damage = 50
             player.attack = 1
             player.base_speed = 275
             player.speed = 1
@@ -264,6 +278,7 @@ while running:
         player_world_y = player_pos.y
         
         player_speed = player.get_speed()
+        current_time = pygame.time.get_ticks()
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -274,6 +289,11 @@ while running:
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_q:
                 inventory_in_use = not inventory_in_use
+
+            if event.type == pygame.KEYDOWN:
+                if event.key in [pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9, pygame.K_0]:
+                    print(f"DEBUG main.py: Hotbar key pressed: {event.key}")
+                inventory.handle_keydown_hotbar(event, screen=None, use_on_press=False)
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if inventory_in_use:
@@ -339,14 +359,9 @@ while running:
                                         elif obj.resource == "Mushroom" or obj.resource == "Poisonous Mushroom" or obj.resource == "Duskshroom" or obj.resource == "Dawnshroom":
                                             sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
                                     
-                                    collection_messages.insert(0, [
-                                        font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)),
-                                        pygame.Surface((font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_width() + 10, font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_height() + 10), pygame.SRCALPHA),
-                                        pygame.Rect(20, 500, font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_width(), font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_height()),
-                                        3.0,
-                                        1.0
-                                    ])
-                                    collection_messages[0][1].fill((0, 0, 0, 100))
+                                    resource_counts = group_resources_by_type(resource)
+                                    for resource_name, count in resource_counts.items():
+                                        add_collection_message(resource_name, count)
                                 else:
                                     if hasattr(obj, 'is_empty'):
                                         obj.is_empty = False
@@ -362,10 +377,6 @@ while running:
                     state = "menu"
                     paused = False
     
-        current_time = pygame.time.get_ticks()
-
-
-            
         if not paused and not inventory_in_use and pygame.mouse.get_pressed()[0] and not player.exhausted:
             if current_time - harvest_cooldown > harvest_delay:
                 for obj in visible_objects:
@@ -402,15 +413,9 @@ while running:
                                         sound_manager.play_sound(random.choice(["break_bush1", "break_bush2"]))
                                 
                                 if inventory.add(resource):
-                                    resource_collect_text = font.render(f"Collected {len(resource)} {obj.resource}", True, (20, 255, 20))
-                                    collection_messages.insert(0, [
-                                        resource_collect_text,
-                                        pygame.Surface((resource_collect_text.get_width() + 10, resource_collect_text.get_height() + 10), pygame.SRCALPHA),
-                                        pygame.Rect(20, 500, resource_collect_text.get_width(), resource_collect_text.get_height()),
-                                        3.0,
-                                        1.0
-                                    ])
-                                    collection_messages[0][1].fill((0, 0, 0, 100))
+                                    resource_counts = group_resources_by_type(resource)
+                                    for resource_name, count in resource_counts.items():
+                                        add_collection_message(resource_name, count)
 
                                 if obj.destroyed:
                                     visible_objects.remove(obj)
@@ -511,7 +516,6 @@ while running:
                     and abs(mob.rect.y - player_pos.y) < 800]
         
         inventory.draw_hotbar(screen)
-        
 
 
         if not paused and not inventory_in_use and player.dead == False:
@@ -562,14 +566,9 @@ while running:
                                         elif obj.resource == "Mushroom" or obj.resource == "Poisonous Mushroom" or obj.resource == "Duskshroom" or obj.resource == "Dawnshroom":
                                             sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
                                     
-                                    collection_messages.insert(0, [
-                                        font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)),
-                                        pygame.Surface((font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_width() + 10, font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_height() + 10), pygame.SRCALPHA),
-                                        pygame.Rect(20, 500, font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_width(), font.render(f"Collected {len(resource)} {collected_item}", True, (20, 255, 20)).get_height()),
-                                        3.0,
-                                        1.0
-                                    ])
-                                    collection_messages[0][1].fill((0, 0, 0, 100))
+                                    resource_counts = group_resources_by_type(resource)
+                                    for resource_name, count in resource_counts.items():
+                                        add_collection_message(resource_name, count)
                                 else:
                                     if hasattr(obj, 'is_empty'):
                                         obj.is_empty = False
@@ -630,14 +629,6 @@ while running:
             inventory.add(inventory_resources)
             inventory_resources = []
 
-            if collection_timer > 0:
-                collection_timer -= dt
-                if collection_message:
-                    text, bg, rect = collection_message
-                    screen.blit(bg, (rect.x, rect.y))
-                    screen.blit(text, (rect.x + 5, rect.y + 5))
-                collection_message_num -= 1
-
             for index, message in enumerate(collection_messages[:]):
                 text, bg, rect, timer, total_time = message
                 
@@ -651,7 +642,6 @@ while running:
                 if message[3] < 2:
                     text.set_alpha(alpha)
                     bg.set_alpha(alpha)
-
 
                 screen.blit(bg, (rect.x, rect.y))
                 screen.blit(text, (rect.x + 5, rect.y + 5))
@@ -921,12 +911,12 @@ while running:
         player.stamina_bar(screen)
         player.hunger_bar(screen)
         player.exp_bar(screen)
-        player.water_bar(screen)
+        player.thirst_bar(screen)
         screen.blit(stat_holder_image, (20, 50))
         player.handle_exp(screen, dt)
         player.regain_health(dt)
         player.lose_hunger(dt)
-        player.lose_water(dt)
+        player.lose_thirst(dt)
     
         
         if dungeon_depth >= dungeon_depth_high:
@@ -939,7 +929,7 @@ while running:
         if (not ((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]) and (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT])) and not pygame.mouse.get_pressed()[0]) or player.exhausted:
             player.regain_stamina(dt, screen)
             player.stamina_speed()
-            player.lose_water(dt)
+            player.lose_thirst(dt)
             
         if stamina_depleted_message_timer > 0:
             tired_text = font.render("Too tired. Rest to regain stamina", True, (40, 255, 20))

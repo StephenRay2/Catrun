@@ -199,6 +199,17 @@ class Rock(Solid):
         super().__init__(img, x, y, (64, 64))
         self.resource = "Stone"
         self.resource_amount = random.randint(10, 15)
+    
+    def harvest(self, player=None):
+        resources = super().harvest(player)
+        if random.random() < 0.07:
+            resources.append("Flint")
+        if random.random() < 0.05:
+            resources.append("Raw Metal")
+        if random.random() < 0.002:
+            resources.append("Raw Gold")
+        
+        return resources
 
 
 
@@ -213,6 +224,18 @@ class Boulder(Solid):
     
     def draw(self, screen, cam_x):
         screen.blit(self.image, (self.image_rect.x - cam_x, self.image_rect.y))
+    
+    def harvest(self, player=None):
+        resources = super().harvest(player)
+        if random.random() < 0.07:
+            resources.append("Flint")
+        if random.random() < 0.05:
+            resources.append("Raw Metal")
+        if random.random() < 0.002:
+            resources.append("Raw Gold")
+        
+        return resources
+
 
 
 class BerryBush(pygame.sprite.Sprite):
@@ -238,7 +261,6 @@ class BerryBush(pygame.sprite.Sprite):
         self.resource = "Sticks"
 
     def collect(self, player=None):
-        """Collect berries and sometimes get sticks too"""
         if not self.is_empty and self.amount > 0:
             berry_count = self.amount
             self.amount = 0
@@ -246,13 +268,7 @@ class BerryBush(pygame.sprite.Sprite):
             self.is_empty = True
             self.timer = 0
             
-            # Collect berries
             resources = [self.berry] * berry_count
-            
-            # 30% chance to also get 1-3 sticks when collecting berries
-            if random.random() < 0.3:
-                stick_count = random.randint(1, 3)
-                resources.extend(["Sticks"] * stick_count)
             
             if player:
                 player.experience += collect_experience * len(resources)
@@ -262,14 +278,20 @@ class BerryBush(pygame.sprite.Sprite):
         return []
 
     def harvest(self, player=None):
-        """Harvest the bush for sticks (destroys it)"""
         if not self.destroyed:
-            resource_collected = random.randint(3, 9)
+            resources = []
+            
+            stick_count = random.randint(3, 9)
+            resources.extend([self.resource] * stick_count)
+            
+            if not self.is_empty and self.amount > 0:
+                resources.extend([self.berry] * self.amount)
+            
             self.destroyed = True
             if player:
-                player.experience += harvest_experience * resource_collected
-                player.exp_total += harvest_experience * resource_collected
-            return [self.resource] * resource_collected
+                player.experience += harvest_experience * len(resources)
+                player.exp_total += harvest_experience * len(resources)
+            return resources
         return []
 
     def update(self, dt):
@@ -981,7 +1003,6 @@ for tile_x, tile_image in tiles:
         weighted_fruit_plant_tiles.extend([(tile_x, tile_image)] * weight)
 
 
-# Fire Fern spawning weights
 fire_fern_weights = {
     bg_grass: 0,
     bg_dirt: 0,
