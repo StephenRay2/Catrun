@@ -156,6 +156,7 @@ while running:
             brown_bears.clear()
             gilas.clear()
             crows.clear()
+            duskwretches.clear()
 
             for _ in range(num_cats):
                 tile_x, tile_image = random.choice(weighted_cat_tiles)
@@ -265,15 +266,16 @@ while running:
 
             player.inventory = []
             player.score = 0
-
+            
             inventory.inventory_list = [None] * inventory.capacity
             inventory.hotbar_slots = [None] * inventory.hotbar_size
 
             inventory_resources = []
             collection_messages = []
 
+            inventory.state = "inventory"
+
             game_just_started = False 
-        
         player_world_x = player_pos.x + cam_x
         player_world_y = player_pos.y
         
@@ -284,24 +286,47 @@ while running:
             if event.type == pygame.QUIT:
                 running = False
 
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                paused = not paused
-
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_q:
-                inventory_in_use = not inventory_in_use
-
             if event.type == pygame.KEYDOWN:
-                if event.key in [pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, pygame.K_6, pygame.K_7, pygame.K_8, pygame.K_9, pygame.K_0]:
-                    print(f"DEBUG main.py: Hotbar key pressed: {event.key}")
+                if event.key == pygame.K_ESCAPE and not inventory_in_use:
+                    paused = not paused
+                
                 inventory.handle_keydown_hotbar(event, screen=None, use_on_press=False)
+                
+                if event.key == pygame.K_f and player.is_alive:
+                    success, tags = inventory.consume_item()
+                    if success:
+                        # Play sound based on tags
+                        if "food" in tags:
+                            sound_manager.play_sound(random.choice([f"consume_item{i}" for i in range(1, 7)]))
+                        elif any(tag in tags for tag in ["liquid", "consumable"]):  # Check for liquid or consumable
+                            sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
 
+                if event.key == pygame.K_q:
+                    inventory_in_use = not inventory_in_use
+                    if not inventory_in_use:
+                        inventory.selection_mode = "hotbar"
+                        inventory.selected_inventory_slot = None
+                
+                if inventory_in_use and player.is_alive:
+                    if event.key == pygame.K_ESCAPE:
+                        inventory_in_use = False
+                        inventory.selection_mode = "hotbar"
+                        inventory.selected_inventory_slot = None
+            
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if inventory_in_use:
+                if inventory_in_use and player.is_alive:
                     mouse_pos = pygame.mouse.get_pos()
-                    slot_index, is_hotbar = inventory.get_slot_at_mouse(mouse_pos, screen)
                     
-                    if slot_index is not None:
-                        inventory.start_drag(slot_index, is_hotbar)
+                    if inventory.state == "crafting":
+                        import time
+                        crafting_time = time.time()
+                        inventory.handle_crafting_click(mouse_pos, crafting_time)
+                    else:
+                        slot_index, is_hotbar = inventory.get_slot_at_mouse(mouse_pos, screen)
+                        
+                        if slot_index is not None:
+                            inventory.handle_selection_click(mouse_pos, screen)
+                            inventory.start_drag(slot_index, is_hotbar)
             
             if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                 if inventory_in_use and inventory.dragging:

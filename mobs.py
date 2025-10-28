@@ -192,6 +192,7 @@ class Player(pygame.sprite.Sprite):
         self.level_up_timer = 0
         self.stamina_timer = 0
         self.stamina_message_timer = 0
+        self.health_bar_color = ()
 
         self.inventory = []
         self.is_alive = True
@@ -207,6 +208,10 @@ class Player(pygame.sprite.Sprite):
         self.attack_delay = 300
         self.mob_noise_delay = 3
 
+    def status_effects(self, dt):
+        if self.poison == True:
+            self.poison_time -= dt
+            self.health -= dt / 2
 
     def attacking(self, nearby_mobs, player_world_x, player_world_y):
         if pygame.mouse.get_pressed()[0] and not self.exhausted:
@@ -352,7 +357,7 @@ class Player(pygame.sprite.Sprite):
                     self.hunger -= dt/100
             else:
                 if self.hunger > 0:
-                    self.hunger -= dt / 40
+                    self.hunger -= dt / 30
 
     def regain_stamina(self, dt, screen):
         if self.stamina_timer > 0:
@@ -377,7 +382,7 @@ class Player(pygame.sprite.Sprite):
             if self.thirst_full_timer <= 0:
                 self.thirst -= dt / 100
         elif self.thirst > 0:
-            self.thirst -= dt / 60
+            self.thirst -= dt / 40
 
         if self.stamina > 10 and self.speed < 1:
             self.speed = 1
@@ -448,10 +453,11 @@ class Player(pygame.sprite.Sprite):
         health_width = int(bar_width * health_ratio)
 
         pygame.draw.rect(screen, (60, 60, 60), pygame.Rect(x, y, bar_width, bar_height), border_radius=5)
-        if health_ratio > .4:
-            pygame.draw.rect(screen, (200, 40, 40), pygame.Rect(x, y, health_width, bar_height), border_radius=5)
-        else:
-            pygame.draw.rect(screen, (255, 80, 60), pygame.Rect(x, y, health_width, bar_height), border_radius=5)
+        if not self.poison:
+            if health_ratio > .4:
+                pygame.draw.rect(screen, (200, 40, 40), pygame.Rect(x, y, health_width, bar_height), border_radius=5)
+            else:
+                pygame.draw.rect(screen, (255, 80, 60), pygame.Rect(x, y, health_width, bar_height), border_radius=5)
         pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=2, border_radius=5)
 
         health_text = f"{int(health)} / {max_health}"

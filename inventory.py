@@ -131,7 +131,7 @@ items_list = [
         "weight": .05,
         "type": "raw_material",
         "description": "Deep red berries. Slightly tart with a hint of sweetness.",
-        "use_effect": "player.hunger += .5; player.thirst += .5",
+        "use_effect": "player.hunger += .5; player.thirst += .5; player.health += .5",
         "placeable": False,
         "consumable": True,
         "durability": None,
@@ -409,7 +409,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["material", "wood"],
+        "tags": ["material", "stick"],
         "output_amount": 1
     },
     {
@@ -1200,7 +1200,7 @@ items_list = [
         "durability": None,
         "recipe": [{"item_tag": "wood", "amount": 2}],
         "crafting_medium": "hand",
-        "tags": ["wood", "material"],
+        "tags": ["wooden", "material"],
         "output_amount": 1
     },
     {
@@ -1216,7 +1216,7 @@ items_list = [
         "durability": None,
         "recipe": [{"item_tag": "wood", "amount": 1}],
         "crafting_medium": "hand",
-        "tags": ["wood", "material"],
+        "tags": ["wooden", "material"],
         "output_amount": 1
     },
     {
@@ -1667,8 +1667,8 @@ items_list = [
         "placeable": True,
         "consumable": False,
         "durability": None,
-        "recipe": [{"item": "Stone", "amount": 50}, {"item": "Metal Ingot", "amount": 5}],
-        "crafting_medium": "workbench",
+        "recipe": [{"item": "Stone", "amount": 50}, {"item": "Flint", "amount": 5}],
+        "crafting_medium": "hand",
         "tags": ["item"],
         "output_amount": 1
     },
@@ -2228,6 +2228,8 @@ class Inventory():
         self.hotbar_size = 10
         self.hotbar_slots = [None] * self.hotbar_size
         self.selected_hotbar_slot = 0
+        self.selected_inventory_slot = None
+        self.selection_mode = "hotbar"
         self.inventory_full_message_timer = 0
         self.dragging = False
         self.dragged_item = None
@@ -2237,6 +2239,11 @@ class Inventory():
         self.crafting_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/crafting_screen.png").convert_alpha(), (1100, 600))
         self.level_up_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/level_up_screen.png").convert_alpha(), (1100, 600))
         self.cat_screen_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/cats_screen.png").convert_alpha(), (1100, 600))
+        
+        self.selected_crafting_item = None
+        self.crafting_slot_positions = {}
+        self.last_click_time = 0
+        self.last_click_slot = None
 
     def draw_inventory(self, screen):
         
@@ -2266,6 +2273,8 @@ class Inventory():
             screen.blit(crafting_tab, (width // 2 - 397, height // 2 - 303))
             level_up_tab_unused.draw(screen)
             cats_tab_unused.draw(screen)
+            
+            self.draw_crafting(screen)
     
         elif self.state == "level_up":
             inventory_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
@@ -2305,7 +2314,7 @@ class Inventory():
             x = first_slot_x + i * slot_spacing
             y = slot_y
             
-            if i == self.selected_hotbar_slot:
+            if i == self.selected_hotbar_slot and self.selection_mode == "hotbar":
                 highlight_surface = pygame.Surface((self.slot_size + 8, self.slot_size + 8), pygame.SRCALPHA)
                 pygame.draw.rect(highlight_surface, (255, 255, 255, 200), (0, 0, self.slot_size + 8, self.slot_size + 8), 4)
                 screen.blit(highlight_surface, (x - 6, y - 6))
@@ -2363,6 +2372,11 @@ class Inventory():
             x = start_x + col * (self.slot_size + self.gap_size)
             y = start_y + row * (self.slot_size + self.gap_size - 3)
 
+            if self.selection_mode == "inventory" and self.selected_inventory_slot == slot_index:
+                highlight_surface = pygame.Surface((self.slot_size + 8, self.slot_size + 8), pygame.SRCALPHA)
+                pygame.draw.rect(highlight_surface, (255, 255, 255, 200), (0, 0, self.slot_size + 8, self.slot_size + 8), 4)
+                screen.blit(highlight_surface, (x - 4, y - 4))
+
             if slot is not None:
                 item_name = slot["item_name"]
                 quantity = slot["quantity"]
@@ -2398,6 +2412,252 @@ class Inventory():
         screen.blit(weight_text, (total_weight_pos_x + 20, 110))
         screen.blit(weight_num_text, (total_weight_pos_x + 20, 125))
 
+    def get_craftable_items(self):
+        """Get all items that have recipes and crafting_medium is 'hand', sorted alphabetically."""
+        craftable = []
+        for item in items_list:
+            if item["recipe"] is not None and item.get("crafting_medium") == "hand":
+                craftable.append(item)
+        craftable.sort(key=lambda x: x["item_name"])
+        return craftable
+
+    def has_materials_for_recipe(self, recipe):
+        if recipe is None:
+            return False
+        
+        for requirement in recipe:
+            if "item" in requirement:
+                item_name = requirement["item"]
+                amount_needed = requirement["amount"]
+                amount_have = self.get_item_count(item_name)
+                if amount_have < amount_needed:
+                    return False
+            elif "item_tag" in requirement:
+                tag = requirement["item_tag"]
+                amount_needed = requirement["amount"]
+                amount_have = self.get_items_by_tag_count(tag)
+                if amount_have < amount_needed:
+                    return False
+        return True
+
+    def get_item_count(self, item_name):
+        count = 0
+        for slot in self.inventory_list + self.hotbar_slots:
+            if slot and slot["item_name"] == item_name:
+                count += slot["quantity"]
+        return count
+
+    def get_items_by_tag_count(self, tag):
+        count = 0
+        for slot in self.inventory_list + self.hotbar_slots:
+            if slot:
+                item_name = slot["item_name"]
+                for item in items_list:
+                    if item["item_name"] == item_name and tag in item["tags"]:
+                        count += slot["quantity"]
+                        break
+        return count
+
+    def remove_materials_from_inventory(self, recipe):
+        if recipe is None:
+            return False
+        for requirement in recipe:
+            if "item" in requirement:
+                item_name = requirement["item"]
+                amount_to_remove = requirement["amount"]
+                self.remove_item(item_name, amount_to_remove)
+            elif "item_tag" in requirement:
+                tag = requirement["item_tag"]
+                amount_to_remove = requirement["amount"]
+                self.remove_items_by_tag(tag, amount_to_remove)
+        return True
+
+    def remove_item(self, item_name, amount):
+        remaining = amount
+        
+        for slot in self.inventory_list:
+            if slot and slot["item_name"] == item_name:
+                if slot["quantity"] <= remaining:
+                    remaining -= slot["quantity"]
+                    slot["quantity"] = 0
+                else:
+                    slot["quantity"] -= remaining
+                    remaining = 0
+                    break
+            if remaining == 0:
+                break
+        
+        if remaining > 0:
+            for slot in self.hotbar_slots:
+                if slot and slot["item_name"] == item_name:
+                    if slot["quantity"] <= remaining:
+                        remaining -= slot["quantity"]
+                        slot["quantity"] = 0
+                    else:
+                        slot["quantity"] -= remaining
+                        remaining = 0
+                        break
+                if remaining == 0:
+                    break
+        
+        for i in range(len(self.inventory_list)):
+            if self.inventory_list[i] and self.inventory_list[i]["quantity"] <= 0:
+                self.inventory_list[i] = None
+        
+        for i in range(len(self.hotbar_slots)):
+            if self.hotbar_slots[i] and self.hotbar_slots[i]["quantity"] <= 0:
+                self.hotbar_slots[i] = None
+
+    def remove_items_by_tag(self, tag, amount):
+        remaining = amount
+        
+        for slot in self.inventory_list:
+            if slot:
+                item_name = slot["item_name"]
+                for item in items_list:
+                    if item["item_name"] == item_name and tag in item["tags"]:
+                        if slot["quantity"] <= remaining:
+                            remaining -= slot["quantity"]
+                            slot["quantity"] = 0
+                        else:
+                            slot["quantity"] -= remaining
+                            remaining = 0
+                        break
+            if remaining == 0:
+                break
+        
+        if remaining > 0:
+            for slot in self.hotbar_slots:
+                if slot:
+                    item_name = slot["item_name"]
+                    for item in items_list:
+                        if item["item_name"] == item_name and tag in item["tags"]:
+                            if slot["quantity"] <= remaining:
+                                remaining -= slot["quantity"]
+                                slot["quantity"] = 0
+                            else:
+                                slot["quantity"] -= remaining
+                                remaining = 0
+                            break
+                if remaining == 0:
+                    break
+        
+        for i in range(len(self.inventory_list)):
+            if self.inventory_list[i] and self.inventory_list[i]["quantity"] <= 0:
+                self.inventory_list[i] = None
+        
+        for i in range(len(self.hotbar_slots)):
+            if self.hotbar_slots[i] and self.hotbar_slots[i]["quantity"] <= 0:
+                self.hotbar_slots[i] = None
+    def draw_crafting(self, screen):
+        start_x = (screen.get_width() / 2 - self.inventory_image.get_width() / 2) + 18
+        start_y = (screen.get_height() / 2 - self.inventory_image.get_height() / 2) + 44
+        
+        font_small = pygame.font.SysFont(None, 30)
+        font_medium = pygame.font.SysFont(None, 40)
+        font_large = pygame.font.SysFont(None, 50)
+
+        self.crafting_slot_positions = {}
+        
+        craftable_items = self.get_craftable_items()
+        
+        for idx, item in enumerate(craftable_items):
+            if idx >= self.capacity:
+                break
+            
+            row = idx // self.columns
+            col = idx % self.columns
+            x = start_x + col * (self.slot_size + self.gap_size)
+            y = start_y + row * (self.slot_size + self.gap_size - 3)
+            
+            has_materials = self.has_materials_for_recipe(item["recipe"])
+            
+            if has_materials:
+                highlight_surface = pygame.Surface((self.slot_size, self.slot_size), pygame.SRCALPHA)
+                pygame.draw.rect(highlight_surface, (100, 255, 100, 100), (0, 0, self.slot_size, self.slot_size))
+                screen.blit(highlight_surface, (x, y))
+            else:
+                highlight_surface = pygame.Surface((self.slot_size, self.slot_size), pygame.SRCALPHA)
+                pygame.draw.rect(highlight_surface, (100, 100, 100, 150), (0, 0, self.slot_size, self.slot_size))
+                screen.blit(highlight_surface, (x, y))
+            
+            screen.blit(item["image"], (x, y))
+            
+            self.crafting_slot_positions[idx] = (x, y, item)
+        
+        if hasattr(self, 'selected_crafting_item') and self.selected_crafting_item is not None:
+            item = self.selected_crafting_item
+            
+            preview_x = screen.get_width() - 400
+            preview_y = (screen.get_height() / 2 - self.inventory_image.get_height() / 2) + 60
+            
+            for item_data in items_list:
+                if item_data["item_name"] == item["item_name"]:
+                    preview_image = item_data["image"]
+                    preview_scaled = pygame.transform.scale(preview_image, (250, 250))
+                    preview_rect = preview_scaled.get_rect(center=(preview_x + 60, preview_y + 60))
+                    screen.blit(preview_scaled, preview_rect)
+                    break
+            
+            recipe_x = screen.get_width() - 550
+            recipe_y = screen.get_height() / 2 - self.inventory_image.get_height() / 2 + 290
+            
+            name_text = font_large.render(item["item_name"], True, (20, 20, 50))
+            screen.blit(name_text, (recipe_x, recipe_y))
+            
+            recipe_y += 40
+            max_width = 400
+            words = item["description"].split()
+            line = ""
+            for word in words:
+                test_line = line + word + " "
+                test_width = font_small.size(test_line)[0]
+                if test_width > max_width:
+                    if line:
+                        desc_text = font_small.render(line, True, (0, 0, 0))
+                        screen.blit(desc_text, (recipe_x, recipe_y))
+                        recipe_y += 20
+                    line = word + " "
+                else:
+                    line = test_line
+            if line:
+                desc_text = font_small.render(line, True, (0, 0, 0))
+                screen.blit(desc_text, (recipe_x, recipe_y))
+                recipe_y += 20
+            
+            recipe_y += 20
+            recipe_label = font_medium.render("Recipe:", True, (20, 20, 50))
+            screen.blit(recipe_label, (recipe_x, recipe_y))
+            
+            recipe_y += 40
+            if item["recipe"]:
+                for requirement in item["recipe"]:
+                    if "item" in requirement:
+                        item_name = requirement["item"]
+                        amount = requirement["amount"]
+                        have = self.get_item_count(item_name)
+                    elif "item_tag" in requirement:
+                        item_name = requirement["item_tag"].replace("_", " ").title()
+                        amount = requirement["amount"]
+                        have = self.get_items_by_tag_count(requirement["item_tag"])
+                    
+                    color = (50, 255, 50) if have >= amount else (255, 50, 50)
+                    req_text = font_small.render(f"{item_name}: {have}/{amount}", True, color)
+                    temp_surface = pygame.Surface((req_text.get_width() + 10, req_text.get_height() + 10), pygame.SRCALPHA)
+                    temp_surface.fill((0, 0, 0, 100))
+                    screen.blit(temp_surface, (recipe_x - 5, recipe_y -5))
+                    screen.blit(req_text, (recipe_x, recipe_y))
+                    recipe_y += 30
+
+    def craft_item(self, item):
+        if not self.has_materials_for_recipe(item["recipe"]):
+            return False
+        
+        self.remove_materials_from_inventory(item["recipe"])
+        
+        self.add({item["item_name"]: item["output_amount"]})
+        
+        return True
 
     def add(self, resource):
         all_added = True
@@ -2484,6 +2744,25 @@ class Inventory():
                     return (slot_index, False)
         
         return (None, None) 
+    
+    def handle_crafting_click(self, mouse_pos, current_time):
+        import time
+        
+        for idx, (x, y, item) in self.crafting_slot_positions.items():
+            if x <= mouse_pos[0] <= x + self.slot_size and y <= mouse_pos[1] <= y + self.slot_size:
+                if self.last_click_slot == idx and (current_time - self.last_click_time) < 0.3:
+                    if self.has_materials_for_recipe(item["recipe"]):
+                        success = self.craft_item(item)
+                        self.last_click_slot = None
+                        self.last_click_time = 0
+                        return success
+                else:
+                    self.selected_crafting_item = item
+                    self.last_click_slot = idx
+                    self.last_click_time = current_time
+                    return False
+        
+        return False
     
     def start_drag(self, slot_index, is_hotbar):
         if is_hotbar:
@@ -2677,5 +2956,97 @@ class Inventory():
         elif hasattr(event, 'key'):
             pass
 
+    def handle_selection_click(self, mouse_pos, screen):
+        slot_index, is_hotbar = self.get_slot_at_mouse(mouse_pos, screen)
+    
+        if slot_index is not None:
+            if is_hotbar:
+                self.selected_hotbar_slot = slot_index
+                self.selection_mode = "hotbar"
+                self.selected_inventory_slot = None
+            else:
+                self.selected_inventory_slot = slot_index
+                self.selection_mode = "inventory"
+            
+            return (slot_index, is_hotbar)
+        
+        return (None, None)
+    
+    def consume_item(self):
+        """
+        Consume the currently selected item (from hotbar or inventory).
+        Returns: (success: bool, tags: list) - True if consumed, and the item's tags
+        """
+        # Determine which slot to consume from based on selection mode
+        if self.selection_mode == "hotbar":
+            slot_index = self.selected_hotbar_slot
+            slot = self.hotbar_slots[slot_index]
+            is_hotbar = True
+        elif self.selection_mode == "inventory":
+            if self.selected_inventory_slot is None:
+                return (False, [])  # No inventory slot selected
+            slot_index = self.selected_inventory_slot
+            slot = self.inventory_list[slot_index]
+            is_hotbar = False
+        else:
+            return (False, [])  # Invalid selection mode
+        
+        # Check if slot has an item
+        if slot is None:
+            return (False, [])
+        
+        item_name = slot["item_name"]
+        
+        # Find the item data in items_list
+        item_data = None
+        for item in items_list:
+            if item["item_name"] == item_name:
+                item_data = item
+                break
+        
+        if item_data is None:
+            return (False, [])  # Item not found in items_list
+        
+        # Check if item is consumable
+        if not item_data.get("consumable", False):
+            print(f"{item_name} is not consumable!")
+            return (False, [])
+        
+        # Apply the use_effect to the player
+        use_effect = item_data.get("use_effect")
+        if use_effect:
+            self.apply_use_effect(use_effect)
+        
+        # Reduce quantity by 1
+        slot["quantity"] -= 1
+        
+        # Remove item from slot if quantity reaches 0
+        if slot["quantity"] <= 0:
+            if is_hotbar:
+                self.hotbar_slots[slot_index] = None
+            else:
+                self.inventory_list[slot_index] = None
+        
+        return (True, item_data.get("tags", []))  # Return success and tags
+        
+    def apply_use_effect(self, use_effect):
+        
+        if use_effect is None:
+            return
+        
+        from mob_placement import player
+        
+        effects = use_effect.split(";")
+        
+        for effect in effects:
+            effect = effect.strip()
+            
+            if not effect:
+                continue
+            
+            try:
+                exec(effect)
+            except Exception as e:
+                print(f"Error applying effect '{effect}': {e}")
 
 inventory = Inventory(64)
