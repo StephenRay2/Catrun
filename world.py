@@ -25,7 +25,8 @@ def collect_multiple_resources(resource_list, player=None):
     
     return all_resources
 
-
+num_lavaponds = 30
+num_ponds = 200
 num_rocks = 1500
 num_boulders = 200
 num_bushes = 400
@@ -55,6 +56,10 @@ mushrooms = []
 fruit_plants = []
 ferns = []
 
+
+pond_images = ["/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond1.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond2.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond3.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond4.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond5.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond6.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond7.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond8.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond9.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond10.png"]
+
+lava_pond_images = ["/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/lavastone/lavapond1.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/lavastone/lavapond2.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/lavastone/lavapond3.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/lavastone/lavapond4.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/lavastone/lavapond5.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/lavastone/lavapond6.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/lavastone/lavapond7.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/lavastone/lavapond8.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/lavastone/lavapond9.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/lavastone/lavapond10.png"]
 
 rock_images = ["/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock1.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock2.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock3.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock4.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/Rock6.png"]
 
@@ -157,6 +162,48 @@ fern_data = [{"image": "assets/sprites/biomes/lavastone/FireFern.png", "resource
 
 collect_experience = 1
 harvest_experience = 1.5
+
+class Liquid(pygame.sprite.Sprite):
+    def __init__(self, image, x, y, size):
+        super().__init__()
+        self.image = pygame.transform.scale(
+            pygame.image.load(image).convert_alpha(), size
+        )
+        self.rect = self.image.get_rect(topleft=(x, y))
+        self.destroyed = False
+        self.resource = []
+
+    def draw(self, screen, cam_x):
+        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
+    
+    def get_collision_rect(self, cam_x):
+        return pygame.Rect(
+            self.rect.x - cam_x + 10,
+            self.rect.y + (self.rect.height * .22),
+            self.rect.width - 20,
+            self.rect.height - 50
+        )
+    
+    def collect(self, player=None):
+        if not self.destroyed:
+            resource_collected = min(self.resource_amount, (1 * player.attack))
+            self.resource_amount -= resource_collected
+            
+            if self.resource_amount <= 0:
+                self.destroyed = True
+            player.experience += harvest_experience * resource_collected
+            player.exp_total += harvest_experience * resource_collected
+            return [self.resource] * resource_collected
+        return []
+    
+class Pond(Liquid):
+    def __init__(self):
+        self.resource_amount = 100
+
+class Lavapond(Liquid):
+    def __init__(self):
+        self.resource_amount = 100
+
 
 
 class Solid(pygame.sprite.Sprite):
