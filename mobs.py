@@ -179,6 +179,7 @@ class Player(pygame.sprite.Sprite):
         self.poison = False
         self.poison_time = 0
         self.damage = 50
+        self.poison_strength = 1
         self.attack = 1
         self.temp_attack_boost = 1
         self.base_speed = 275
@@ -193,6 +194,7 @@ class Player(pygame.sprite.Sprite):
         self.stamina_timer = 0
         self.stamina_message_timer = 0
         self.health_bar_color = ()
+        self.poisoned_health_color = ()
 
         self.inventory = []
         self.is_alive = True
@@ -211,7 +213,13 @@ class Player(pygame.sprite.Sprite):
     def status_effects(self, dt):
         if self.poison == True:
             self.poison_time -= dt
-            self.health -= dt / 2
+            self.health -= dt * self.poison_strength
+            if self.health < 0:
+                self.health = 0
+            if self.poison_time <= 0:
+                self.poison = False
+                self.poison_time = 0
+                self.poison_strength = 1
 
     def attacking(self, nearby_mobs, player_world_x, player_world_y):
         if pygame.mouse.get_pressed()[0] and not self.exhausted:
@@ -241,6 +249,8 @@ class Player(pygame.sprite.Sprite):
                     if facing_object and 1 <= mob.health:
                         old_health = mob.health
                         mob.health -= self.damage * self.attack
+                        if mob.health < 0:
+                            mob.health = 0
 
                         if not hasattr(mob, "last_hit_sound_time"):
                             mob.last_hit_sound_time = 0
@@ -341,16 +351,18 @@ class Player(pygame.sprite.Sprite):
 
     def regain_health(self, dt):
         if 1 <= self.health <= self.max_health:
-            if self.hunger == self.max_hunger:
-                self.health += dt / 2
-            elif self.hunger > self.max_hunger * .7:
-                self.health += dt / 4
-            elif self.hunger > self.max_hunger * .4:
-                self.health += dt / 8
-            elif self.hunger > self.max_hunger * .1:
-                self.health += dt / 12
-            else:
-                self.health -= dt / 8
+            # Don't regenerate health while poisoned
+            if not self.poison:
+                if self.hunger == self.max_hunger:
+                    self.health += dt / 2
+                elif self.hunger > self.max_hunger * .7:
+                    self.health += dt / 4
+                elif self.hunger > self.max_hunger * .4:
+                    self.health += dt / 8
+                elif self.hunger > self.max_hunger * .1:
+                    self.health += dt / 12
+                else:
+                    self.health -= dt / 8
             if self.hunger == 100:
                 self.full_timer -= dt
                 if self.full_timer <= 0:
@@ -358,6 +370,11 @@ class Player(pygame.sprite.Sprite):
             else:
                 if self.hunger > 0:
                     self.hunger -= dt / 30
+        # Clamp health and hunger to valid ranges
+        if self.health < 0:
+            self.health = 0
+        if self.hunger < 0:
+            self.hunger = 0
 
     def regain_stamina(self, dt, screen):
         if self.stamina_timer > 0:
@@ -386,6 +403,14 @@ class Player(pygame.sprite.Sprite):
 
         if self.stamina > 10 and self.speed < 1:
             self.speed = 1
+        
+        # Clamp stamina, health, and thirst to valid ranges
+        if self.stamina < 0:
+            self.stamina = 0
+        if self.health < 0:
+            self.health = 0
+        if self.thirst < 0:
+            self.thirst = 0
 
 
     def lose_stamina(self, screen, dt):
@@ -422,6 +447,9 @@ class Player(pygame.sprite.Sprite):
             else:
                 self.hunger -= dt / 100
                 self.full_timer = 60
+        # Clamp hunger to valid range
+        if self.hunger < 0:
+            self.hunger = 0
             
 
     def lose_thirst(self, dt):
@@ -433,10 +461,34 @@ class Player(pygame.sprite.Sprite):
             else:
                 self.thirst -= dt / 100
                 self.thirst_full_timer = 60
+        # Clamp thirst to valid range
+        if self.thirst < 0:
+            self.thirst = 0
 
     def take_damage(self, damage):
         self.health -= damage
+        if self.health < 0:
+            self.health = 0
         sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1,5)]))
+
+    def clamp_stats(self):
+        """Clamp all player stats to valid ranges"""
+        if self.health < 0:
+            self.health = 0
+        if self.health > self.max_health:
+            self.health = self.max_health
+        if self.hunger < 0:
+            self.hunger = 0
+        if self.hunger > self.max_hunger:
+            self.hunger = self.max_hunger
+        if self.stamina < 0:
+            self.stamina = 0
+        if self.stamina > self.max_stamina:
+            self.stamina = self.max_stamina
+        if self.thirst < 0:
+            self.thirst = 0
+        if self.thirst > self.max_thirst:
+            self.thirst = self.max_thirst
 
     def feed_cat(self, cat):
         pass
@@ -453,7 +505,10 @@ class Player(pygame.sprite.Sprite):
         health_width = int(bar_width * health_ratio)
 
         pygame.draw.rect(screen, (60, 60, 60), pygame.Rect(x, y, bar_width, bar_height), border_radius=5)
-        if not self.poison:
+        if self.poison:
+            # Purple bar when poisoned
+            pygame.draw.rect(screen, (150, 80, 200), pygame.Rect(x, y, health_width, bar_height), border_radius=5)
+        else:
             if health_ratio > .4:
                 pygame.draw.rect(screen, (200, 40, 40), pygame.Rect(x, y, health_width, bar_height), border_radius=5)
             else:

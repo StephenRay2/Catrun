@@ -434,8 +434,8 @@ items_list = [
         "stack_size": 100,
         "weight": .1,
         "type": "raw_material",
-        "description": "A toxic mushroom. Do not eat! Used in alchemy.",
-        "use_effect": "player.health -= 10; player.poison = True",
+        "description": "A toxic mushroom. Do not eat! Or do. Could be fun. Or painful. Mess around and find out, I guess. Used in alchemy.",
+        "use_effect": "player.poison = True; player.poison_time += 30; player.poison_strength += 1",
         "placeable": False,
         "consumable": True,
         "durability": None,
@@ -1292,7 +1292,7 @@ items_list = [
         "weight": .1,
         "type": "crafted_material",
         "description": "A thick and viscous liquid that keeps water out of where it's not wanted, and keeps it in where it's enslaved. I wouldn't it this if I were you.",
-        "use_effect": "player.health -= 50",
+        "use_effect": "player.health -= 50; player.poison = True; player.poison_time = 10; player.poison_strength += 3",
         "placeable": False,
         "consumable": True,
         "durability": None,
@@ -3048,5 +3048,15 @@ class Inventory():
                 exec(effect)
             except Exception as e:
                 print(f"Error applying effect '{effect}': {e}")
+        
+        # Cap stats to their maximum values
+        if player.health > player.max_health:
+            player.health = player.max_health
+        if player.hunger > player.max_hunger:
+            player.hunger = player.max_hunger
+        if player.stamina > player.max_stamina:
+            player.stamina = player.max_stamina
+        if player.thirst > player.max_thirst:
+            player.thirst = player.max_thirst
 
 inventory = Inventory(64)

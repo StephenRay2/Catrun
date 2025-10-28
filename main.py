@@ -295,10 +295,9 @@ while running:
                 if event.key == pygame.K_f and player.is_alive:
                     success, tags = inventory.consume_item()
                     if success:
-                        # Play sound based on tags
                         if "food" in tags:
                             sound_manager.play_sound(random.choice([f"consume_item{i}" for i in range(1, 7)]))
-                        elif any(tag in tags for tag in ["liquid", "consumable"]):  # Check for liquid or consumable
+                        elif any(tag in tags for tag in ["liquid", "consumable"]):
                             sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
 
                 if event.key == pygame.K_q:
@@ -939,9 +938,11 @@ while running:
         player.thirst_bar(screen)
         screen.blit(stat_holder_image, (20, 50))
         player.handle_exp(screen, dt)
+        player.status_effects(dt)
         player.regain_health(dt)
         player.lose_hunger(dt)
         player.lose_thirst(dt)
+        player.clamp_stats()
     
         
         if dungeon_depth >= dungeon_depth_high:
