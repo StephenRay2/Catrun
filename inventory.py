@@ -851,7 +851,7 @@ items_list = [
         "weight": .7,
         "type": "raw_material",
         "description": "A tropical pineapple. Sweet and tangy.",
-        "use_effect": "player.hunger += 7; player.thirst += 4",
+        "use_effect": "player.hunger += 7; player.thirst += 4; player.thirst += 4",
         "placeable": False,
         "consumable": True,
         "durability": None,
@@ -1216,7 +1216,7 @@ items_list = [
         "durability": None,
         "recipe": [{"item_tag": "wood", "amount": 1}],
         "crafting_medium": "hand",
-        "tags": ["wooden", "material"],
+        "tags": ["wooden", "material", "container"],
         "output_amount": 1
     },
     {
@@ -1765,7 +1765,7 @@ items_list = [
         "durability": None,
         "recipe": [{"item": "Glass", "amount": 2}, {"item": "Sealing Paste", "amount": 1}],
         "crafting_medium": "workbench",
-        "tags": ["crafted", "material"],
+        "tags": ["crafted", "material", "container"],
         "output_amount": 1
     },
     {
@@ -1813,7 +1813,7 @@ items_list = [
         "durability": 100,
         "recipe": [{"item": "Rope", "amount": 1}, {"item": "Metal Ingot", "amount": 5}],
         "crafting_medium": "workbench",
-        "tags": ["material", "ore"],
+        "tags": ["material", "ore", "container", "metal_container"],
         "output_amount": 1
     },
     {
@@ -2122,7 +2122,7 @@ items_list = [
         "durability": None,
         "recipe": [{"item": "Metal Ingot", "amount": 10}, {"item": "Sealing Paste", "amount": 1}],
         "crafting_medium": "workbench",
-        "tags": ["material", "ore"],
+        "tags": ["material", "ore", "container"],
         "output_amount": 1
     },
     {
@@ -2203,6 +2203,39 @@ items_list = [
         "recipe": [{"item": "Sun Berries", "amount": 30}, {"item": "Fire Fern Leaf", "amount": 10}, {"item": "Dusk Berries", "amount": 5}, {"item": "Large Metal Water", "amount": 1}],
         "crafting_medium": "alchemy_bench",
         "tags": ["material", "ore"],
+        "output_amount": 1
+    },
+    # Raw Liquids
+    {
+        "item_name": "Waterbucket",
+        "icon": "Waterbucket.png",
+        "stack_size": 100,
+        "weight": 10,
+        "type": "raw_material",
+        "description": "Fresh water collected from a pond or lake or stream. Can be used for drinking or cooking.",
+        "use_effect": "player.thirst += 100",
+        "placeable": False,
+        "consumable": True,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": "gameplay",
+        "tags": ["liquid", "water", "consumable"],
+        "output_amount": 1
+    },
+    {
+        "item_name": "Lavabucket",
+        "icon": "Lavabucket.png",
+        "stack_size": 100,
+        "weight": 10,
+        "type": "raw_material",
+        "description": "Molten lava collected from a lava pond or stream or river or lake. Extremely hot and dangerous. Used for something, probably.",
+        "use_effect": "player.is_alive = False; player.health = 0",
+        "placeable": False,
+        "consumable": True,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": "gameplay",
+        "tags": ["liquid", "lava", "material"],
         "output_amount": 1
     }
 
@@ -2877,10 +2910,6 @@ class Inventory():
                 
                 break
     def select_hotbar_slot(self, index, do_use=False, screen=None):
-        """
-        Select the hotbar slot index (0..hotbar_size-1).
-        If do_use is True, also attempt to use the item in that slot.
-        """
         if index is None or index < 0 or index >= self.hotbar_size:
             return
 
@@ -2890,42 +2919,23 @@ class Inventory():
             self.use_hotbar_slot(index, screen)
 
     def use_hotbar_slot(self, index, screen=None):
-        """
-        Try to 'use' the item in the hotbar slot.
-        Implement whatever using means for your game here (eat, equip, place, etc).
-        This is a stub — replace with your game logic.
-        """
         slot = self.hotbar_slots[index]
         if slot is None:
-            return  # nothing in that slot
+            return
 
         item_name = slot["item_name"]
         quantity = slot["quantity"]
 
-        # Example behaviors you might want to do:
-        # - If it's a consumable: apply effect and reduce quantity
-        # - If it's a placeable: spawn an object in the world
-        # - If it's a tool: equip it or run its action
-
-        # --- Simple example: consume 1 quantity if it's a consumable type ---
         consumables = {"Apples", "Baked Apples", "Small thirst", "Small Health Brew"}  # expand as needed
         if item_name in consumables:
-            # apply effects here (health, stamina, etc.)
-            # e.g., player.heal(5)
             slot["quantity"] -= 1
             if slot["quantity"] <= 0:
                 self.hotbar_slots[index] = None
 
-        # --- Example fallback: just print to console for now ---
         else:
             print(f"Used hotbar slot {index}: {item_name} x{quantity}")
 
     def handle_keydown_hotbar(self, event, screen=None, use_on_press=False):
-        """
-        Call this from your main event loop when you get KEYDOWN events.
-        If use_on_press is True, pressing the number also triggers use_hotbar_slot.
-        """
-        # map keys 1-9,0 -> indices 0-9
         key_to_index = {
             pygame.K_1: 0,
             pygame.K_2: 1,
@@ -2937,7 +2947,7 @@ class Inventory():
             pygame.K_8: 7,
             pygame.K_9: 8,
             pygame.K_0: 9,
-            # Also support numeric keypad
+            # numeric keypad
             pygame.K_KP1: 0,
             pygame.K_KP2: 1,
             pygame.K_KP3: 2,
@@ -3027,6 +3037,15 @@ class Inventory():
             else:
                 self.inventory_list[slot_index] = None
         
+        # Return the empty container to inventory if this item used one
+        recipe = item_data.get("recipe")
+        if recipe and isinstance(recipe, list):
+            for recipe_item in recipe:
+                if isinstance(recipe_item, dict) and "item" in recipe_item:
+                    container_name = recipe_item["item"]
+                    # Add the empty container back to inventory (must pass as list)
+                    self.add([container_name])
+        
         return (True, item_data.get("tags", []))  # Return success and tags
         
     def apply_use_effect(self, use_effect):
@@ -3049,7 +3068,6 @@ class Inventory():
             except Exception as e:
                 print(f"Error applying effect '{effect}': {e}")
         
-        # Cap stats to their maximum values
         if player.health > player.max_health:
             player.health = player.max_health
         if player.hunger > player.max_hunger:

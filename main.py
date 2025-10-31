@@ -93,10 +93,15 @@ while running:
 
         
         collectibles = sticks + stones + grasses + savannah_grasses + mushrooms 
-        all_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants
+        all_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants + ponds + lavas
 
         visible_collectibles = [col for col in collectibles if col.rect.x- cam_x > -1000 and col.rect.y - cam_x < width + 1000]
-        visible_objects = [obj for obj in all_objects if obj.rect.x - cam_x > -1000 and obj.rect.x - cam_x < width + 1000]
+        all_objects_no_liquids = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants
+        visible_objects = [obj for obj in all_objects_no_liquids if obj.rect.x - cam_x > -1000 and obj.rect.x - cam_x < width + 1000]
+        
+        # Draw ponds and lavaponds first (before other objects)
+        visible_liquids = [obj for obj in (ponds + lavas) if obj.rect.x - cam_x > -1000 and obj.rect.x - cam_x < width + 1000]
+        
         visible_objects.extend(visible_collectibles)
         visible_objects.sort(key=lambda obj: obj.rect.y + obj.rect.height)
 
@@ -107,6 +112,11 @@ while running:
             if -BACKGROUND_SIZE < screen_x < width:
                 screen.blit(tile_image, (screen_x, floor_y))
 
+        # Update and draw ponds and lavaponds first (on the ground layer)
+        for obj in visible_liquids:
+            obj.update_animation(dt)
+            obj.draw(screen, cam_x)
+        
         for obj in visible_objects:
             object_mid_y = obj.rect.y + obj.rect.height / 2
             obj.draw(screen, cam_x)
@@ -228,6 +238,12 @@ while running:
                 y = random.randint(0, height - 64)
                 crows.append(Crow(x, y, "Crow"))
 
+            for _ in range(num_duskwretches):
+                tile_x, tile_image = random.choice(weighted_duskwretch_tiles)
+                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                y = random.randint(0, height - 64)
+                duskwretches.append(Duskwretch(x, y, "Duskwretch"))
+
             dungeon_depth = 0
             dungeon_depth_high = 0
             cam_x = 0
@@ -280,6 +296,9 @@ while running:
         player_world_y = player_pos.y
         
         player_speed = player.get_speed()
+        # Reduce speed when swimming
+        if player.swimming:
+            player_speed *= 0.5
         current_time = pygame.time.get_ticks()
 
         for event in pygame.event.get():
@@ -311,24 +330,26 @@ while running:
                         inventory_in_use = False
                         inventory.selection_mode = "hotbar"
                         inventory.selected_inventory_slot = None
-            
+
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if inventory_in_use and player.is_alive:
-                    mouse_pos = pygame.mouse.get_pos()
-                    
+                mouse_pos = pygame.mouse.get_pos()
+
+                slot_index, is_hotbar = inventory.get_slot_at_mouse(mouse_pos, screen)
+                if is_hotbar:
+                    inventory.handle_selection_click(mouse_pos, screen)
+                    inventory.start_drag(slot_index, is_hotbar)
+
+                elif inventory_in_use and player.is_alive:
                     if inventory.state == "crafting":
                         import time
                         crafting_time = time.time()
                         inventory.handle_crafting_click(mouse_pos, crafting_time)
                     else:
-                        slot_index, is_hotbar = inventory.get_slot_at_mouse(mouse_pos, screen)
-                        
-                        if slot_index is not None:
-                            inventory.handle_selection_click(mouse_pos, screen)
-                            inventory.start_drag(slot_index, is_hotbar)
-            
+                        inventory.handle_selection_click(mouse_pos, screen)
+                        inventory.start_drag(slot_index, is_hotbar)
+
             if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                if inventory_in_use and inventory.dragging:
+                if inventory.dragging:
                     mouse_pos = pygame.mouse.get_pos()
                     slot_index, is_hotbar = inventory.get_slot_at_mouse(mouse_pos, screen)
                     
@@ -336,6 +357,7 @@ while running:
                         inventory.end_drag(slot_index, is_hotbar, screen)
                     else:
                         inventory.cancel_drag()
+
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
                 for obj in visible_objects:
@@ -393,6 +415,97 @@ while running:
                                 
                                 collect_cooldown = current_time
                                 break
+                
+                # Liquid collection - iterate through visible_liquids
+                for obj in visible_liquids:
+                    if hasattr(obj, 'collect_from_pond') and hasattr(obj, 'destroyed') and not obj.destroyed:
+                        obj_collision = obj.get_collision_rect(0)
+                        horizontal_dist = abs(obj_collision.centerx - player_world_x)
+                        vertical_dist = abs(obj_collision.centery - player_world_y)
+                        collect_reach = 40
+                        horizontal_range = (obj_collision.width / 2) + collect_reach
+                        vertical_range = (obj_collision.height / 2) + collect_reach
+                        
+                        facing_object = False
+                        if player.last_direction == "right" and obj_collision.centerx > player_world_x - 10 and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                            facing_object = True
+                        elif player.last_direction == "left" and obj_collision.centerx < player_world_x + 10 and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                            facing_object = True
+                        elif player.last_direction == "up" and obj_collision.centery < player_world_y + 10 and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                            facing_object = True
+                        elif player.last_direction == "down" and obj_collision.centery > player_world_y - 10 and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                            facing_object = True
+                        
+                        if facing_object:
+                            # Get the currently held item to check if it's a container
+                            held_item = None
+                            selected_slot = inventory.selected_hotbar_slot
+                            if inventory.hotbar_slots[selected_slot] is not None:
+                                held_item = inventory.hotbar_slots[selected_slot]
+                            
+                            # Only collect if holding a container
+                            if held_item:
+                                resources = obj.collect_from_pond(player, held_item)
+                                if resources:
+                                    sound_manager.play_sound("consume_water1")
+                                    # Remove the container from inventory (it gets consumed)
+                                    held_item["quantity"] -= 1
+                                    if held_item["quantity"] <= 0:
+                                        inventory.hotbar_slots[selected_slot] = None
+                                    
+                                    if inventory.add(resources):
+                                        # Use the actual resource name (e.g., "Small Water", "Medium Glass Water")
+                                        water_type = resources[0]
+                                        add_collection_message(water_type, len(resources))
+                                    if obj.destroyed:
+                                        if obj in visible_liquids:
+                                            visible_liquids.remove(obj)
+                                    harvest_cooldown = current_time
+                                    break
+                    
+                    if hasattr(obj, 'collect_from_lava') and hasattr(obj, 'destroyed') and not obj.destroyed:
+                        obj_collision = obj.get_collision_rect(0)
+                        horizontal_dist = abs(obj_collision.centerx - player_world_x)
+                        vertical_dist = abs(obj_collision.centery - player_world_y)
+                        collect_reach = 40
+                        horizontal_range = (obj_collision.width / 2) + collect_reach
+                        vertical_range = (obj_collision.height / 2) + collect_reach
+                        
+                        facing_object = False
+                        if player.last_direction == "right" and obj_collision.centerx > player_world_x - 10 and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                            facing_object = True
+                        elif player.last_direction == "left" and obj_collision.centerx < player_world_x + 10 and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                            facing_object = True
+                        elif player.last_direction == "up" and obj_collision.centery < player_world_y + 10 and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                            facing_object = True
+                        elif player.last_direction == "down" and obj_collision.centery > player_world_y - 10 and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                            facing_object = True
+                        
+                        if facing_object:
+                            # Get the currently held item to check if it's a metal container
+                            held_item = None
+                            selected_slot = inventory.selected_hotbar_slot
+                            if inventory.hotbar_slots[selected_slot] is not None:
+                                held_item = inventory.hotbar_slots[selected_slot]
+                            
+                            # Only collect if holding a metal container
+                            if held_item:
+                                resources = obj.collect_from_lava(player, held_item)
+                                if resources:
+                                    sound_manager.play_sound("fire")
+                                    # Remove the container from inventory (it gets consumed)
+                                    held_item["quantity"] -= 1
+                                    if held_item["quantity"] <= 0:
+                                        inventory.hotbar_slots[selected_slot] = None
+                                    
+                                    if inventory.add(resources):
+                                        add_collection_message("Lava", len(resources))
+                                    if obj.destroyed:
+                                        if obj in visible_liquids:
+                                            visible_liquids.remove(obj)
+                                    harvest_cooldown = current_time
+                                    break
+
 
             if paused:
                 if resume_button.is_clicked(event):
@@ -446,7 +559,8 @@ while running:
                                 
                                 harvest_cooldown = current_time
                                 break
-
+                    
+                    
         dead_bushes = [db for db in dead_bushes if not db.destroyed]
         mushrooms = [m for m in mushrooms if not m.destroyed]
         savannah_grasses = [sgrass for sgrass in savannah_grasses if not sgrass.destroyed]
@@ -459,6 +573,8 @@ while running:
         berry_bushes = [bush for bush in berry_bushes if not bush.destroyed]
         ferns = [f for f in ferns if not f.destroyed]
         fruit_plants = [fp for fp in fruit_plants if not fp.destroyed]
+        ponds = [pond for pond in ponds if not pond.destroyed]
+        lavas = [lava for lava in lavas if not lava.destroyed]
 
         cats = [cat for cat in cats if not cat.destroyed]
         squirrels = [squirrel for squirrel in squirrels if not squirrel.destroyed]
@@ -482,11 +598,13 @@ while running:
         keys = pygame.key.get_pressed()
 
         collectibles = sticks + stones + grasses + savannah_grasses + mushrooms
-        all_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants
+        all_objects_no_liquids = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants
+        all_objects = all_objects_no_liquids + ponds + lavas
         mobs = cats + squirrels + cows + chickens + crawlers + duskwretches + pocks + deers + black_bears + brown_bears + gilas + crows
 
         visible_collectibles = [col for col in collectibles if col.rect.x- cam_x > -256 and col.rect.x - cam_x < width + 256]
-        visible_objects = [obj for obj in all_objects if obj.rect.x - cam_x > -256 and obj.rect.x - cam_x < width + 256 and obj.rect.y > -256 and obj.rect.y < height + 256]
+        visible_liquids = [obj for obj in (ponds + lavas) if obj.rect.x - cam_x > -256 and obj.rect.x - cam_x < width + 256 and obj.rect.y > -256 and obj.rect.y < height + 256]
+        visible_objects = [obj for obj in all_objects_no_liquids if obj.rect.x - cam_x > -256 and obj.rect.x - cam_x < width + 256 and obj.rect.y > -256 and obj.rect.y < height + 256]
         visible_mobs = [mob for mob in mobs if mob.rect.x - cam_x > -256 and mob.rect.x - cam_x < width + 256 and mob.rect.y > -256 and mob.rect.y < height + 256]
         for mob in visible_mobs:
             if isinstance(mob, Cat) and random.random() < 0.001:
@@ -520,15 +638,73 @@ while running:
 
         player_drawn = False
 
+        # Update and draw ponds and lavaponds first (on the ground layer, before other objects)
+        for obj in visible_liquids:
+            obj.update_animation(dt)
+            obj.draw(screen, cam_x)
+
         for obj in visible_objects:
             object_mid_y = obj.rect.y + obj.rect.height / 2
             if not player_drawn and (player.rect.centery + 20) <= object_mid_y:
-                screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size/2))
+                if player.swimming and player.current_liquid:
+                    # Calculate sinking depth based on distance from liquid center (X and Y)
+                    liquid_center_x = player.current_liquid.rect.centerx
+                    liquid_center_y = player.current_liquid.rect.centery
+                    liquid_width = player.current_liquid.rect.width
+                    liquid_height = player.current_liquid.rect.height
+                    
+                    distance_x = abs((player_pos.x + cam_x) - liquid_center_x)
+                    distance_y = abs(player_pos.y - liquid_center_y)
+                    max_distance_x = liquid_width / 2
+                    max_distance_y = liquid_height / 2
+                    
+                    # Normalize distances to 0-1 range
+                    normalized_x = min(1, distance_x / max_distance_x) if max_distance_x > 0 else 0
+                    normalized_y = min(1, distance_y / max_distance_y) if max_distance_y > 0 else 0
+                    
+                    # Use max of both directions for sinking ratio (0 at edges, 1 at center)
+                    sinking_ratio = max(0, 1 - max(normalized_x, normalized_y))
+                    
+                    # Clip progressively from bottom (0 to 50% as we move to center)
+                    clip_height = int(player_current_image.get_height() * (1 - sinking_ratio * 0.5))
+                    clip_rect = pygame.Rect(0, 0, player_current_image.get_width(), clip_height)
+                    clipped_image = player_current_image.subsurface(clip_rect)
+                    
+                    # Move down progressively (0 to 4 as we move to center)
+                    y_offset = sinking_ratio * 4
+                    screen.blit(clipped_image, (player_pos.x - size/2, player_pos.y - size/2 + y_offset))
+                else:
+                    screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size/2))
                 player_drawn = True
             obj.draw(screen, cam_x)
 
         if not player_drawn:
-            screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size/2))
+            if player.swimming and player.current_liquid:
+                # Calculate sinking depth based on distance from liquid center (X and Y)
+                liquid_center_x = player.current_liquid.rect.centerx
+                liquid_center_y = player.current_liquid.rect.centery
+                liquid_width = player.current_liquid.rect.width
+                liquid_height = player.current_liquid.rect.height
+                
+                distance_x = abs((player_pos.x + cam_x) - liquid_center_x)
+                distance_y = abs(player_pos.y - liquid_center_y)
+                max_distance_x = liquid_width / 2
+                max_distance_y = liquid_height / 2
+                
+                # Normalize distances to 0-1 range
+                normalized_x = min(1, distance_x / max_distance_x) if max_distance_x > 0 else 0
+                normalized_y = min(1, distance_y / max_distance_y) if max_distance_y > 0 else 0
+                
+                sinking_ratio = max(0, 1 - max(normalized_x, normalized_y))
+                
+                clip_height = int(player_current_image.get_height() * (1 - sinking_ratio * 0.5))
+                clip_rect = pygame.Rect(0, 0, player_current_image.get_width(), clip_height)
+                clipped_image = player_current_image.subsurface(clip_rect)
+                
+                y_offset = sinking_ratio * 4
+                screen.blit(clipped_image, (player_pos.x - size/2, player_pos.y - size/2 + y_offset))
+            else:
+                screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size/2))
 
         player.rect.center = (player_pos.x, player_pos.y)
             
@@ -646,7 +822,19 @@ while running:
             player.attacking(nearby_mobs, player_world_x, player_world_y)
             for mob in nearby_mobs:
                 mob.handle_health(screen, cam_x, dt)
+                mob.handle_lava_damage(dt)
                 mob.flee(player_world_x, player_world_y, dt)
+                
+                # Liquid collision for mobs
+                mob_in_liquid = False
+                for liquid in nearby_objects:
+                    if hasattr(liquid, 'liquid_type'):
+                        if mob.rect.colliderect(liquid.get_collision_rect(0)):
+                            mob.enter_liquid(liquid.liquid_type, liquid)
+                            mob_in_liquid = True
+                            break
+                if not mob_in_liquid:
+                    mob.exit_liquid()
 
 
             
@@ -683,28 +871,48 @@ while running:
             for mob in mobs:
                 mob.collision_rect = mob.rect.inflate(-15, -15)
 
-            all_nearby = nearby_objects + nearby_mobs
+            # Exclude liquids from collision detection so player can enter them
+            all_nearby_solid = [obj for obj in (nearby_objects + nearby_mobs) 
+                               if not hasattr(obj, 'liquid_type')]
 
             left_collision = any(
                 left_player_check.colliderect(obj.get_collision_rect(cam_x))
-                for obj in all_nearby
+                for obj in all_nearby_solid
             )
 
             right_collision = any(
                 right_player_check.colliderect(obj.get_collision_rect(cam_x))
-                for obj in all_nearby
+                for obj in all_nearby_solid
             )
 
             up_collision = any(
                 top_player_check.colliderect(obj.get_collision_rect(cam_x))
-                for obj in all_nearby
+                for obj in all_nearby_solid
             )
 
             down_collision = any(
                 bottom_player_check.colliderect(obj.get_collision_rect(cam_x))
-                for obj in all_nearby
+                for obj in all_nearby_solid
             )
 
+            # Liquid collision detection - use bottom center point of player
+            player_feet_rect = pygame.Rect(player.rect.centerx - 5, player.rect.bottom - 5, 10, 10)
+            in_liquid = False
+            for pond in nearby_objects:
+                if hasattr(pond, 'liquid_type') and pond.liquid_type == "water":
+                    if player_feet_rect.colliderect(pond.get_collision_rect(cam_x)):
+                        player.enter_liquid("water", pond)
+                        in_liquid = True
+                        break
+            for lava in nearby_objects:
+                if hasattr(lava, 'liquid_type') and lava.liquid_type == "lava":
+                    if player_feet_rect.colliderect(lava.get_collision_rect(cam_x)):
+                        player.enter_liquid("lava", lava)
+                        in_liquid = True
+                        break
+            
+            if not in_liquid:
+                player.exit_liquid()
 
             if not inventory_in_use:
 
@@ -939,6 +1147,8 @@ while running:
         screen.blit(stat_holder_image, (20, 50))
         player.handle_exp(screen, dt)
         player.status_effects(dt)
+        player.handle_swimming(dt)
+        player.handle_lava_damage(dt)
         player.regain_health(dt)
         player.lose_hunger(dt)
         player.lose_thirst(dt)

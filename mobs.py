@@ -209,6 +209,13 @@ class Player(pygame.sprite.Sprite):
         self.attack_cooldown = pygame.time.get_ticks()
         self.attack_delay = 300
         self.mob_noise_delay = 3
+        
+        self.swimming = False
+        self.in_lava = False
+        self.swim_stamina_drain = 0.3
+        self.lava_damage_rate = 40  # damage per second in lava
+        self.lava_damage_timer = 0
+        self.current_liquid = None
 
     def status_effects(self, dt):
         if self.poison == True:
@@ -220,6 +227,47 @@ class Player(pygame.sprite.Sprite):
                 self.poison = False
                 self.poison_time = 0
                 self.poison_strength = 1
+    
+    def handle_swimming(self, dt, liquid_collision=None):
+        """Handle swimming mechanics - stamina drain and drowning"""
+        if self.swimming:
+            self.stamina -= self.swim_stamina_drain * dt
+            
+            if self.stamina < 0:
+                self.stamina = 0
+                if not self.in_lava:
+                    self.health -= 5 * dt  # Drown damage
+                    if self.health < 0:
+                        self.health = 0
+                        self.is_alive = False
+                        self.dead = True
+    
+    def handle_lava_damage(self, dt):
+        if self.in_lava:
+            self.lava_damage_timer += dt
+            if self.lava_damage_timer >= 0.1:
+                self.health -= self.lava_damage_rate * (self.lava_damage_timer / 1.0)
+                self.lava_damage_timer = 0
+                if self.health < 0:
+                    self.health = 0
+                    self.is_alive = False
+                    self.dead = True
+    
+    def enter_liquid(self, liquid_type, liquid_obj=None):
+        if liquid_type == "water":
+            self.swimming = True
+            self.in_lava = False
+        elif liquid_type == "lava":
+            self.swimming = True
+            self.in_lava = True
+        self.current_liquid = liquid_obj
+    
+    def exit_liquid(self):
+        """Exit a liquid"""
+        self.swimming = False
+        self.in_lava = False
+        self.lava_damage_timer = 0
+        self.current_liquid = None
 
     def attacking(self, nearby_mobs, player_world_x, player_world_y):
         if pygame.mouse.get_pressed()[0] and not self.exhausted:
@@ -351,7 +399,6 @@ class Player(pygame.sprite.Sprite):
 
     def regain_health(self, dt):
         if 1 <= self.health <= self.max_health:
-            # Don't regenerate health while poisoned
             if not self.poison:
                 if self.hunger == self.max_hunger:
                     self.health += dt / 2
@@ -370,7 +417,6 @@ class Player(pygame.sprite.Sprite):
             else:
                 if self.hunger > 0:
                     self.hunger -= dt / 30
-        # Clamp health and hunger to valid ranges
         if self.health < 0:
             self.health = 0
         if self.hunger < 0:
@@ -404,7 +450,6 @@ class Player(pygame.sprite.Sprite):
         if self.stamina > 10 and self.speed < 1:
             self.speed = 1
         
-        # Clamp stamina, health, and thirst to valid ranges
         if self.stamina < 0:
             self.stamina = 0
         if self.health < 0:
@@ -447,7 +492,6 @@ class Player(pygame.sprite.Sprite):
             else:
                 self.hunger -= dt / 100
                 self.full_timer = 60
-        # Clamp hunger to valid range
         if self.hunger < 0:
             self.hunger = 0
             
@@ -461,7 +505,6 @@ class Player(pygame.sprite.Sprite):
             else:
                 self.thirst -= dt / 100
                 self.thirst_full_timer = 60
-        # Clamp thirst to valid range
         if self.thirst < 0:
             self.thirst = 0
 
@@ -472,7 +515,6 @@ class Player(pygame.sprite.Sprite):
         sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1,5)]))
 
     def clamp_stats(self):
-        """Clamp all player stats to valid ranges"""
         if self.health < 0:
             self.health = 0
         if self.health > self.max_health:
@@ -644,7 +686,38 @@ class Mob(pygame.sprite.Sprite):
         self.speed = 1
         self.level = 1
         self.death_experience = 50
+        
+        self.swimming = False
+        self.in_lava = False
+        self.lava_damage_rate = 50
+        self.lava_damage_timer = 0
+        self.immune_to_lava = False
+        self.current_liquid = None
 
+
+    def handle_lava_damage(self, dt):
+        """Handle lava damage for mobs - only take damage if not immune"""
+        if self.in_lava and not self.immune_to_lava:
+            self.lava_damage_timer += dt
+            if self.lava_damage_timer >= 0.1:  # Apply damage every 0.1 seconds
+                self.health -= self.lava_damage_rate * (self.lava_damage_timer / 1.0)
+                self.lava_damage_timer = 0
+                if self.health < 0:
+                    self.health = 0
+                    self.is_alive = False
+    
+    def enter_liquid(self, liquid_type, liquid_obj=None):
+        if liquid_type in ["water", "lava"]:
+            self.swimming = True
+            if liquid_type == "lava":
+                self.in_lava = True
+        self.current_liquid = liquid_obj
+    
+    def exit_liquid(self):
+        self.swimming = False
+        self.in_lava = False
+        self.lava_damage_timer = 0
+        self.current_liquid = None
 
     def give_experience(self, player):
         if self.health < 1:
@@ -662,7 +735,8 @@ class Mob(pygame.sprite.Sprite):
         return pygame.Rect(rect.x - cam_x, rect.y, rect.width, rect.height)
 
     def check_collision(self, direction, nearby_objects, nearby_mobs):
-        all_nearby = nearby_objects + nearby_mobs
+        solid_objects = [obj for obj in nearby_objects if not hasattr(obj, 'liquid_type')]
+        all_nearby = solid_objects + nearby_mobs
 
         collision_rect = self.get_collision_rect(0)
         
@@ -682,7 +756,36 @@ class Mob(pygame.sprite.Sprite):
         return can_move_x, can_move_y
 
     def get_speed(self):
-        return self.base_speed * self.speed
+        speed = self.base_speed * self.speed
+        if self.swimming:
+            speed *= 0.5
+        return speed
+
+    def draw(self, screen, cam_x):
+        if self.swimming:
+            if hasattr(self, 'current_liquid') and self.current_liquid:
+                liquid_center_x = self.current_liquid.rect.centerx
+                liquid_center_y = self.current_liquid.rect.centery
+                liquid_width = self.current_liquid.rect.width
+                liquid_height = self.current_liquid.rect.height
+                
+                dist_x = abs(self.rect.centerx - liquid_center_x) / (liquid_width / 2)
+                dist_y = abs(self.rect.centery - liquid_center_y) / (liquid_height / 2)
+                
+                sinking_ratio = max(0, 1 - max(dist_x, dist_y))
+                
+                # Clip image from bottom based on sinking depth
+                clip_pixels = int(sinking_ratio * self.rect.height * 0.4)
+                
+                if clip_pixels > 0 and self.image:
+                    clipped_image = self.image.subsurface(pygame.Rect(0, 0, self.image.get_width(), self.image.get_height() - clip_pixels))
+                    screen.blit(clipped_image, (self.rect.x - cam_x, self.rect.y))
+                else:
+                    screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
+            else:
+                screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
+        else:
+            screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
 
     def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
         if not hasattr(self, "cow") and self.move_timer <= 0 and self.is_alive and not self.fleeing:
@@ -899,9 +1002,6 @@ class Cat(Mob):
             else:
                 self.image = self.dead_cat_left_image
 
-    def draw(self, screen, cam_x):
-        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
-
 
 class Squirrel(Mob):
     def __init__(self, x, y, name):
@@ -934,9 +1034,6 @@ class Squirrel(Mob):
         self.last_direction = "right" 
         self.dead_squirrel_right_image = pygame.transform.scale(pygame.image.load(squirrel_dead_image).convert_alpha(), (48, 48))
         self.dead_squirrel_left_image = pygame.transform.flip(self.dead_squirrel_right_image, True, False)
-
-    def draw(self, screen, cam_x):
-        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
 
     def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
         super().update(dt, player, nearby_objects, nearby_mobs)
@@ -993,9 +1090,6 @@ class Cow(Mob):
             else:
                 self.image = self.dead_cow_left_image
 
-    def draw(self, screen, cam_x):
-        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
-
 
 class Chicken(Mob):
     def __init__(self, x, y, name):
@@ -1028,9 +1122,6 @@ class Chicken(Mob):
         self.last_direction = "right"
         self.dead_chicken_right_image = pygame.transform.scale(pygame.image.load(chicken_dead_image).convert_alpha(), (40, 40))
         self.dead_chicken_left_image = pygame.transform.flip(self.dead_chicken_right_image, True, False)
-
-    def draw(self, screen, cam_x):
-        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
 
     def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
         super().update(dt, player, nearby_objects, nearby_mobs)
@@ -1156,11 +1247,6 @@ class Crawler(Enemy):
         self.death_experience = 500  * (1 + (self.level * self.death_experience * .0001))
         self.level = 1
 
-    
-
-    def draw(self, screen, cam_x):
-        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
-
     def attack(self, player_world_x, player_world_y, player):
         dx = player_world_x - self.rect.centerx
         dy = player_world_y - self.rect.centery
@@ -1267,9 +1353,6 @@ class Duskwretch(Enemy):
     def get_collision_rect(self, cam_x):
         rect = self.rect
         return pygame.Rect(rect.x - cam_x + 10, rect.y + 50, rect.width - 20, rect.height - 70)
-
-    def draw(self, screen, cam_x):
-        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
 
     def attack(self, player_world_x, player_world_y, player):
         dx = player_world_x - self.rect.centerx
@@ -1500,9 +1583,6 @@ class Pock(Enemy):
         self.death_experience = 500  * (1 + (self.level * self.death_experience * .0001))
         self.level = 1
 
-    def draw(self, screen, cam_x):
-        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
-
     def attack(self, player_world_x, player_world_y, player):
         dx = player_world_x - self.rect.centerx
         dy = player_world_y - self.rect.centery
@@ -1609,10 +1689,6 @@ class Deer(AggressiveMob):
                 rect = self.rect
                 return pygame.Rect(rect.x - cam_x + 5, rect.y + 20, rect.width - 20, rect.height - 35)
 
-
-    def draw(self, screen, cam_x):
-        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
-    
     def handle_health(self, screen, cam_x, dt):
         max_health = self.full_health
         health = self.health
@@ -1820,9 +1896,6 @@ class BlackBear(AggressiveMob):
         if self.health <= 0:
             self.is_alive = False
     
-    def draw(self, screen, cam_x):
-        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
-    
     def handle_player_proximity(self, dt, player_world_x, player_world_y, player=None, nearby_objects=None, nearby_mobs=None):
         if not self.aggressive:
             return
@@ -2022,9 +2095,6 @@ class BrownBear(AggressiveMob):
         if self.health <= 0:
             self.is_alive = False
     
-    def draw(self, screen, cam_x):
-        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
-    
     def handle_player_proximity(self, dt, player_world_x, player_world_y, player=None, nearby_objects=None, nearby_mobs=None):
         if not self.aggressive:
             return
@@ -2178,9 +2248,6 @@ class Gila(AggressiveMob):
         if self.health <= 0:
             self.is_alive = False
     
-    def draw(self, screen, cam_x):
-        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
-    
     def flee(self, player_world_x, player_world_y, dt):
         self.fleeing = False
     
@@ -2279,9 +2346,6 @@ class Crow(Mob):
     def get_collision_rect(self, cam_x):
             rect = self.rect
             return pygame.Rect(rect.x - cam_x + 25, rect.y + 30, rect.width - 43, rect.height - 47)
-    
-    def draw(self, screen, cam_x):
-        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
     
     def handle_health(self, screen, cam_x, dt):
         max_health = self.full_health

@@ -37,7 +37,7 @@ num_grasses = 1000
 num_sticks = 500
 num_stones = 500
 num_savannah_grasses = 1600
-num_mushrooms = 2000
+num_mushrooms = 200
 num_dead_bushes = 300
 num_fruit_plants = 300
 num_fire_ferns = 50
@@ -55,6 +55,8 @@ savannah_grasses = []
 mushrooms = []
 fruit_plants = []
 ferns = []
+ponds = []
+lavas = []
 
 
 pond_images = ["/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond1.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond2.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond3.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond4.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond5.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond6.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond7.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond8.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond9.png", "/Users/stephenray/CodeProjects/Catrun/assets/sprites/biomes/grassland/pond10.png"]
@@ -164,25 +166,57 @@ collect_experience = 1
 harvest_experience = 1.5
 
 class Liquid(pygame.sprite.Sprite):
-    def __init__(self, image, x, y, size):
+    def __init__(self, image, x, y, size, animation_frames=None):
         super().__init__()
-        self.image = pygame.transform.scale(
-            pygame.image.load(image).convert_alpha(), size
-        )
+        self.size = size
+        self.animation_frames = []
+        
+        if animation_frames:
+            for frame_path in animation_frames:
+                frame = pygame.transform.scale(
+                    pygame.image.load(frame_path).convert_alpha(), size
+                )
+                self.animation_frames.append(frame)
+        else:
+            single_image = pygame.transform.scale(
+                pygame.image.load(image).convert_alpha(), size
+            )
+            self.animation_frames.append(single_image)
+        
+        self.current_frame = 0
+        self.animation_timer = 0.0
+        self.animation_speed = 0.1
+        
+        self.image = self.animation_frames[0]
         self.rect = self.image.get_rect(topleft=(x, y))
         self.destroyed = False
         self.resource = []
+        self.mask = pygame.mask.from_surface(self.image)
+
+
+    def update_animation(self, dt):
+        if len(self.animation_frames) > 1:
+            self.animation_timer += dt / 2
+            if self.animation_timer >= self.animation_speed:
+                self.animation_timer = 0.0
+                self.current_frame = (self.current_frame + 1) % len(self.animation_frames)
+                self.image = self.animation_frames[self.current_frame]
+                self.mask = pygame.mask.from_surface(self.image)
 
     def draw(self, screen, cam_x):
         screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
     
     def get_collision_rect(self, cam_x):
-        return pygame.Rect(
-            self.rect.x - cam_x + 10,
-            self.rect.y + (self.rect.height * .22),
-            self.rect.width - 20,
-            self.rect.height - 50
-        )
+        mask_rect = self.mask.get_bounding_rects()
+        if mask_rect:
+            pixel_rect = mask_rect[0]
+            return pygame.Rect(
+                self.rect.x + pixel_rect.x - cam_x,
+                self.rect.y + pixel_rect.y - 40,
+                pixel_rect.width,
+                pixel_rect.height
+            )
+        return self.rect.copy()
     
     def collect(self, player=None):
         if not self.destroyed:
@@ -197,12 +231,73 @@ class Liquid(pygame.sprite.Sprite):
         return []
     
 class Pond(Liquid):
-    def __init__(self):
+    def __init__(self, x, y):
+        random_x = random.randint(160, 250)
+        random_y = random.randint(100, 140)
+        super().__init__(pond_images[0], x, y, (random_x, random_y), animation_frames=pond_images)
+        self.resource = "Water"
         self.resource_amount = 100
+        self.liquid_type = "water"
+    
+    def collect_from_pond(self, player=None, container_item=None):
+        """Collect water from pond if holding a container"""
+        if not self.destroyed and container_item:
+            from inventory import items_list
+            
+            container_name = container_item.get("item_name", "")
+            item_def = None
+            for item in items_list:
+                if item.get("item_name") == container_name:
+                    item_def = item
+                    break
+            
+            if item_def and "container" in item_def.get("tags", []):
+                resource_collected = min(self.resource_amount, 1)
+                self.resource_amount -= resource_collected
+                
+                if self.resource_amount <= 0:
+                    self.destroyed = True
+                
+                if container_name == "Wooden Cup":
+                    return ["Small Water"] * resource_collected
+                elif container_name == "Glass Bottle":
+                    return ["Medium Glass Water"] * resource_collected
+                elif container_name == "Metal Bucket":
+                    return ["Waterbucket"] * resource_collected
+                elif container_name == "Large Metal Canteen":
+                    return ["Large Metal Water"] * resource_collected
+        return []
 
 class Lavapond(Liquid):
-    def __init__(self):
+    def __init__(self, x, y):
+        random_x = random.randint(200, 300)
+        random_y = random.randint(140, 180)
+        super().__init__(lava_pond_images[0], x, y, (random_x, random_y), animation_frames=lava_pond_images)
+        self.resource = "Lavabucket"
         self.resource_amount = 100
+        self.liquid_type = "lava"
+    
+    def collect_from_lava(self, player=None, container_item=None):
+        """Collect lava from lavapond if holding a metal container"""
+        if not self.destroyed and container_item:
+            from inventory import items_list
+            
+            container_name = container_item.get("item_name", "")
+            item_def = None
+            for item in items_list:
+                if item.get("item_name") == container_name:
+                    item_def = item
+                    break
+            
+            if item_def and "metal_container" in item_def.get("tags", []):
+                resource_collected = min(self.resource_amount, 1)
+                self.resource_amount -= resource_collected
+                
+                if self.resource_amount <= 0:
+                    self.destroyed = True
+                
+                return ["Lavabucket"] * resource_collected
+        return []
 
 
 
@@ -1096,7 +1191,7 @@ for tile_x, tile_image in tiles:
 
 
 def generate_world():
-    global rocks, dead_bushes, grasses, stones, boulders, berry_bushes, trees, sticks, savannah_grasses, mushrooms, fruit_plants, ferns
+    global rocks, dead_bushes, grasses, stones, boulders, berry_bushes, trees, sticks, savannah_grasses, mushrooms, fruit_plants, ferns, ponds, lavas
     
     rocks.clear()
     dead_bushes.clear()
@@ -1110,6 +1205,8 @@ def generate_world():
     mushrooms.clear()
     fruit_plants.clear()
     ferns.clear()
+    ponds.clear()
+    lavas.clear()
 
     for _ in range(num_rocks):
         tile_x, tile_image = random.choice(weighted_rock_tiles)
@@ -1216,5 +1313,16 @@ def generate_world():
             y = random.randint(0, height - 64)
             ferns.append(Fern(x, y, fern_data[1]))
     
+    for _ in range(num_ponds):
+        x = random.randint(0, 512000)
+        y = random.randint(0, height - 128)
+        ponds.append(Pond(x, y))
     
-    return rocks, boulders, berry_bushes, trees, sticks, stones, grasses, savannah_grasses, mushrooms, dead_bushes, fruit_plants, ferns
+    lavastone_start = 180 * BACKGROUND_SIZE
+    lavastone_end = 216 * BACKGROUND_SIZE
+    for _ in range(num_lavaponds):
+        x = random.randint(int(lavastone_start), int(lavastone_end - 128))
+        y = random.randint(0, height - 128)
+        lavas.append(Lavapond(x, y))
+    
+    return rocks, boulders, berry_bushes, trees, sticks, stones, grasses, savannah_grasses, mushrooms, dead_bushes, fruit_plants, ferns, ponds, lavas

@@ -15,7 +15,7 @@ num_brown_bears = 30
 
 num_crawlers = 50
 num_pocks = 50
-num_duskwretches = 40
+num_duskwretches = 100
 
 
 allowed_squirrel_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_snow, bg_wasteland]
