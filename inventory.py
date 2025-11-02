@@ -1,6 +1,8 @@
 import pygame
+import random
 from mob_placement import player
 from buttons import inventory_tab, crafting_tab, level_up_tab, cats_tab, inventory_tab_unused, crafting_tab_unused, level_up_tab_unused, cats_tab_unused
+from sounds import sound_manager
 
 
 hotbar_image = pygame.image.load("assets/sprites/buttons/hotbar.png").convert_alpha()
@@ -2237,15 +2239,185 @@ items_list = [
         "crafting_medium": "gameplay",
         "tags": ["liquid", "lava", "material"],
         "output_amount": 1
+    },
+    # Tamed Cats - one item for each cat type
+    {
+        "item_name": "Tamed Black Cat",
+        "icon": "assets/sprites/mobs/BlackCatRightStanding.png",
+        "stack_size": 1,
+        "weight": 5,
+        "type": "pet",
+        "description": "A tamed black cat companion. Loyal and ready to fight.",
+        "use_effect": None,
+        "placeable": True,
+        "consumable": False,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": None,
+        "tags": ["pet", "tamed_cat"],
+        "output_amount": 1,
+        "cat_object": None,
+        "cat_type": "black"
+    },
+    {
+        "item_name": "Tamed Salt and Pepper Cat",
+        "icon": "assets/sprites/mobs/SandPCatRightStanding.png",
+        "stack_size": 1,
+        "weight": 5,
+        "type": "pet",
+        "description": "A tamed salt and pepper cat companion. Loyal and ready to fight.",
+        "use_effect": None,
+        "placeable": True,
+        "consumable": False,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": None,
+        "tags": ["pet", "tamed_cat"],
+        "output_amount": 1,
+        "cat_object": None,
+        "cat_type": "salt_and_pepper"
+    },
+    {
+        "item_name": "Tamed White Cat",
+        "icon": "assets/sprites/mobs/WhiteCatRightStanding.png",
+        "stack_size": 1,
+        "weight": 5,
+        "type": "pet",
+        "description": "A tamed white cat companion. Loyal and ready to fight.",
+        "use_effect": None,
+        "placeable": True,
+        "consumable": False,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": None,
+        "tags": ["pet", "tamed_cat"],
+        "output_amount": 1,
+        "cat_object": None,
+        "cat_type": "white"
+    },
+    {
+        "item_name": "Tamed Black and White Cat",
+        "icon": "assets/sprites/mobs/WandBCatRightStanding.png",
+        "stack_size": 1,
+        "weight": 5,
+        "type": "pet",
+        "description": "A tamed black and white cat companion. Loyal and ready to fight.",
+        "use_effect": None,
+        "placeable": True,
+        "consumable": False,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": None,
+        "tags": ["pet", "tamed_cat"],
+        "output_amount": 1,
+        "cat_object": None,
+        "cat_type": "white_and_black"
+    },
+    {
+        "item_name": "Tamed Sandy Cat",
+        "icon": "assets/sprites/mobs/SandyCatRightStanding.png",
+        "stack_size": 1,
+        "weight": 5,
+        "type": "pet",
+        "description": "A tamed sandy cat companion. Loyal and ready to fight.",
+        "use_effect": None,
+        "placeable": True,
+        "consumable": False,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": None,
+        "tags": ["pet", "tamed_cat"],
+        "output_amount": 1,
+        "cat_object": None,
+        "cat_type": "sandy"
+    },
+    {
+        "item_name": "Tamed Orange Cat",
+        "icon": "assets/sprites/mobs/OrangeCatRightStanding.png",
+        "stack_size": 1,
+        "weight": 5,
+        "type": "pet",
+        "description": "A tamed orange cat companion. Loyal and ready to fight.",
+        "use_effect": None,
+        "placeable": True,
+        "consumable": False,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": None,
+        "tags": ["pet", "tamed_cat"],
+        "output_amount": 1,
+        "cat_object": None,
+        "cat_type": "orange"
+    },
+    {
+        "item_name": "Tamed Calico Cat",
+        "icon": "assets/sprites/mobs/CalicoCatRightStanding.png",
+        "stack_size": 1,
+        "weight": 5,
+        "type": "pet",
+        "description": "A tamed calico cat companion. Loyal and ready to fight.",
+        "use_effect": None,
+        "placeable": True,
+        "consumable": False,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": None,
+        "tags": ["pet", "tamed_cat"],
+        "output_amount": 1,
+        "cat_object": None,
+        "cat_type": "calico"
+    },
+    {
+        "item_name": "Tamed Gray Cat",
+        "icon": "assets/sprites/mobs/GrayCatRightStanding.png",
+        "stack_size": 1,
+        "weight": 5,
+        "type": "pet",
+        "description": "A tamed gray cat companion. Loyal and ready to fight.",
+        "use_effect": None,
+        "placeable": True,
+        "consumable": False,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": None,
+        "tags": ["pet", "tamed_cat"],
+        "output_amount": 1,
+        "cat_object": None,
+        "cat_type": "gray"
+    },
+    {
+        "item_name": "Tamed Orange and White Cat",
+        "icon": "assets/sprites/mobs/WandOCatRightStanding.png",
+        "stack_size": 1,
+        "weight": 5,
+        "type": "pet",
+        "description": "A tamed orange and white cat companion. Loyal and ready to fight.",
+        "use_effect": None,
+        "placeable": True,
+        "consumable": False,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": None,
+        "tags": ["pet", "tamed_cat"],
+        "output_amount": 1,
+        "cat_object": None,
+        "cat_type": "white_and_orange"
     }
 
 ]
 
 for item in items_list:
-    item["image"] = pygame.transform.scale(
-        pygame.image.load(f"{image_path}/{item['icon']}").convert_alpha(),
-        (60, 60)
-    )
+    # Handle tamed cat icons from mobs folder
+    if "cat_type" in item:
+        item["image"] = pygame.transform.scale(
+            pygame.image.load(item['icon']).convert_alpha(),
+            (60, 60)
+        )
+    else:
+        item["image"] = pygame.transform.scale(
+            pygame.image.load(f"{image_path}/{item['icon']}").convert_alpha(),
+            (60, 60)
+        )
 
 class Inventory():
     def __init__(self, capacity):
@@ -2690,6 +2862,9 @@ class Inventory():
         
         self.add({item["item_name"]: item["output_amount"]})
         
+        # Play random hammer_wood sound
+        sound_manager.play_sound(random.choice([f"hammer_wood{i}" for i in range(1, 4)]))
+        
         return True
 
     def add(self, resource):
@@ -3076,5 +3251,56 @@ class Inventory():
             player.stamina = player.max_stamina
         if player.thirst > player.max_thirst:
             player.thirst = player.max_thirst
+    
+    def place_cat(self, cam_x=0):
+        """Place a tamed cat from inventory into the world at player position."""
+        # Determine which slot to use
+        if self.selection_mode == "hotbar":
+            slot_index = self.selected_hotbar_slot
+            slot = self.hotbar_slots[slot_index]
+            is_hotbar = True
+        elif self.selection_mode == "inventory":
+            if self.selected_inventory_slot is None:
+                return None
+            slot_index = self.selected_inventory_slot
+            slot = self.inventory_list[slot_index]
+            is_hotbar = False
+        else:
+            return None
+        
+        # Check if slot has a tamed cat (check for cat_type field which all tamed cat items have)
+        if slot is None or "cat_type" not in slot:
+            return None
+        
+        # Get the cat object
+        cat = slot.get("cat_object")
+        if cat is None:
+            return None
+        
+        # Place the cat near the player (using world coordinates)
+        # player.rect is in screen coordinates, so we add cam_x to get world coordinates
+        from mob_placement import player
+        cat.rect.centerx = player.rect.centerx + cam_x + 50
+        cat.rect.centery = player.rect.centery
+        
+        # Restore cat data from inventory
+        if "cat_name" in slot:
+            cat.cat_name = slot["cat_name"]
+        if "cat_health" in slot:
+            cat.health = slot["cat_health"]
+        if "cat_tame" in slot:
+            cat.tame = slot["cat_tame"]
+        if "cat_level" in slot:
+            cat.level = slot["cat_level"]
+        
+        # Remove the item from inventory
+        slot["quantity"] -= 1
+        if slot["quantity"] <= 0:
+            if is_hotbar:
+                self.hotbar_slots[slot_index] = None
+            else:
+                self.inventory_list[slot_index] = None
+        
+        return cat
 
 inventory = Inventory(64)

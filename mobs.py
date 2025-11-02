@@ -974,9 +974,16 @@ class Cat(Mob):
 
         self.last_direction = "right" 
 
-        self.tame_max = 100
+        self.tame_max = 100 * (1 + (self.level * 0.05))
         self.tame = 0
         self.tamed = False
+        self.just_tamed = False
+        self.cat_name = None
+        self.poison = False
+        self.poison_time = 0
+        self.poison_strength = 0
+        self.poison_damage_timer = 0
+        self.poison_damage_rate = 1.5
         self.death_experience = 200  * (1 + (self.level * self.death_experience * .0001))
         self.level = 1
         self.tamed_boost = 1.1
@@ -985,6 +992,7 @@ class Cat(Mob):
 
         self.full_health = 100 + (random.randint(5, 7) * self.level) * self.tamed_boost
         self.health = self.full_health
+        self.max_health = self.full_health
         self.max_hunger = 100
         self.hunger = 100
         self.base_speed = 160
@@ -992,15 +1000,212 @@ class Cat(Mob):
 
         self.dead_cat_right_image = pygame.image.load(self.cat_type["dead_image"]).convert_alpha()
         self.dead_cat_left_image = pygame.transform.flip(self.dead_cat_right_image, True, False)
+        
+        # Taming bar display
+        self.tame_bar_timer = 0
+        self.tame_bar_display_time = 2.0  # Show bar for 2 seconds after feeding
+        
+        # Tamed cat behaviors
+        self.follow_player = True
+        self.sit = False
+        self.wander = False
+        self.passive = False
+        self.follow_radius = 200  # Cats must stay within 500px of player
+        self.target_enemy = None  # Enemy cat is attacking
 
     def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
         super().update(dt, player, nearby_objects, nearby_mobs)
+        
+        # Update taming bar timer
+        if self.tame_bar_timer > 0:
+            self.tame_bar_timer -= dt
+        
+        # Tamed cat behavior - follow player and combat support
+        if self.tamed and player and self.follow_player:
+            dx = player.rect.centerx - self.rect.centerx
+            dy = player.rect.centery - self.rect.centery
+            distance = (dx**2 + dy**2) ** 0.5
+            
+            # Follow player if too far away
+            if distance > self.follow_radius:
+                if distance > 0:
+                    direction = pygame.Vector2(dx, dy).normalize()
+                    self.speed = 1.3  # Move faster when following
+                else:
+                    direction = pygame.Vector2(0, 0)
+                    self.speed = 1.0
+                self.direction = direction
+            else:
+                # Maintain position, slow wander if not in combat
+                if self.wander and not self.target_enemy:
+                    if self.move_timer <= 0:
+                        self.direction = pygame.Vector2(random.choice([(-1, 0), (1, 0), (0, -1), (0, 1)]))
+                        self.move_timer = random.randint(60, 180)
+                        self.speed = 0.7
+                    self.move_timer -= 1
+                else:
+                    self.direction = pygame.Vector2(0, 0)
+                    self.speed = 1.0
+            
+            # Target enemies that are attacking the player or that player is attacking
+            if nearby_mobs:
+                for mob in nearby_mobs:
+                    # Attack if mob is attacking player or if player is attacking mob
+                    if mob != self and mob.is_alive:
+                        if hasattr(mob, 'target') and mob.target == player:
+                            # This mob is attacking the player
+                            self.target_enemy = mob
+                            break
+                        elif hasattr(player, 'attacking_target') and player.attacking_target == mob:
+                            # Player is attacking this mob
+                            self.target_enemy = mob
+                            break
+            
+            # Attack target enemy if exists
+            if self.target_enemy and self.target_enemy.is_alive:
+                enemy_dx = self.target_enemy.rect.centerx - self.rect.centerx
+                enemy_dy = self.target_enemy.rect.centery - self.rect.centery
+                enemy_distance = (enemy_dx**2 + enemy_dy**2) ** 0.5
+                
+                # Move toward enemy if not in attack range
+                if enemy_distance > 50:
+                    if enemy_distance > 0:
+                        enemy_direction = pygame.Vector2(enemy_dx, enemy_dy).normalize()
+                        self.direction = enemy_direction
+                        self.speed = 1.2
+                    self.move_timer = 0
+                else:
+                    # Attack the enemy
+                    self.attacking = True
+                    self.attack_cooldown = 0.5
+            else:
+                # Clear target if it's dead or none found
+                if self.target_enemy and not self.target_enemy.is_alive:
+                    self.target_enemy = None
 
         if not self.is_alive:
             if self.last_direction == "right":
                 self.image = self.dead_cat_right_image
             else:
                 self.image = self.dead_cat_left_image
+
+    def feed_cat(self, item_name):
+        """Feed the cat with food item. Returns the tame increase amount."""
+        tame_increase = 0
+        health_increase = 0
+        
+        # Raw meats - +20 tame, +15 health
+        if item_name in ["Fish", "Raw Venison", "Gila Meat", "Raw Beef", "Raw Chicken"]:
+            tame_increase = 100
+            health_increase = 15
+        # Cooked meats - +10 tame, +20 health
+        elif item_name in ["Cooked Fish", "Cooked Venison", "Cooked Gila Meat", "Cooked Beef", "Cooked Chicken"]:
+            tame_increase = 5
+            health_increase = 20
+        # Milk - +30 tame, +25 health
+        elif item_name =="Small Milk":
+            tame_increase = 30
+            health_increase = 25
+        elif item_name == "Medium Glass Milk":
+            tame_increase = 60
+            health_increase = 50
+        elif item_name == "Large Metal Milk":
+            tame_increase = 150
+            health_increase = 100
+        # Poisonous Mushroom - same as player (poison)
+        elif item_name == "Poisonous Mushroom":
+            self.poison = True
+            self.poison_time = 30
+            self.poison_strength = 1
+            return 0
+        # Other normal foods - +1 tame, +5 health
+        elif item_name in ["Apples", "Oranges", "Coconuts", "Mushroom", "Blood Berries", "Dawn Berries", "Dusk Berries", "Sun Berries", "Teal Berries", "Twilight Drupes", "Vio Berries"]:
+            tame_increase = 1
+            health_increase = 5
+        
+        # Apply tame increase and health increase
+        if tame_increase > 0:
+            self.tame = min(self.tame + tame_increase, self.tame_max)
+            # Increase health when feeding
+            self.health = min(self.health + health_increase, self.max_health)
+            
+            # Check if just became tamed
+            if self.tame >= self.tame_max and not self.tamed:
+                self.tamed = True
+                self.just_tamed = True
+            
+            # Play cat purr sound
+            sound_manager.play_sound(random.choice(["cat_purr1", "cat_purr2"]))
+            # Show taming bar
+            self.tame_bar_timer = self.tame_bar_display_time
+        
+        return tame_increase
+    
+    def draw_tame_bar(self, screen, cam_x):
+        """Draw the taming bar above the cat."""
+        if self.tame_bar_timer <= 0:
+            return
+        
+        bar_width = 50
+        bar_height = 8
+        x = self.rect.centerx - cam_x - bar_width // 2
+        y = self.rect.top + 5
+        
+        # Draw background (dark purple)
+        pygame.draw.rect(screen, (60, 20, 60), pygame.Rect(x, y, bar_width, bar_height), border_radius=2)
+        
+        # Draw taming progress (bright purple)
+        tame_ratio = self.tame / self.tame_max
+        tame_width = int(bar_width * tame_ratio)
+        pygame.draw.rect(screen, (200, 100, 200), pygame.Rect(x, y, tame_width, bar_height), border_radius=2)
+        
+        # Draw border
+        pygame.draw.rect(screen, (255, 255, 255), pygame.Rect(x, y, bar_width, bar_height), width=1, border_radius=2)
+    
+    def draw_cat_name(self, screen, cam_x):
+        """Draw the cat's name above its head if it has one."""
+        
+        font = pygame.font.SysFont(None, 24)
+        name_text = font.render(self.cat_name, True, (255, 255, 200))
+        text_x = self.rect.centerx - cam_x - name_text.get_width() // 2
+        text_y = self.rect.top + 5
+        screen.blit(name_text, (text_x, text_y))
+    
+    def draw(self, screen, cam_x):
+
+        self.draw_tame_bar(screen, cam_x)
+        self.draw_cat_name(screen, cam_x)
+        super().draw(screen, cam_x)
+
+    def get_item_data(self):
+        """Create inventory item data for this cat."""
+        cat_type = self.cat_type["type"]
+        
+        # Map cat type to item name
+        cat_type_to_item_name = {
+            "black": "Tamed Black Cat",
+            "salt_and_pepper": "Tamed Salt and Pepper Cat",
+            "white": "Tamed White Cat",
+            "white_and_black": "Tamed Black and White Cat",
+            "sandy": "Tamed Sandy Cat",
+            "orange": "Tamed Orange Cat",
+            "calico": "Tamed Calico Cat",
+            "gray": "Tamed Gray Cat",
+            "white_and_orange": "Tamed Orange and White Cat"
+        }
+        
+        item_name = cat_type_to_item_name.get(cat_type, "Tamed Black Cat")
+        
+        return {
+            "item_name": item_name,
+            "quantity": 1,
+            "cat_object": self,
+            "cat_type": cat_type,
+            "cat_tame": self.tame,
+            "cat_health": self.health,
+            "cat_level": self.level,
+            "cat_name": self.cat_name
+        }
 
 
 class Squirrel(Mob):

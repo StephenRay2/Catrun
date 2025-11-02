@@ -25,6 +25,10 @@ player_world_y = player_pos.y
 
 collection_messages = []
 
+# Cat naming system
+naming_cat = None  # The cat that needs to be named
+cat_name_input = ""  # The name being typed
+
 paused = False
 inventory_in_use = False
 
@@ -306,18 +310,53 @@ while running:
                 running = False
 
             if event.type == pygame.KEYDOWN:
+                # Handle cat naming input
+                if naming_cat is not None:
+                    if event.key == pygame.K_RETURN:
+                        # Confirm name
+                        if cat_name_input.strip():
+                            naming_cat.cat_name = cat_name_input.strip()
+                        naming_cat = None
+                        cat_name_input = ""
+                    elif event.key == pygame.K_BACKSPACE:
+                        cat_name_input = cat_name_input[:-1]
+                    elif event.unicode.isprintable() and len(cat_name_input) < 20:
+                        cat_name_input += event.unicode
+                    continue  # Skip other key handlers while naming
+                
                 if event.key == pygame.K_ESCAPE and not inventory_in_use:
                     paused = not paused
                 
                 inventory.handle_keydown_hotbar(event, screen=None, use_on_press=False)
                 
                 if event.key == pygame.K_f and player.is_alive:
-                    success, tags = inventory.consume_item()
-                    if success:
-                        if "food" in tags:
-                            sound_manager.play_sound(random.choice([f"consume_item{i}" for i in range(1, 7)]))
-                        elif any(tag in tags for tag in ["liquid", "consumable"]):
-                            sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
+                    # Check if selected item is a tamed cat
+                    selected_slot = None
+                    is_hotbar = False
+                    if inventory.selection_mode == "hotbar":
+                        selected_slot = inventory.hotbar_slots[inventory.selected_hotbar_slot]
+                        is_hotbar = True
+                    elif inventory.selection_mode == "inventory" and inventory.selected_inventory_slot is not None:
+                        selected_slot = inventory.inventory_list[inventory.selected_inventory_slot]
+                    
+                    # Check if the selected item is any type of tamed cat
+                    is_tamed_cat = selected_slot and "cat_type" in selected_slot
+                    
+                    if is_tamed_cat:
+                        # Place the cat
+                        cat = inventory.place_cat(cam_x)
+                        if cat:
+                            # Add cat back to source list (cats list)
+                            cats.append(cat)
+                            sound_manager.play_sound(random.choice(["cat_meow1", "cat_meow2", "cat_meow3"]))
+                    else:
+                        # Consume regular items
+                        success, tags = inventory.consume_item()
+                        if success:
+                            if "food" in tags:
+                                sound_manager.play_sound(random.choice([f"consume_item{i}" for i in range(1, 7)]))
+                            elif any(tag in tags for tag in ["liquid", "consumable"]):
+                                sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
 
                 if event.key == pygame.K_q:
                     inventory_in_use = not inventory_in_use
@@ -346,7 +385,8 @@ while running:
                         inventory.handle_crafting_click(mouse_pos, crafting_time)
                     else:
                         inventory.handle_selection_click(mouse_pos, screen)
-                        inventory.start_drag(slot_index, is_hotbar)
+                        if slot_index is not None:
+                            inventory.start_drag(slot_index, is_hotbar)
 
             if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                 if inventory.dragging:
@@ -358,6 +398,62 @@ while running:
                     else:
                         inventory.cancel_drag()
 
+            # Mouse wheel scrolling to switch hotbar slots
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+                if event.button == 4:  # Scroll up
+                    inventory.selected_hotbar_slot = (inventory.selected_hotbar_slot - 1) % inventory.hotbar_size
+                elif event.button == 5:  # Scroll down
+                    inventory.selected_hotbar_slot = (inventory.selected_hotbar_slot + 1) % inventory.hotbar_size
+                inventory.selection_mode = "hotbar"
+
+            # Right-click to pick up tamed cats
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+                if player.is_alive and not inventory_in_use:
+                    # Check for nearby tamed cats to pick up
+                    for mob in nearby_mobs:
+                        if mob.__class__.__name__ != "Cat":
+                            continue
+                        if not mob.tamed or not mob.is_alive:
+                            continue
+                        
+                        mob_collision = mob.rect
+                        horizontal_dist = abs(mob_collision.centerx - player_world_x)
+                        vertical_dist = abs(mob_collision.centery - player_world_y)
+                        pickup_radius = 100  # Pickup range for right-click
+                        
+                        if horizontal_dist < pickup_radius and vertical_dist < pickup_radius:
+                            # Pick up the cat
+                            cat_item = mob.get_item_data()
+                            if inventory.add([cat_item["item_name"]]):
+                                # Store the cat object in the inventory slot
+                                # Find the slot where the cat was added
+                                item_name = cat_item["item_name"]
+                                for slot in inventory.inventory_list:
+                                    if slot is not None and slot.get("item_name") == item_name and slot.get("cat_object") is None:
+                                        slot["cat_object"] = mob
+                                        slot["cat_type"] = cat_item.get("cat_type")
+                                        slot["cat_tame"] = cat_item.get("cat_tame")
+                                        slot["cat_health"] = cat_item.get("cat_health")
+                                        slot["cat_level"] = cat_item.get("cat_level")
+                                        slot["cat_name"] = cat_item.get("cat_name")
+                                        break
+                                # Also check hotbar
+                                for slot in inventory.hotbar_slots:
+                                    if slot is not None and slot.get("item_name") == item_name and slot.get("cat_object") is None:
+                                        slot["cat_object"] = mob
+                                        slot["cat_type"] = cat_item.get("cat_type")
+                                        slot["cat_tame"] = cat_item.get("cat_tame")
+                                        slot["cat_health"] = cat_item.get("cat_health")
+                                        slot["cat_level"] = cat_item.get("cat_level")
+                                        slot["cat_name"] = cat_item.get("cat_name")
+                                        break
+                                
+                                # Remove from world - remove from source list based on mob type
+                                if isinstance(mob, Cat) and mob in cats:
+                                    cats.remove(mob)
+                                
+                                sound_manager.play_sound(random.choice(["cat_meow1", "cat_meow2", "cat_meow3"]))
+                                break  # Only pick up one cat per right-click
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
                 for obj in visible_objects:
@@ -514,7 +610,7 @@ while running:
                     state = "menu"
                     paused = False
     
-        if not paused and not inventory_in_use and pygame.mouse.get_pressed()[0] and not player.exhausted:
+        if not paused and not inventory_in_use and naming_cat is None and pygame.mouse.get_pressed()[0] and not player.exhausted:
             if current_time - harvest_cooldown > harvest_delay:
                 for obj in visible_objects:
                     if hasattr(obj, 'harvest') and hasattr(obj, 'destroyed') and not obj.destroyed:
@@ -601,6 +697,7 @@ while running:
         all_objects_no_liquids = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants
         all_objects = all_objects_no_liquids + ponds + lavas
         mobs = cats + squirrels + cows + chickens + crawlers + duskwretches + pocks + deers + black_bears + brown_bears + gilas + crows
+        all_mobs = mobs  # Reference to all mobs for inventory pickup/placement
 
         visible_collectibles = [col for col in collectibles if col.rect.x- cam_x > -256 and col.rect.x - cam_x < width + 256]
         visible_liquids = [obj for obj in (ponds + lavas) if obj.rect.x - cam_x > -256 and obj.rect.x - cam_x < width + 256 and obj.rect.y > -256 and obj.rect.y < height + 256]
@@ -776,6 +873,51 @@ while running:
                                 
                                 collect_cooldown = current_time
                                 break
+                
+                # Try to feed cats
+                for mob in nearby_mobs:
+                    if mob.__class__.__name__ == "Cat" and not mob.is_alive:
+                        continue
+                    if mob.__class__.__name__ != "Cat":
+                        continue
+                    
+                    mob_collision = mob.rect
+                    horizontal_dist = abs(mob_collision.centerx - player_world_x)
+                    vertical_dist = abs(mob_collision.centery - player_world_y)
+                    feed_reach = 40
+                    horizontal_range = (mob_collision.width / 2) + feed_reach
+                    vertical_range = (mob_collision.height / 2) + feed_reach
+                    facing_mob = False
+                    
+                    if player.last_direction == "right" and mob_collision.centerx > player_world_x - 10 and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                        facing_mob = True
+                    elif player.last_direction == "left" and mob_collision.centerx < player_world_x + 10 and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                        facing_mob = True
+                    elif player.last_direction == "up" and mob_collision.centery < player_world_y + 10 and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                        facing_mob = True
+                    elif player.last_direction == "down" and mob_collision.centery > player_world_y - 10 and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                        facing_mob = True
+                    
+                    if facing_mob:
+                        # Get current hotbar item
+                        current_slot = inventory.hotbar_slots[inventory.selected_hotbar_slot]
+                        if current_slot is not None:
+                            item_name = current_slot["item_name"]
+                            # Feed the cat
+                            tame_increase = mob.feed_cat(item_name)
+                            if tame_increase > 0 or item_name == "Poisonous Mushroom":
+                                # Check if cat was just tamed
+                                if hasattr(mob, 'just_tamed') and mob.just_tamed and naming_cat is None:
+                                    naming_cat = mob
+                                    cat_name_input = ""
+                                    mob.just_tamed = False
+                                
+                                # Remove item from hotbar
+                                current_slot["quantity"] -= 1
+                                if current_slot["quantity"] <= 0:
+                                    inventory.hotbar_slots[inventory.selected_hotbar_slot] = None
+                                collect_cooldown = current_time
+                                break
 
             for bush in berry_bushes:
                 bush.update(dt)
@@ -914,7 +1056,7 @@ while running:
             if not in_liquid:
                 player.exit_liquid()
 
-            if not inventory_in_use:
+            if not inventory_in_use and naming_cat is None:
 
                 if (((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]) and (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT])) or pygame.mouse.get_pressed()[0]) and not player.exhausted:
                     if player.lose_stamina(screen, dt):
@@ -1217,17 +1359,54 @@ while running:
         screen.blit(temp_surface, (depth_rect.x, depth_rect.y))
         screen.blit(depth_text, (depth_rect.x + 5, depth_rect.y + 5))
 
+        if not paused and not inventory_in_use and naming_cat is None:
+            if keys[pygame.K_o]:
+                dungeon_depth -= 500
+                absolute_cam_x -= 500
+                player_pos.x = width / 2
 
-        if keys[pygame.K_o]:
-            dungeon_depth -= 500
-            absolute_cam_x -= 500
-            player_pos.x = width / 2
+            if keys[pygame.K_p]:
+                dungeon_depth += 500
+                absolute_cam_x += 500
+                player_pos.x = width / 2
 
-        if keys[pygame.K_p]:
-            dungeon_depth += 500
-            absolute_cam_x += 500
-            player_pos.x = width / 2
-
+        # Draw cat naming prompt
+        if naming_cat is not None:
+            # Semi-transparent overlay
+            overlay = pygame.Surface((width, height), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 150))
+            screen.blit(overlay, (0, 0))
+            
+            # Naming box
+            box_width = 400
+            box_height = 150
+            box_x = width // 2 - box_width // 2
+            box_y = height // 2 - box_height // 2
+            
+            # Draw box background
+            pygame.draw.rect(screen, (40, 40, 60), pygame.Rect(box_x, box_y, box_width, box_height), border_radius=10)
+            # Draw border
+            pygame.draw.rect(screen, (200, 150, 100), pygame.Rect(box_x, box_y, box_width, box_height), width=3, border_radius=10)
+            
+            # Draw text
+            title_font = pygame.font.SysFont(None, 28)
+            input_font = pygame.font.SysFont(None, 24)
+            
+            title_text = title_font.render("Enter Cat's Name:", True, (255, 255, 200))
+            title_rect = title_text.get_rect(center=(width // 2, box_y + 30))
+            screen.blit(title_text, title_rect)
+            
+            # Draw input text with cursor
+            input_display = cat_name_input + "|"
+            input_text = input_font.render(input_display, True, (200, 200, 255))
+            input_rect = input_text.get_rect(center=(width // 2, box_y + 70))
+            screen.blit(input_text, input_rect)
+            
+            # Draw instruction text
+            instruction_font = pygame.font.SysFont(None, 20)
+            instruction_text = instruction_font.render("Press ENTER to confirm or BACKSPACE to delete", True, (200, 200, 200))
+            instruction_rect = instruction_text.get_rect(center=(width // 2, box_y + 120))
+            screen.blit(instruction_text, instruction_rect)
 
         pygame.display.flip()
         dt = clock.tick(60) / 1000
