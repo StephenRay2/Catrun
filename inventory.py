@@ -6,7 +6,7 @@ from sounds import sound_manager
 
 
 hotbar_image = pygame.image.load("assets/sprites/buttons/hotbar.png").convert_alpha()
-hotbar_image = pygame.transform.scale(hotbar_image, (686, 74))
+hotbar_image = pygame.transform.scale(hotbar_image, (514, 55))
 player_inventory_image = pygame.image.load("assets/sprites/player/CharacterCorynnFrontStanding.png")
 player_inventory_image = pygame.transform.scale(player_inventory_image, (500, 500))
 
@@ -2409,11 +2409,23 @@ items_list = [
 for item in items_list:
     # Handle tamed cat icons from mobs folder
     if "cat_type" in item:
+        # Load hotbar version (45x45)
+        item["image_hotbar"] = pygame.transform.scale(
+            pygame.image.load(item['icon']).convert_alpha(),
+            (45, 45)
+        )
+        # Load inventory version (60x60)
         item["image"] = pygame.transform.scale(
             pygame.image.load(item['icon']).convert_alpha(),
             (60, 60)
         )
     else:
+        # Load hotbar version (45x45)
+        item["image_hotbar"] = pygame.transform.scale(
+            pygame.image.load(f"{image_path}/{item['icon']}").convert_alpha(),
+            (45, 45)
+        )
+        # Load inventory version (60x60)
         item["image"] = pygame.transform.scale(
             pygame.image.load(f"{image_path}/{item['icon']}").convert_alpha(),
             (60, 60)
@@ -2506,23 +2518,22 @@ class Inventory():
 
     def draw_hotbar(self, screen):
         hotbar_x = screen.get_width() // 2 - hotbar_image.get_width() // 2
-        hotbar_y = screen.get_height() - 100
+        hotbar_y = screen.get_height() - 70
         screen.blit(hotbar_image, (hotbar_x, hotbar_y))
-        
-        font = pygame.font.SysFont(None, 20)
-        large_font = pygame.font.SysFont(None, 32, bold=True)
-        first_slot_x = hotbar_x + 6
-        slot_y = hotbar_y + 6
-        slot_spacing = 68
+        slot_size = self.slot_size * .75
+        hotbar_font = pygame.font.SysFont(None, 15)
+        first_slot_x = hotbar_x + 4.5
+        slot_y = hotbar_y + 4.5
+        slot_spacing = 51
         
         for i in range(self.hotbar_size):
             x = first_slot_x + i * slot_spacing
             y = slot_y
             
             if i == self.selected_hotbar_slot and self.selection_mode == "hotbar":
-                highlight_surface = pygame.Surface((self.slot_size + 8, self.slot_size + 8), pygame.SRCALPHA)
-                pygame.draw.rect(highlight_surface, (255, 255, 255, 200), (0, 0, self.slot_size + 8, self.slot_size + 8), 4)
-                screen.blit(highlight_surface, (x - 6, y - 6))
+                highlight_surface = pygame.Surface((slot_size + 6, slot_size + 6), pygame.SRCALPHA)
+                pygame.draw.rect(highlight_surface, (255, 255, 255, 200), (0, 0, slot_size + 6, slot_size + 6), 3)
+                screen.blit(highlight_surface, (x - 4.5, y - 4.5))
                 
             
             slot = self.hotbar_slots[i]
@@ -2532,23 +2543,23 @@ class Inventory():
                 
                 for item in items_list:
                     if item["item_name"] == item_name:
-                        screen.blit(item["image"], (x, y))
+                        screen.blit(item["image_hotbar"], (x, y))  # Use hotbar version
                         
                         stack_weight = round(quantity * item["weight"], 1)
-                        weight_text = font.render(str(stack_weight), True, (250, 250, 20))
-                        weight_x_pos = x + 39
+                        weight_text = hotbar_font.render(str(stack_weight), True, (250, 250, 20))
+                        weight_x_pos = x + 29
                         if stack_weight == int(stack_weight) and stack_weight < 10:
-                            weight_x_pos += 7
-                        screen.blit(weight_text, (weight_x_pos, y + 4))
+                            weight_x_pos += 4
+                        screen.blit(weight_text, (weight_x_pos, y + 3))
                         
                         if quantity > 1:
-                            stack_text = font.render(str(quantity), True, (255, 255, 255))
+                            stack_text = hotbar_font.render(str(quantity), True, (255, 255, 255))
                             if quantity >= 100:
-                                screen.blit(stack_text, (x + 38, y + 44))
+                                screen.blit(stack_text, (x + 28, y + 33))
                             elif quantity > 9:
-                                screen.blit(stack_text, (x + 42, y + 44))
+                                screen.blit(stack_text, (x + 29, y + 33))
                             else:
-                                screen.blit(stack_text, (x + 47, y + 44))
+                                screen.blit(stack_text, (x + 30, y + 33))
                         
                         break
         
@@ -2588,7 +2599,7 @@ class Inventory():
 
                 for item in items_list:
                     if item["item_name"] == item_name:
-                        screen.blit(item["image"], (x, y))
+                        screen.blit(item["image"], (x, y))  # Use inventory version (already 60x60)
                         
                         stack_weight = round(quantity * item["weight"], 1)
                         self.total_inventory_weight += stack_weight
@@ -2926,16 +2937,17 @@ class Inventory():
         mouse_x, mouse_y = mouse_pos
         
         hotbar_x = screen.get_width() // 2 - hotbar_image.get_width() // 2
-        hotbar_y = screen.get_height() - 100
-        first_slot_x = hotbar_x + 6
-        slot_y = hotbar_y + 6
-        slot_spacing = 68
+        hotbar_y = screen.get_height() - 70
+        first_slot_x = hotbar_x + 4.5  # Changed from 3 to match draw_hotbar
+        slot_y = hotbar_y + 4.5  # Changed from 3 to match draw_hotbar
+        slot_spacing = 51  # Changed from 34 to match draw_hotbar
+        slot_size = self.slot_size * 0.75  # Changed from /2 to *0.75 to match draw_hotbar
         
         for i in range(self.hotbar_size):
             x = first_slot_x + i * slot_spacing
             y = slot_y
-            
-            if x <= mouse_x <= x + self.slot_size and y <= mouse_y <= y + self.slot_size:
+
+            if x <= mouse_x <= x + slot_size and y <= mouse_y <= y + slot_size:  # Changed from /2 to use slot_size variable
                 return (i, True)
         
         if self.state == "inventory":
@@ -2951,7 +2963,7 @@ class Inventory():
                 if x <= mouse_x <= x + self.slot_size and y <= mouse_y <= y + self.slot_size:
                     return (slot_index, False)
         
-        return (None, None) 
+        return (None, None)
     
     def handle_crafting_click(self, mouse_pos, current_time):
         import time
@@ -3157,6 +3169,82 @@ class Inventory():
         
         return (None, None)
     
+    def get_selected_item(self):
+        """
+        Get the item data for the currently selected item (from hotbar or inventory).
+        Returns: item data dict or None if no valid item selected
+        """
+        # Determine which slot is selected based on selection mode
+        if self.selection_mode == "hotbar":
+            slot = self.hotbar_slots[self.selected_hotbar_slot]
+        elif self.selection_mode == "inventory":
+            if self.selected_inventory_slot is None:
+                return None
+            slot = self.inventory_list[self.selected_inventory_slot]
+        else:
+            return None
+        
+        # Check if slot has an item
+        if slot is None:
+            return None
+        
+        item_name = slot["item_name"]
+        
+        # Find the item data in items_list
+        for item in items_list:
+            if item["item_name"] == item_name:
+                return item
+        
+        return None
+
+    def throw_item(self):
+        """
+        Remove the currently selected item from inventory for throwing.
+        Does NOT apply the use_effect (unlike consume_item).
+        Returns: (success: bool, tags: list) - True if item removed, and the item's tags
+        """
+        # Determine which slot to throw from based on selection mode
+        if self.selection_mode == "hotbar":
+            slot_index = self.selected_hotbar_slot
+            slot = self.hotbar_slots[slot_index]
+            is_hotbar = True
+        elif self.selection_mode == "inventory":
+            if self.selected_inventory_slot is None:
+                return (False, [])
+            slot_index = self.selected_inventory_slot
+            slot = self.inventory_list[slot_index]
+            is_hotbar = False
+        else:
+            return (False, [])
+        
+        # Check if slot has an item
+        if slot is None:
+            return (False, [])
+        
+        item_name = slot["item_name"]
+        
+        # Find the item data in items_list
+        item_data = None
+        for item in items_list:
+            if item["item_name"] == item_name:
+                item_data = item
+                break
+        
+        if item_data is None:
+            return (False, [])
+        
+        # Reduce quantity by 1
+        slot["quantity"] -= 1
+        
+        # Remove item from slot if quantity reaches 0
+        if slot["quantity"] <= 0:
+            if is_hotbar:
+                self.hotbar_slots[slot_index] = None
+            else:
+                self.inventory_list[slot_index] = None
+        
+        return (True, item_data.get("tags", []))
+
     def consume_item(self):
         """
         Consume the currently selected item (from hotbar or inventory).
@@ -3194,7 +3282,6 @@ class Inventory():
         
         # Check if item is consumable
         if not item_data.get("consumable", False):
-            print(f"{item_name} is not consumable!")
             return (False, [])
         
         # Apply the use_effect to the player
@@ -3280,9 +3367,19 @@ class Inventory():
         # Place the cat near the player (using world coordinates)
         # player.rect is in screen coordinates, so we add cam_x to get world coordinates
         from mob_placement import player
-        cat.rect.centerx = player.rect.centerx + cam_x + 50
-        cat.rect.centery = player.rect.centery
-        
+        if player.last_direction == "right":
+            cat.rect.centerx = player.rect.centerx + cam_x + 50
+            cat.rect.centery = player.rect.centery
+        if player.last_direction == "left":
+            cat.rect.centerx = player.rect.centerx + cam_x - 50
+            cat.rect.centery = player.rect.centery
+        if player.last_direction == "up":
+            cat.rect.centerx = player.rect.centerx + cam_x
+            cat.rect.centery = player.rect.centery - 50
+        if player.last_direction == "down":
+            cat.rect.centerx = player.rect.centerx + cam_x
+            cat.rect.centery = player.rect.centery + 50
+
         # Restore cat data from inventory
         if "cat_name" in slot:
             cat.cat_name = slot["cat_name"]

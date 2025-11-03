@@ -9,8 +9,6 @@ size = 64
 
 ############ PLAYER IMAGES #################
 
-hotbar_image = pygame.image.load("assets/sprites/buttons/hotbar.png").convert_alpha()
-hotbar_image = pygame.transform.scale(hotbar_image, (686, 74))
 
 player_stand_image = pygame.image.load("assets/sprites/player/CharacterCorynnFrontStanding.png")
 player_stand_image_back = pygame.image.load("assets/sprites/player/CharacterCorynnBackStanding.png")
@@ -641,12 +639,13 @@ class Player(pygame.sprite.Sprite):
         screen.blit(text_surface, (text_x, text_y))
 
     def exp_bar(self, screen):
+        from inventory import hotbar_image
         next_level_exp = self.next_level_exp
         experience = self.experience
         bar_width = hotbar_image.get_width()
         bar_height = 5
         x = screen.get_width()//2 - bar_width // 2
-        y = screen.get_height() - 105
+        y = screen.get_height() - 75
 
         experience_ratio = experience / next_level_exp
         experience_width = int(bar_width * experience_ratio)
@@ -1164,13 +1163,13 @@ class Cat(Mob):
     
     def draw_cat_name(self, screen, cam_x):
         """Draw the cat's name above its head if it has one."""
+        if self.cat_name:
+            font = pygame.font.SysFont(None, 20)
+            name_text = font.render(str(self.cat_name) + " Lvl " + str(self.level), True, (255, 255, 200))
+            text_x = self.rect.centerx - cam_x - name_text.get_width() // 2
+            text_y = self.rect.top + 5
+            screen.blit(name_text, (text_x, text_y))
         
-        font = pygame.font.SysFont(None, 24)
-        name_text = font.render(self.cat_name, True, (255, 255, 200))
-        text_x = self.rect.centerx - cam_x - name_text.get_width() // 2
-        text_y = self.rect.top + 5
-        screen.blit(name_text, (text_x, text_y))
-    
     def draw(self, screen, cam_x):
 
         self.draw_tame_bar(screen, cam_x)
@@ -1181,23 +1180,24 @@ class Cat(Mob):
         """Create inventory item data for this cat."""
         cat_type = self.cat_type["type"]
         
-        # Map cat type to item name
-        cat_type_to_item_name = {
-            "black": "Tamed Black Cat",
-            "salt_and_pepper": "Tamed Salt and Pepper Cat",
-            "white": "Tamed White Cat",
-            "white_and_black": "Tamed Black and White Cat",
-            "sandy": "Tamed Sandy Cat",
-            "orange": "Tamed Orange Cat",
-            "calico": "Tamed Calico Cat",
-            "gray": "Tamed Gray Cat",
-            "white_and_orange": "Tamed Orange and White Cat"
+        # Map cat type to item name and icon
+        cat_type_to_mapping = {
+            "black": ("Tamed Black Cat", "assets/sprites/mobs/BlackCatRightStanding.png"),
+            "salt_and_pepper": ("Tamed Salt and Pepper Cat", "assets/sprites/mobs/SandPCatRightStanding.png"),
+            "white": ("Tamed White Cat", "assets/sprites/mobs/WhiteCatRightStanding.png"),
+            "white_and_black": ("Tamed Black and White Cat", "assets/sprites/mobs/WandBCatRightStanding.png"),
+            "sandy": ("Tamed Sandy Cat", "assets/sprites/mobs/SandyCatRightStanding.png"),
+            "orange": ("Tamed Orange Cat", "assets/sprites/mobs/OrangeCatRightStanding.png"),
+            "calico": ("Tamed Calico Cat", "assets/sprites/mobs/CalicoCatRightStanding.png"),
+            "gray": ("Tamed Gray Cat", "assets/sprites/mobs/GrayCatRightStanding.png"),
+            "white_and_orange": ("Tamed Orange and White Cat", "assets/sprites/mobs/WandOCatRightStanding.png")
         }
         
-        item_name = cat_type_to_item_name.get(cat_type, "Tamed Black Cat")
+        item_name, icon = cat_type_to_mapping.get(cat_type, ("Tamed Black Cat", "assets/sprites/mobs/BlackCatRightStanding.png"))
         
         return {
             "item_name": item_name,
+            "icon": icon,
             "quantity": 1,
             "cat_object": self,
             "cat_type": cat_type,
@@ -2402,8 +2402,7 @@ class Gila(AggressiveMob):
         self.full_health = 60 + (random.randint(5, 10) * self.level)
         self.health = self.full_health
         self.resource = "Gila Meat"
-        self.special_drops = [{'item': 'Venom Sac', 'chance': 0.1, 'min': 1, 'max': 2}
-]
+        self.special_drops = [{'item': 'Venom Sac', 'chance': 0.1, 'min': 1, 'max': 2}]
         self.resource_amount = 2
         self.death_experience = 500  * (1 + (self.level * self.death_experience * .0001))
         self.level = 1
