@@ -986,7 +986,7 @@ class Cat(Mob):
         self.death_experience = 200  * (1 + (self.level * self.death_experience * .0001))
         self.level = 1
         self.tamed_boost = 1.1
-        self.meat_resource = "Cat Meat"
+        self.meat_resource = "Small Meat"
         self.special_drops = [{'item': 'Fur', 'chance': 0.1, 'min': 1, 'max': 2}]
 
         self.full_health = 100 + (random.randint(5, 7) * self.level) * self.tamed_boost
@@ -1094,11 +1094,11 @@ class Cat(Mob):
         health_increase = 0
         
         # Raw meats - +20 tame, +15 health
-        if item_name in ["Fish", "Raw Venison", "Gila Meat", "Raw Beef", "Raw Chicken"]:
-            tame_increase = 100
+        if item_name in ["Fish", "Raw Venison", "Gila Meat", "Raw Beef", "Raw Chicken", "Small Meat", "Bear Meat"]:
+            tame_increase = 20
             health_increase = 15
         # Cooked meats - +10 tame, +20 health
-        elif item_name in ["Cooked Fish", "Cooked Venison", "Cooked Gila Meat", "Cooked Beef", "Cooked Chicken"]:
+        elif item_name in ["Cooked Fish", "Cooked Venison", "Cooked Gila Meat", "Cooked Beef", "Cooked Chicken", "Cooked Small Meat", "Cooked Bear Meat"]:
             tame_increase = 5
             health_increase = 20
         # Milk - +30 tame, +25 health
@@ -1113,12 +1113,13 @@ class Cat(Mob):
             health_increase = 100
         # Poisonous Mushroom - same as player (poison)
         elif item_name == "Poisonous Mushroom":
+            tame_increase = -50
             self.poison = True
             self.poison_time = 30
             self.poison_strength = 1
             return 0
         # Other normal foods - +1 tame, +5 health
-        elif item_name in ["Apples", "Oranges", "Coconuts", "Mushroom", "Blood Berries", "Dawn Berries", "Dusk Berries", "Sun Berries", "Teal Berries", "Twilight Drupes", "Vio Berries"]:
+        elif item_name in ["Apples", "Oranges", "Coconuts", "Pineapple", "Watermelon", "Mushroom", "Blood Berries", "Dawn Berries", "Dusk Berries", "Sun Berries", "Teal Berries", "Twilight Drupes", "Vio Berries"]:
             tame_increase = 1
             health_increase = 5
         
@@ -1227,7 +1228,7 @@ class Squirrel(Mob):
         self.level = 1
         self.death_experience = 75 * (1 + (self.level * self.death_experience * .0001))
         self.resource = "Hide"
-        self.meat_resource = "Squirrel Meat"
+        self.meat_resource = "Small Meat"
         self.special_drops = [{'item': 'Fur', 'chance': 0.1, 'min': 1, 'max': 2}]
         
 
@@ -2534,6 +2535,7 @@ class Crow(Mob):
         self.full_health = 30 + (random.randint(5, 10) * self.level)
         self.health = self.full_health
         self.resource = "Feathers"
+        self.special_drops = [{'item': 'Small Meat', 'chance': 0.6, 'min': 2, 'max': 4}]
         self.resource_amount = 4
         self.death_experience = 400 * (1 + (self.level * self.death_experience * .0001))
         self.level = 1

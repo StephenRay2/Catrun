@@ -18,7 +18,8 @@ dungeon_depth_high = 0
 font = pygame.font.SysFont(None, 24)
 scroll = 0
 dungeon_traversal_speed = .1
-
+time_of_day = 12.00
+total_elapsed_time = 00.00
 stamina_depleted_message_timer = 0
 player_world_x = player_pos.x + cam_x
 player_world_y = player_pos.y
@@ -268,6 +269,9 @@ while running:
 
     elif state == "game":
         dungeon_depth = absolute_cam_x
+        total_elapsed_time += dt
+        time_of_day = (12 + (total_elapsed_time / 60)) % 24
+
         
         if game_just_started:
             generate_world()
@@ -1093,8 +1097,62 @@ while running:
                     and abs(obj.rect.y - player_pos.y) < 800]
         nearby_mobs = [mob for mob in mobs
                     if abs(mob.rect.x - (player_pos.x + cam_x)) < 3000
-                    and abs(mob.rect.y - player_pos.y) < 800]
-        
+                    and abs(mob.rect.y - player_pos.y) < 800]        
+
+        def lerp(a, b, t):
+            """Linear interpolation between a and b for t in [0,1]."""
+            return a + (b - a) * max(0, min(1, t))
+
+        # Default color/alpha
+        R_value = G_value = B_value = A_value = 0
+
+        # ---- Sunset (18 → 19) ----
+        if 18.0 <= time_of_day < 19.0:
+            t = (time_of_day - 18.0) / 1.0
+            R_value = int(lerp(0, 120, t))
+            B_value = int(lerp(0, 0, t))
+            A_value = int(lerp(0, 90, t))
+
+        # ---- Evening → Night (19 → 22) ----
+        elif 19.0 <= time_of_day < 22.0:
+            t = (time_of_day - 19.0) / 3.0
+            R_value = int(lerp(120, 40, t))
+            B_value = int(lerp(0, 20, t))
+            A_value = int(lerp(90, 200, t))    
+
+        # ---- Full Night (22 → 5) ----
+        elif 22.0 <= time_of_day or time_of_day < 5.0:
+            if time_of_day >= 22.0:
+                t = (time_of_day - 22.0) / 5.0
+            else:
+                t = ((time_of_day + 24) - 22.0) / 5.0
+
+            R_value = int(lerp(40, 0, t))
+            B_value = int(lerp(20, 20, t))
+            A_value = int(lerp(200, 200, t))
+
+        # ---- Dawn (5 → 7) ----
+        elif 5.0 <= time_of_day < 7.0:
+            t = (time_of_day - 5.0) / 2.0
+            R_value = int(lerp(0, 0, t))
+            B_value = int(lerp(20, 0, t))
+            A_value = int(lerp(200, 0, t))
+
+        # ---- Daytime (6 → 18) ----
+        else:
+            R_value = G_value = B_value = A_value = 0
+
+        R_value = max(0, min(255, R_value))
+        G_value = max(0, min(255, G_value))
+        B_value = max(0, min(255, B_value))
+        A_value = max(0, min(255, A_value))
+
+        # Draw overlay
+        day_night_overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        day_night_overlay.fill((R_value, G_value, B_value, A_value))
+        screen.blit(day_night_overlay, (0, 0))
+
+
         inventory.draw_hotbar(screen)
 
 
@@ -1641,6 +1699,13 @@ while running:
         temp_surface.fill((0, 0, 0, 100))
         screen.blit(temp_surface, (depth_rect.x, depth_rect.y))
         screen.blit(depth_text, (depth_rect.x + 5, depth_rect.y + 5))
+
+        time_text = font.render(f"Time: {time_of_day:.0f}", True, (255, 255, 255))
+        time_rect = pygame.Rect(width - time_text.get_width() - 30, 20, time_text.get_width(), time_text.get_height())
+        time_surface = pygame.Surface((time_rect.width + 10, time_rect.height + 10), pygame.SRCALPHA)
+        time_surface.fill((0, 0, 0, 100))
+        screen.blit(time_surface, (time_rect.x + 8, time_rect.y + 22))
+        screen.blit(time_text, (time_rect.x + 13, time_rect.y + 27))
 
         if not paused and not inventory_in_use and naming_cat is None:
             if keys[pygame.K_o]:
