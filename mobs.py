@@ -2749,6 +2749,8 @@ class Dragon(Enemy):
         self.breath_damage = 20
         self.attack_cooldown = pygame.time.get_ticks()
         self.attack_delay = 2000
+        
+        self.immune_to_lava = (dragon_type == "fire")
     
     def get_collision_rect(self, cam_x):
         rect = self.rect
@@ -2769,7 +2771,7 @@ class Dragon(Enemy):
             if self.state != "flying" and random.random() < 0.6:
                 self.state = "flying"
                 self.frame_index = 0
-                self.flying_timer = random.randint(120, 240)
+                self.flying_timer = random.randint(300, 600)
                 self.direction = pygame.Vector2(random.choice([-1, 1]), random.uniform(-1, -0.5))
                 if self.direction.length_squared() > 0:
                     self.direction = self.direction.normalize()
@@ -2835,7 +2837,7 @@ class Dragon(Enemy):
         if self.state == "walking" and random.random() < 0.001:
             self.state = "flying"
             self.frame_index = 0
-            self.flying_timer = random.randint(60, 180)
+            self.flying_timer = random.randint(300, 600)
             self.direction = pygame.Vector2(random.uniform(-1, 1), random.uniform(-1, 1))
             if self.direction.length_squared() > 0:
                 self.direction = self.direction.normalize()

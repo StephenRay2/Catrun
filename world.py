@@ -1313,13 +1313,17 @@ def generate_world():
             y = random.randint(0, height - 64)
             ferns.append(Fern(x, y, fern_data[1]))
     
-    for _ in range(num_ponds):
-        x = random.randint(0, 512000)
-        y = random.randint(0, height - 128)
-        ponds.append(Pond(x, y))
-    
     lavastone_start = 180 * BACKGROUND_SIZE
     lavastone_end = 216 * BACKGROUND_SIZE
+    
+    for _ in range(num_ponds):
+        valid = False
+        while not valid:
+            x = random.randint(0, 512000)
+            if not (lavastone_start <= x < lavastone_end):
+                valid = True
+        y = random.randint(0, height - 128)
+        ponds.append(Pond(x, y))
     for _ in range(num_lavaponds):
         x = random.randint(int(lavastone_start), int(lavastone_end - 128))
         y = random.randint(0, height - 128)
