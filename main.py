@@ -1088,6 +1088,9 @@ while running:
                     screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size/2))
                 player_drawn = True
             obj.draw(screen, cam_x)
+            
+            if hasattr(obj, 'breath_image') and obj.breath_image:
+                screen.blit(obj.breath_image, (obj.breath_image_x - cam_x, obj.breath_image_y))
 
         if not player_drawn:
             if player.swimming and player.current_liquid:

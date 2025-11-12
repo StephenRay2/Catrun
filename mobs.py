@@ -142,6 +142,7 @@ dragon_types = [
 
 def create_dragon_images(dragon_type_name):
     prefix = f"{dragon_type_name.capitalize()}Dragon"
+    breath_prefix = f"{dragon_type_name.capitalize()}Breath"
     walk_left = [f"assets/sprites/mobs/{prefix}LeftWalk{i}.png" for i in range(1, 7)]
     idle_left = [f"assets/sprites/mobs/{prefix}LeftIdle{i}.png" for i in range(1, 4)]
     start_fly_left = [f"assets/sprites/mobs/{prefix}LeftStartFly{i}.png" for i in range(1, 8)]
@@ -149,6 +150,8 @@ def create_dragon_images(dragon_type_name):
     end_fly_left = [f"assets/sprites/mobs/{prefix}LeftEndFly{i}.png" for i in range(1, 8)]
     bite_attack_left = [f"assets/sprites/mobs/{prefix}LeftBiteAttack{i}.png" for i in range(1, 4)]
     breath_attack_left = [f"assets/sprites/mobs/{prefix}LeftBreathAttack{i}.png" for i in range(1, 11)]
+    breath_effect_left = [f"assets/sprites/mobs/{breath_prefix}Left{i}.png" for i in range(1, 11)]
+    dead_left = f"assets/sprites/mobs/{prefix}LeftDead.png"
     
     return {
         "walk_left": walk_left,
@@ -157,7 +160,9 @@ def create_dragon_images(dragon_type_name):
         "fly_left": fly_left,
         "end_fly_left": end_fly_left,
         "bite_attack_left": bite_attack_left,
-        "breath_attack_left": breath_attack_left
+        "breath_attack_left": breath_attack_left,
+        "breath_effect_left": breath_effect_left,
+        "dead_left": dead_left
     }
 
 fire_dragon_images = create_dragon_images("fire")
@@ -2705,11 +2710,15 @@ class Dragon(Enemy):
         self.fly_left_images = [pygame.image.load(img).convert_alpha() for img in self.dragon_images["fly_left"]]
         self.end_fly_left_images = [pygame.image.load(img).convert_alpha() for img in self.dragon_images["end_fly_left"]]
         self.bite_attack_left_images = [pygame.image.load(img).convert_alpha() for img in self.dragon_images["bite_attack_left"]]
-        self.breath_attack_left_images = [pygame.transform.scale(pygame.image.load(img).convert_alpha(), (200, 100)) for img in self.dragon_images["breath_attack_left"]]
+        self.breath_attack_left_images = [pygame.image.load(img).convert_alpha() for img in self.dragon_images["breath_attack_left"]]
+        self.breath_effect_left_images = [pygame.image.load(img).convert_alpha() for img in self.dragon_images["breath_effect_left"]]
+        self.dead_image_left = pygame.image.load(self.dragon_images["dead_left"]).convert_alpha()
         
         scale = (1.0 + (level - 1) * 0.025) * 0.5
         self._scale_images(scale)
         self.size_scale = scale
+        self.dead_image_left = pygame.transform.scale(self.dead_image_left, (int(self.dead_image_left.get_width() * scale), int(self.dead_image_left.get_height() * scale)))
+        self.dead_image_right = pygame.transform.flip(self.dead_image_left, True, False)
         
         self.walk_right_images = [pygame.transform.flip(img, True, False) for img in self.walk_left_images]
         self.idle_right_images = [pygame.transform.flip(img, True, False) for img in self.idle_left_images]
@@ -2718,6 +2727,7 @@ class Dragon(Enemy):
         self.end_fly_right_images = [pygame.transform.flip(img, True, False) for img in self.end_fly_left_images]
         self.bite_attack_right_images = [pygame.transform.flip(img, True, False) for img in self.bite_attack_left_images]
         self.breath_attack_right_images = [pygame.transform.flip(img, True, False) for img in self.breath_attack_left_images]
+        self.breath_effect_right_images = [pygame.transform.flip(img, True, False) for img in self.breath_effect_left_images]
         
         self.image = self.idle_left_images[0]
         self.rect = self.image.get_rect(center=(x, y))
@@ -2754,6 +2764,10 @@ class Dragon(Enemy):
         self.attack_cooldown = pygame.time.get_ticks()
         self.attack_delay = 2000
         
+        self.breath_image = None
+        self.breath_image_x = 0
+        self.breath_image_y = 0
+        
         self.immune_to_lava = (dragon_type == "fire")
     
     def _scale_images(self, scale):
@@ -2771,27 +2785,17 @@ class Dragon(Enemy):
         self.end_fly_left_images = scale_image_list(self.end_fly_left_images)
         self.bite_attack_left_images = scale_image_list(self.bite_attack_left_images)
         self.breath_attack_left_images = scale_image_list(self.breath_attack_left_images)
+        self.breath_effect_left_images = scale_image_list(self.breath_effect_left_images)
     
     def get_collision_rect(self, cam_x):
         rect = self.rect
         
-        if self.state == "flying" and not self.attacking:
-            return pygame.Rect(rect.x - cam_x, rect.y, 0, 0)
-        
         x_offset = int(rect.width * 0.15)
-        y_offset = int(rect.height * 0.40)
+        y_offset = int(rect.height * 0.45)
         width = int(rect.width * 0.70)
-        height = int(rect.height * 0.30)
+        height = int(rect.height * 0.45)
         
         base_rect = pygame.Rect(rect.x - cam_x + x_offset, rect.y + y_offset, width, height)
-        
-        if self.attacking and self.state == "flying":
-            if self.last_direction == "left":
-                base_rect.x += base_rect.width // 2
-                base_rect.width = base_rect.width // 2
-            else:
-                base_rect.width = base_rect.width // 2
-        
         return base_rect
     
     def handle_health(self, screen, cam_x, dt):
@@ -2860,8 +2864,8 @@ class Dragon(Enemy):
         distance_sq = dx*dx + dy*dy
         
         if self.state == "flying":
-            target_distance = 200
-            if distance_sq > (target_distance * target_distance):
+            target_distance = 120
+            if (target_distance * target_distance * 3) > distance_sq > (target_distance * target_distance):
                 direction = pygame.Vector2(dx, dy)
                 if direction.length_squared() > 0:
                     direction = direction.normalize()
@@ -2880,7 +2884,7 @@ class Dragon(Enemy):
         distance_sq = dx*dx + dy*dy
         
         breath_range = 150 * self.size_scale
-        bite_range = 100 * self.size_scale
+        bite_range = 50 * self.size_scale
         current_time = pygame.time.get_ticks()
         if current_time - self.attack_cooldown > self.attack_delay and distance_sq < (breath_range * breath_range):
             self.attack_cooldown = current_time
@@ -2891,15 +2895,20 @@ class Dragon(Enemy):
         
         if self.attacking:
             if self.state == "flying":
-                breath_offset = 100 * self.size_scale
-                if self.last_direction == "left":
-                    self.rect.x = self.attack_start_x - breath_offset
-                else:
-                    self.rect.x = self.attack_start_x
+                breath_attack_frames = self.breath_attack_right_images if self.last_direction == "right" else self.breath_attack_left_images
+                breath_effect_frames = self.breath_effect_right_images if self.last_direction == "right" else self.breath_effect_left_images
                 
-                frames = self.breath_attack_right_images if self.last_direction == "right" else self.breath_attack_left_images
-                self.frame_index = (self.frame_index + self.animation_speed * 0.8) % len(frames)
-                self.image = frames[int(self.frame_index)]
+                breath_frame_index = (self.frame_index + self.animation_speed * 0.8) % len(breath_attack_frames)
+                self.frame_index = breath_frame_index
+                
+                self.image = breath_attack_frames[int(breath_frame_index)]
+                self.breath_image = breath_effect_frames[int(breath_frame_index)]
+                
+                if self.last_direction == "left":
+                    self.breath_image_x = self.rect.left - self.breath_image.get_width()
+                else:
+                    self.breath_image_x = self.rect.right
+                self.breath_image_y = self.rect.centery - self.breath_image.get_height() // 2
                 
                 if self.attack_timer == self.attack_duration // 2 and distance_sq < (breath_range * breath_range):
                     if self.last_direction == "left":
@@ -2922,11 +2931,11 @@ class Dragon(Enemy):
             self.attack_timer -= 1
             if self.attack_timer <= 0:
                 self.attacking = False
+                self.breath_image = None
                 if self.state == "flying":
                     self.frame_index = float(len(self.start_fly_left_images))
                 else:
                     self.frame_index = 0.0
-                self.rect.x = self.attack_start_x
     
     def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
         if self.attacking:
@@ -2968,7 +2977,10 @@ class Dragon(Enemy):
             super().update(dt, player, nearby_objects, nearby_mobs)
         
         if not self.is_alive:
-            self.image = self.idle_left_images[0] if self.idle_left_images else self.image
+            if self.last_direction == "right":
+                self.image = self.dead_image_right
+            else:
+                self.image = self.dead_image_left
     
     def animate_stand(self):
         if self.state == "walking":
