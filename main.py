@@ -55,12 +55,6 @@ thrown_items = []
 loaded_item_sprites = {}  # Cache for loaded item sprites
 
 def calculate_throw_trajectory(start_x, start_y, target_x, target_y, throw_power):
-    """Calculate straight-line trajectory from start to target point, based on throw power.
-    
-    In top-down games, items travel in straight lines. The throw power determines how far they travel.
-    Returns direction vector (normalized) and max distance.
-    """
-    # Calculate direction toward target
     delta_x = target_x - start_x
     delta_y = target_y - start_y
     distance_to_target = (delta_x**2 + delta_y**2) ** 0.5
@@ -80,11 +74,6 @@ def calculate_throw_trajectory(start_x, start_y, target_x, target_y, throw_power
     return dir_x, dir_y, max_distance
 
 def spawn_thrown_item(x, y, vel_x, vel_y, item_data, is_cat=False, throw_power=1.0):
-    """Create a thrown item projectile that travels in a straight line.
-    
-    In top-down games, items travel in straight lines determined by direction (vel_x, vel_y).
-    The magnitude of velocity becomes the speed, and items stop when hitting objects or reaching max distance.
-    """
     # Load the item sprite
     sprite = None
     sprite_size = 64 if is_cat else 32  # Cats are 64x64, regular items are 32x32
@@ -150,12 +139,6 @@ def create_world_item_from_thrown(thrown_item):
         return True
     elif item_name == "Stone":
         stones.append(Stone(x, y))
-        return True
-    elif item_name == "Fiber":
-        grasses.append(Grass(x, y))
-        return True
-    elif item_name == "Savannah Fiber":
-        savannah_grasses.append(SavannahGrass(x, y))
         return True
     elif item_name == "Mushroom":
         mushrooms.append(Mushroom(x, y))
