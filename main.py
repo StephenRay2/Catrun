@@ -423,6 +423,14 @@ while running:
                 
                 inventory.handle_keydown_hotbar(event, screen=None, use_on_press=False)
 
+                if event.key == pygame.K_f and not inventory_in_use and player.is_alive:
+                    success, tags = inventory.consume_item()
+                    if success:
+                        if "food" in tags:
+                            sound_manager.play_sound(random.choice([f"consume_item{i}" for i in range(1, 7)]))
+                        elif any(tag in tags for tag in ["liquid", "consumable"]):
+                            sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
+
                 if event.key == pygame.K_q:
                     inventory_in_use = not inventory_in_use
                     if not inventory_in_use:
