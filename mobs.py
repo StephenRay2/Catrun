@@ -2879,16 +2879,16 @@ class Dragon(Enemy):
             self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
             self.image = frames[int(self.frame_index)]
         elif self.state == "flying":
-            if self.frame_index < len(self.start_fly_left_images):
+            total_start_frames = len(self.start_fly_left_images)
+            if self.frame_index < total_start_frames:
                 frames = self.start_fly_right_images if self.last_direction == "right" else self.start_fly_left_images
                 self.frame_index += self.animation_speed
-                if self.frame_index >= len(self.start_fly_left_images):
-                    self.frame_index = 0
-                self.image = frames[int(min(self.frame_index, len(frames) - 1))]
+                self.image = frames[int(min(self.frame_index, total_start_frames - 1))]
             else:
                 frames = self.fly_right_images if self.last_direction == "right" else self.fly_left_images
-                self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
-                self.image = frames[int(self.frame_index)]
+                fly_frame_index = (self.frame_index - total_start_frames) % len(frames)
+                self.frame_index += self.animation_speed
+                self.image = frames[int(fly_frame_index)]
         elif self.state == "landing":
             frames = self.end_fly_right_images if self.last_direction == "right" else self.end_fly_left_images
             self.frame_index = min(self.frame_index + self.animation_speed, len(frames) - 1)
