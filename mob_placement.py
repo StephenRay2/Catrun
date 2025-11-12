@@ -13,15 +13,15 @@ num_black_bears = 50
 num_brown_bears = 30
 
 
-num_crawlers = 50
-num_pocks = 50
-num_duskwretches = 100
+num_crawlers = 0
+num_pocks = 0
+num_duskwretches = 0
 
-num_fire_dragons = 15
-num_ice_dragons = 15
-num_electric_dragons = 15
-num_poison_dragons = 15
-num_dusk_dragons = 20
+num_fire_dragons = 50
+num_ice_dragons = 50
+num_electric_dragons = 50
+num_poison_dragons = 50
+num_dusk_dragons = 50
 
 
 allowed_squirrel_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_snow, bg_wasteland]

@@ -353,35 +353,51 @@ while running:
                     tile_x, tile_image = random.choice(weighted_fire_dragon_tiles)
                     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                     y = random.randint(0, height - 64)
-                    fire_dragons.append(Dragon(x, y, "Fire Dragon", "fire"))
+                    fire_dragons.append(Dragon(x, y, "Fire Dragon", "fire", random.randint(1, 100)))
 
             for _ in range(num_ice_dragons):
                 if weighted_ice_dragon_tiles:
                     tile_x, tile_image = random.choice(weighted_ice_dragon_tiles)
                     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                     y = random.randint(0, height - 64)
-                    ice_dragons.append(Dragon(x, y, "Ice Dragon", "ice"))
+                    ice_dragons.append(Dragon(x, y, "Ice Dragon", "ice", random.randint(1, 100)))
 
             for _ in range(num_electric_dragons):
                 if weighted_electric_dragon_tiles:
                     tile_x, tile_image = random.choice(weighted_electric_dragon_tiles)
                     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                     y = random.randint(0, height - 64)
-                    electric_dragons.append(Dragon(x, y, "Electric Dragon", "electric"))
+                    electric_dragons.append(Dragon(x, y, "Electric Dragon", "electric", random.randint(1, 100)))
 
             for _ in range(num_poison_dragons):
                 if weighted_poison_dragon_tiles:
                     tile_x, tile_image = random.choice(weighted_poison_dragon_tiles)
                     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                     y = random.randint(0, height - 64)
-                    poison_dragons.append(Dragon(x, y, "Poison Dragon", "poison"))
+                    poison_dragons.append(Dragon(x, y, "Poison Dragon", "poison", random.randint(1, 100)))
 
             for _ in range(num_dusk_dragons):
                 if weighted_dusk_dragon_tiles:
                     tile_x, tile_image = random.choice(weighted_dusk_dragon_tiles)
                     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                     y = random.randint(0, height - 64)
-                    dusk_dragons.append(Dragon(x, y, "Dusk Dragon", "dusk"))
+                    dusk_dragons.append(Dragon(x, y, "Dusk Dragon", "dusk", random.randint(1, 100)))
+
+            lavastone_start = 180 * BACKGROUND_SIZE
+            debug_fire = Dragon(lavastone_start + 500, height // 2, "Fire Dragon", "fire", random.randint(1, 100))
+            fire_dragons.append(debug_fire)
+            
+            snow_start = 24 * BACKGROUND_SIZE
+            debug_ice = Dragon(snow_start + 500, height // 2, "Ice Dragon", "ice", random.randint(1, 100))
+            ice_dragons.append(debug_ice)
+            
+            duskstone_start = 132 * BACKGROUND_SIZE
+            debug_electric = Dragon(duskstone_start + 500, height // 2, "Electric Dragon", "electric", random.randint(1, 100))
+            electric_dragons.append(debug_electric)
+            
+            wasteland_start = 108 * BACKGROUND_SIZE
+            debug_poison = Dragon(wasteland_start + 500, height // 2, "Poison Dragon", "poison", random.randint(1, 100))
+            poison_dragons.append(debug_poison)
 
             dungeon_depth = 0
             dungeon_depth_high = 0
