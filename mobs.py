@@ -2754,7 +2754,20 @@ class Dragon(Enemy):
     
     def get_collision_rect(self, cam_x):
         rect = self.rect
-        return pygame.Rect(rect.x - cam_x + 15, rect.y + 20, rect.width - 30, rect.height - 40)
+        
+        if self.state == "flying" and not self.attacking:
+            return pygame.Rect(rect.x - cam_x, rect.y, 0, 0)
+        
+        base_rect = pygame.Rect(rect.x - cam_x + 15, rect.y + 20, rect.width - 30, rect.height - 40)
+        
+        if self.attacking and self.state == "flying":
+            if self.last_direction == "left":
+                base_rect.x += base_rect.width // 2
+                base_rect.width = base_rect.width // 2
+            else:
+                base_rect.width = base_rect.width // 2
+        
+        return base_rect
     
     def handle_health(self, screen, cam_x, dt):
         max_health = self.full_health
@@ -2771,7 +2784,7 @@ class Dragon(Enemy):
             if self.state != "flying" and random.random() < 0.6:
                 self.state = "flying"
                 self.frame_index = 0
-                self.flying_timer = random.randint(300, 600)
+                self.flying_timer = random.randint(600, 1200)
                 self.direction = pygame.Vector2(random.choice([-1, 1]), random.uniform(-1, -0.5))
                 if self.direction.length_squared() > 0:
                     self.direction = self.direction.normalize()
@@ -2789,7 +2802,26 @@ class Dragon(Enemy):
     
     def check_collision(self, direction, nearby_objects, nearby_mobs):
         if self.state == "flying":
-            return True, True
+            flying_mobs = [mob for mob in nearby_mobs if hasattr(mob, 'state') and mob.state == "flying"]
+            if not flying_mobs:
+                return True, True
+            
+            collision_rect = self.get_collision_rect(0)
+            
+            left_check = pygame.Rect(collision_rect.left - 1, collision_rect.top + 5, 1, collision_rect.height - 10)
+            right_check = pygame.Rect(collision_rect.right, collision_rect.top + 5, 1, collision_rect.height - 10)
+            top_check = pygame.Rect(collision_rect.left + 5, collision_rect.top - 1, collision_rect.width - 10, 1)
+            bottom_check = pygame.Rect(collision_rect.left + 5, collision_rect.bottom, collision_rect.width - 10, 1)
+            
+            left_collision = any(left_check.colliderect(mob.get_collision_rect(0)) for mob in flying_mobs)
+            right_collision = any(right_check.colliderect(mob.get_collision_rect(0)) for mob in flying_mobs)
+            up_collision = any(top_check.colliderect(mob.get_collision_rect(0)) for mob in flying_mobs)
+            down_collision = any(bottom_check.colliderect(mob.get_collision_rect(0)) for mob in flying_mobs)
+            
+            can_move_x = not ((direction.x > 0 and right_collision) or (direction.x < 0 and left_collision))
+            can_move_y = not ((direction.y > 0 and down_collision) or (direction.y < 0 and up_collision))
+            
+            return can_move_x, can_move_y
         return super().check_collision(direction, nearby_objects, nearby_mobs)
     
     def attack(self, player_world_x, player_world_y, player):
@@ -2801,34 +2833,50 @@ class Dragon(Enemy):
         distance_sq = dx*dx + dy*dy
         
         current_time = pygame.time.get_ticks()
-        if current_time - self.attack_cooldown > self.attack_delay and distance_sq < (150 * 150):
+        if current_time - self.attack_cooldown > self.attack_delay and distance_sq < (100 * 100):
             self.attack_cooldown = current_time
             self.attacking = True
             self.attack_timer = self.attack_duration
             self.frame_index = 0.0
+            self.attack_start_x = self.rect.x
         
         if self.attacking:
             if self.state == "flying":
+                if self.last_direction == "left":
+                    self.rect.x = self.attack_start_x - 100
+                else:
+                    self.rect.x = self.attack_start_x
+                
                 frames = self.breath_attack_right_images if self.last_direction == "right" else self.breath_attack_left_images
                 self.frame_index = (self.frame_index + self.animation_speed * 0.8) % len(frames)
                 self.image = frames[int(self.frame_index)]
                 
                 if self.attack_timer == self.attack_duration // 2 and distance_sq < (150 * 150):
-                    player.health -= self.breath_damage
-                    sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                    if self.last_direction == "left":
+                        player_in_breath = player_world_x < self.attack_start_x
+                    else:
+                        player_in_breath = player_world_x >= self.attack_start_x
+                    
+                    if player_in_breath:
+                        player.health -= self.breath_damage
+                        sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
             else:
                 frames = self.bite_attack_right_images if self.last_direction == "right" else self.bite_attack_left_images
                 self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
                 self.image = frames[int(self.frame_index)]
                 
-                if self.attack_timer == self.attack_duration // 2 and distance_sq < (100 * 100):
+                if self.attack_timer == self.attack_duration // 2 and distance_sq < (50 * 50):
                     player.health -= self.bite_damage
                     sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
             
             self.attack_timer -= 1
             if self.attack_timer <= 0:
                 self.attacking = False
-                self.frame_index = 0.0
+                if self.state == "flying":
+                    self.frame_index = float(len(self.start_fly_left_images))
+                else:
+                    self.frame_index = 0.0
+                self.rect.x = self.attack_start_x
     
     def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
         if self.attacking:
@@ -2837,7 +2885,7 @@ class Dragon(Enemy):
         if self.state == "walking" and random.random() < 0.001:
             self.state = "flying"
             self.frame_index = 0
-            self.flying_timer = random.randint(300, 600)
+            self.flying_timer = random.randint(600, 1200)
             self.direction = pygame.Vector2(random.uniform(-1, 1), random.uniform(-1, 1))
             if self.direction.length_squared() > 0:
                 self.direction = self.direction.normalize()
