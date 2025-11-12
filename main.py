@@ -270,6 +270,11 @@ while running:
             gilas.clear()
             crows.clear()
             duskwretches.clear()
+            fire_dragons.clear()
+            ice_dragons.clear()
+            electric_dragons.clear()
+            poison_dragons.clear()
+            dusk_dragons.clear()
 
             for _ in range(num_cats):
                 tile_x, tile_image = random.choice(weighted_cat_tiles)
@@ -342,6 +347,41 @@ while running:
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
                 duskwretches.append(Duskwretch(x, y, "Duskwretch"))
+
+            for _ in range(num_fire_dragons):
+                if weighted_fire_dragon_tiles:
+                    tile_x, tile_image = random.choice(weighted_fire_dragon_tiles)
+                    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    y = random.randint(0, height - 64)
+                    fire_dragons.append(Dragon(x, y, "Fire Dragon", "fire"))
+
+            for _ in range(num_ice_dragons):
+                if weighted_ice_dragon_tiles:
+                    tile_x, tile_image = random.choice(weighted_ice_dragon_tiles)
+                    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    y = random.randint(0, height - 64)
+                    ice_dragons.append(Dragon(x, y, "Ice Dragon", "ice"))
+
+            for _ in range(num_electric_dragons):
+                if weighted_electric_dragon_tiles:
+                    tile_x, tile_image = random.choice(weighted_electric_dragon_tiles)
+                    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    y = random.randint(0, height - 64)
+                    electric_dragons.append(Dragon(x, y, "Electric Dragon", "electric"))
+
+            for _ in range(num_poison_dragons):
+                if weighted_poison_dragon_tiles:
+                    tile_x, tile_image = random.choice(weighted_poison_dragon_tiles)
+                    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    y = random.randint(0, height - 64)
+                    poison_dragons.append(Dragon(x, y, "Poison Dragon", "poison"))
+
+            for _ in range(num_dusk_dragons):
+                if weighted_dusk_dragon_tiles:
+                    tile_x, tile_image = random.choice(weighted_dusk_dragon_tiles)
+                    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    y = random.randint(0, height - 64)
+                    dusk_dragons.append(Dragon(x, y, "Dusk Dragon", "dusk"))
 
             dungeon_depth = 0
             dungeon_depth_high = 0
@@ -942,6 +982,11 @@ while running:
         brown_bears = [brown_bear for brown_bear in brown_bears if not brown_bear.destroyed]
         gilas = [gila for gila in gilas if not gila.destroyed]
         crows = [crow for crow in crows if not crow.destroyed]
+        fire_dragons = [dragon for dragon in fire_dragons if not dragon.destroyed]
+        ice_dragons = [dragon for dragon in ice_dragons if not dragon.destroyed]
+        electric_dragons = [dragon for dragon in electric_dragons if not dragon.destroyed]
+        poison_dragons = [dragon for dragon in poison_dragons if not dragon.destroyed]
+        dusk_dragons = [dragon for dragon in dusk_dragons if not dragon.destroyed]
 
         for tile_x, tile_image in tiles:
             screen_x = tile_x - cam_x
@@ -953,7 +998,7 @@ while running:
         collectibles = sticks + stones + grasses + savannah_grasses + mushrooms
         all_objects_no_liquids = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants
         all_objects = all_objects_no_liquids + ponds + lavas
-        mobs = cats + squirrels + cows + chickens + crawlers + duskwretches + pocks + deers + black_bears + brown_bears + gilas + crows
+        mobs = cats + squirrels + cows + chickens + crawlers + duskwretches + pocks + deers + black_bears + brown_bears + gilas + crows + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
         all_mobs = mobs
 
         visible_collectibles = [col for col in collectibles if col.rect.x- cam_x > -256 and col.rect.x - cam_x < width + 256]

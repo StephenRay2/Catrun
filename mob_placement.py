@@ -17,6 +17,12 @@ num_crawlers = 50
 num_pocks = 50
 num_duskwretches = 100
 
+num_fire_dragons = 15
+num_ice_dragons = 15
+num_electric_dragons = 15
+num_poison_dragons = 15
+num_dusk_dragons = 20
+
 
 allowed_squirrel_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_snow, bg_wasteland]
 
@@ -398,3 +404,158 @@ for _ in range(num_crows):
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
     crows.append(Crow(x, y, "Crow"))
+
+allowed_fire_dragon_tiles = [bg_lavastone, bg_sand, bg_wasteland, bg_redrock, bg_blackstone]
+
+fire_dragon_spawn_weights = {
+    bg_grass: 0,
+    bg_dirt: 0,
+    bg_compact: 0,
+    bg_sand: 0,
+    bg_savannah: 0,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 0,
+    bg_lavastone: 5,
+    bg_snow: 0,
+    bg_wasteland: 2,
+    bg_blackstone: 2,
+    bg_redrock: 4
+}
+
+weighted_fire_dragon_tiles = []
+for tile_x, tile_image in tiles:
+    weight = fire_dragon_spawn_weights.get(tile_image, 0)
+    weighted_fire_dragon_tiles.extend([(tile_x, tile_image)] * weight)
+
+fire_dragons = []
+for _ in range(num_fire_dragons):
+    if weighted_fire_dragon_tiles:
+        tile_x, tile_image = random.choice(weighted_fire_dragon_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        fire_dragons.append(Dragon(x, y, "Fire Dragon", "fire"))
+
+allowed_ice_dragon_tiles = [bg_snow, bg_riverrock, bg_bigrock, bg_compact]
+
+ice_dragon_spawn_weights = {
+    bg_grass: 0,
+    bg_dirt: 0,
+    bg_compact: 0,
+    bg_sand: 0,
+    bg_savannah: 0,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 0,
+    bg_lavastone: 0,
+    bg_snow: 5,
+    bg_wasteland: 0,
+    bg_blackstone: 0,
+    bg_redrock: 0
+}
+
+weighted_ice_dragon_tiles = []
+for tile_x, tile_image in tiles:
+    weight = ice_dragon_spawn_weights.get(tile_image, 0)
+    weighted_ice_dragon_tiles.extend([(tile_x, tile_image)] * weight)
+
+ice_dragons = []
+for _ in range(num_ice_dragons):
+    if weighted_ice_dragon_tiles:
+        tile_x, tile_image = random.choice(weighted_ice_dragon_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        ice_dragons.append(Dragon(x, y, "Ice Dragon", "ice"))
+
+allowed_electric_dragon_tiles = [bg_duskstone, bg_blackstone, bg_bigrock, bg_wasteland]
+
+electric_dragon_spawn_weights = {
+    bg_grass: 0,
+    bg_dirt: 0,
+    bg_compact: 0,
+    bg_sand: 0,
+    bg_savannah: 1,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 0,
+    bg_lavastone: 0,
+    bg_snow: 0,
+    bg_wasteland: 5,
+    bg_blackstone: 2,
+    bg_redrock: 0
+}
+
+weighted_electric_dragon_tiles = []
+for tile_x, tile_image in tiles:
+    weight = electric_dragon_spawn_weights.get(tile_image, 0)
+    weighted_electric_dragon_tiles.extend([(tile_x, tile_image)] * weight)
+
+electric_dragons = []
+for _ in range(num_electric_dragons):
+    if weighted_electric_dragon_tiles:
+        tile_x, tile_image = random.choice(weighted_electric_dragon_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        electric_dragons.append(Dragon(x, y, "Electric Dragon", "electric"))
+
+allowed_poison_dragon_tiles = [bg_wasteland, bg_compact, bg_redrock, bg_blackstone]
+
+poison_dragon_spawn_weights = {
+    bg_grass: 0,
+    bg_dirt: 0,
+    bg_compact: 1,
+    bg_sand: 0,
+    bg_savannah: 0,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 0,
+    bg_lavastone: 0,
+    bg_snow: 0,
+    bg_wasteland: 4,
+    bg_blackstone: 0,
+    bg_redrock: 0
+}
+
+weighted_poison_dragon_tiles = []
+for tile_x, tile_image in tiles:
+    weight = poison_dragon_spawn_weights.get(tile_image, 0)
+    weighted_poison_dragon_tiles.extend([(tile_x, tile_image)] * weight)
+
+poison_dragons = []
+for _ in range(num_poison_dragons):
+    if weighted_poison_dragon_tiles:
+        tile_x, tile_image = random.choice(weighted_poison_dragon_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        poison_dragons.append(Dragon(x, y, "Poison Dragon", "poison"))
+
+allowed_dusk_dragon_tiles = [bg_duskstone, bg_wasteland, bg_blackstone, bg_redrock, bg_dirt]
+
+dusk_dragon_spawn_weights = {
+    bg_grass: 0,
+    bg_dirt: 0,
+    bg_compact: 0,
+    bg_sand: 0,
+    bg_savannah: 0,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 5,
+    bg_lavastone: 0,
+    bg_snow: 0,
+    bg_wasteland: 1,
+    bg_blackstone: 1,
+    bg_redrock: 4
+}
+
+weighted_dusk_dragon_tiles = []
+for tile_x, tile_image in tiles:
+    weight = dusk_dragon_spawn_weights.get(tile_image, 0)
+    weighted_dusk_dragon_tiles.extend([(tile_x, tile_image)] * weight)
+
+dusk_dragons = []
+for _ in range(num_dusk_dragons):
+    if weighted_dusk_dragon_tiles:
+        tile_x, tile_image = random.choice(weighted_dusk_dragon_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        dusk_dragons.append(Dragon(x, y, "Dusk Dragon", "dusk"))

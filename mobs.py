@@ -132,6 +132,39 @@ crow_start_fly_left_images = ["assets/sprites/mobs/CrowStartFlyLeft1.png", "asse
 crow_landing_left_images = ["assets/sprites/mobs/CrowLandingLeft1.png", "assets/sprites/mobs/CrowLandingLeft2.png", "assets/sprites/mobs/CrowLandingLeft3.png", "assets/sprites/mobs/CrowLandingLeft4.png", "assets/sprites/mobs/CrowLandingLeft5.png", "assets/sprites/mobs/CrowLandingLeft6.png", "assets/sprites/mobs/CrowLandingLeft7.png", "assets/sprites/mobs/CrowLandingLeft8.png"]
 crow_dead_image = pygame.image.load("assets/sprites/mobs/CrowDead.png").convert_alpha()
 
+dragon_types = [
+    {"type": "fire", "rare_gems": [{"gem": "Ruby", "chance": 0.4}, {"gem": "Garnet", "chance": 0.3}]},
+    {"type": "ice", "rare_gems": [{"gem": "Aquamarine", "chance": 0.4}, {"gem": "Sapphire", "chance": 0.3}]},
+    {"type": "electric", "rare_gems": [{"gem": "Topaz", "chance": 0.3}, {"gem": "Opal", "chance": 0.3}]},
+    {"type": "poison", "rare_gems": [{"gem": "Amethyst", "chance": 0.3}, {"gem": "Emerald", "chance": 0.3}]},
+    {"type": "dusk", "rare_gems": [{"gem": "Diamond", "chance": 0.2}, {"gem": "Pearl", "chance": 0.3}]}
+]
+
+def create_dragon_images(dragon_type_name):
+    prefix = f"{dragon_type_name.capitalize()}Dragon"
+    walk_left = [f"assets/sprites/mobs/{prefix}LeftWalk{i}.png" for i in range(1, 7)]
+    idle_left = [f"assets/sprites/mobs/{prefix}LeftIdle{i}.png" for i in range(1, 4)]
+    start_fly_left = [f"assets/sprites/mobs/{prefix}LeftStartFly{i}.png" for i in range(1, 8)]
+    fly_left = [f"assets/sprites/mobs/{prefix}LeftFly{i}.png" for i in range(1, 11)]
+    end_fly_left = [f"assets/sprites/mobs/{prefix}LeftEndFly{i}.png" for i in range(1, 8)]
+    bite_attack_left = [f"assets/sprites/mobs/{prefix}LeftBiteAttack{i}.png" for i in range(1, 4)]
+    breath_attack_left = [f"assets/sprites/mobs/{prefix}LeftBreathAttack{i}.png" for i in range(1, 11)]
+    
+    return {
+        "walk_left": walk_left,
+        "idle_left": idle_left,
+        "start_fly_left": start_fly_left,
+        "fly_left": fly_left,
+        "end_fly_left": end_fly_left,
+        "bite_attack_left": bite_attack_left,
+        "breath_attack_left": breath_attack_left
+    }
+
+fire_dragon_images = create_dragon_images("fire")
+ice_dragon_images = create_dragon_images("ice")
+electric_dragon_images = create_dragon_images("electric")
+poison_dragon_images = create_dragon_images("poison")
+dusk_dragon_images = create_dragon_images("dusk")
 
 
 class Player(pygame.sprite.Sprite):
@@ -2648,3 +2681,228 @@ class Crow(Mob):
             frames = self.landing_right_images if self.last_direction == "right" else self.landing_left_images
             self.frame_index = min(self.frame_index + self.animation_speed, len(frames) - 1)
             self.image = frames[int(self.frame_index)]
+
+
+class Dragon(Enemy):
+    def __init__(self, x, y, name, dragon_type):
+        super().__init__(x, y, name)
+        self.dragon_type = dragon_type
+        self.type_data = next((d for d in dragon_types if d["type"] == dragon_type), None)
+        
+        images_dict = {
+            "fire": fire_dragon_images,
+            "ice": ice_dragon_images,
+            "electric": electric_dragon_images,
+            "poison": poison_dragon_images,
+            "dusk": dusk_dragon_images
+        }
+        self.dragon_images = images_dict.get(dragon_type)
+        
+        self.walk_left_images = [pygame.image.load(img).convert_alpha() for img in self.dragon_images["walk_left"]]
+        self.idle_left_images = [pygame.image.load(img).convert_alpha() for img in self.dragon_images["idle_left"]]
+        self.start_fly_left_images = [pygame.image.load(img).convert_alpha() for img in self.dragon_images["start_fly_left"]]
+        self.fly_left_images = [pygame.image.load(img).convert_alpha() for img in self.dragon_images["fly_left"]]
+        self.end_fly_left_images = [pygame.image.load(img).convert_alpha() for img in self.dragon_images["end_fly_left"]]
+        self.bite_attack_left_images = [pygame.image.load(img).convert_alpha() for img in self.dragon_images["bite_attack_left"]]
+        self.breath_attack_left_images = [pygame.transform.scale(pygame.image.load(img).convert_alpha(), (200, 100)) for img in self.dragon_images["breath_attack_left"]]
+        
+        self.walk_right_images = [pygame.transform.flip(img, True, False) for img in self.walk_left_images]
+        self.idle_right_images = [pygame.transform.flip(img, True, False) for img in self.idle_left_images]
+        self.start_fly_right_images = [pygame.transform.flip(img, True, False) for img in self.start_fly_left_images]
+        self.fly_right_images = [pygame.transform.flip(img, True, False) for img in self.fly_left_images]
+        self.end_fly_right_images = [pygame.transform.flip(img, True, False) for img in self.end_fly_left_images]
+        self.bite_attack_right_images = [pygame.transform.flip(img, True, False) for img in self.bite_attack_left_images]
+        self.breath_attack_right_images = [pygame.transform.flip(img, True, False) for img in self.breath_attack_left_images]
+        
+        self.image = self.idle_left_images[0]
+        self.rect = self.image.get_rect(center=(x, y))
+        
+        self.base_speed = 120
+        self.speed = 1
+        self.full_health = 120 + (random.randint(20, 40) * self.level)
+        self.health = self.full_health
+        self.resource = "Dragon Meat"
+        self.meat_resource = "Dragon Meat"
+        self.resource_amount = 5
+        
+        special_drops = [{'item': 'Dragon Scales', 'chance': 0.8, 'min': 2, 'max': 5}]
+        if self.type_data:
+            for gem_data in self.type_data["rare_gems"]:
+                special_drops.append({'item': gem_data["gem"], 'chance': gem_data["chance"], 'min': 1, 'max': 2})
+        self.special_drops = special_drops
+        
+        self.death_experience = 2000 * (1 + (self.level * self.death_experience * .0001))
+        self.level = 1
+        
+        self.frame_index = 0
+        self.animation_speed = 0.2
+        self.direction = pygame.Vector2(0, 0)
+        self.move_timer = 0
+        self.last_direction = "left"
+        self.state = "walking"
+        self.flying_timer = 0
+        
+        self.attacking = False
+        self.attack_timer = 0
+        self.attack_duration = 40
+        self.bite_damage = 15
+        self.breath_damage = 20
+        self.attack_cooldown = pygame.time.get_ticks()
+        self.attack_delay = 2000
+    
+    def get_collision_rect(self, cam_x):
+        rect = self.rect
+        return pygame.Rect(rect.x - cam_x + 15, rect.y + 20, rect.width - 30, rect.height - 40)
+    
+    def handle_health(self, screen, cam_x, dt):
+        max_health = self.full_health
+        health = self.health
+        bar_width = 40
+        bar_height = 5
+        x = self.rect.centerx - bar_width / 2 - cam_x
+        y = self.rect.top + 5
+        health_ratio = health / max_health
+        health_width = int(bar_width * health_ratio)
+        
+        if self.health < self.last_health:
+            self.bar_timer = 5
+            if self.state != "flying" and random.random() < 0.6:
+                self.state = "flying"
+                self.frame_index = 0
+                self.flying_timer = random.randint(120, 240)
+                self.direction = pygame.Vector2(random.choice([-1, 1]), random.uniform(-1, -0.5))
+                if self.direction.length_squared() > 0:
+                    self.direction = self.direction.normalize()
+                self.speed = 1.3
+        
+        if self.bar_timer > 0:
+            pygame.draw.rect(screen, (255, 20, 20), pygame.Rect(x, y, bar_width, bar_height), border_radius=2)
+            pygame.draw.rect(screen, (40, 250, 40), pygame.Rect(x, y, health_width, bar_height), border_radius=2)
+            pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=1, border_radius=2)
+            self.bar_timer -= dt
+        
+        self.last_health = self.health
+        if self.health <= 0:
+            self.is_alive = False
+    
+    def check_collision(self, direction, nearby_objects, nearby_mobs):
+        if self.state == "flying":
+            return True, True
+        return super().check_collision(direction, nearby_objects, nearby_mobs)
+    
+    def attack(self, player_world_x, player_world_y, player):
+        if not self.is_alive:
+            return
+        
+        dx = player_world_x - self.rect.centerx
+        dy = player_world_y - self.rect.centery
+        distance_sq = dx*dx + dy*dy
+        
+        current_time = pygame.time.get_ticks()
+        if current_time - self.attack_cooldown > self.attack_delay and distance_sq < (150 * 150):
+            self.attack_cooldown = current_time
+            self.attacking = True
+            self.attack_timer = self.attack_duration
+            self.frame_index = 0.0
+        
+        if self.attacking:
+            if self.state == "flying":
+                frames = self.breath_attack_right_images if self.last_direction == "right" else self.breath_attack_left_images
+                self.frame_index = (self.frame_index + self.animation_speed * 0.8) % len(frames)
+                self.image = frames[int(self.frame_index)]
+                
+                if self.attack_timer == self.attack_duration // 2 and distance_sq < (150 * 150):
+                    player.health -= self.breath_damage
+                    sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+            else:
+                frames = self.bite_attack_right_images if self.last_direction == "right" else self.bite_attack_left_images
+                self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+                self.image = frames[int(self.frame_index)]
+                
+                if self.attack_timer == self.attack_duration // 2 and distance_sq < (100 * 100):
+                    player.health -= self.bite_damage
+                    sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+            
+            self.attack_timer -= 1
+            if self.attack_timer <= 0:
+                self.attacking = False
+                self.frame_index = 0.0
+    
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
+        if self.attacking:
+            return
+        
+        if self.state == "walking" and random.random() < 0.001:
+            self.state = "flying"
+            self.frame_index = 0
+            self.flying_timer = random.randint(60, 180)
+            self.direction = pygame.Vector2(random.uniform(-1, 1), random.uniform(-1, 1))
+            if self.direction.length_squared() > 0:
+                self.direction = self.direction.normalize()
+            self.speed = 1.3
+        
+        if self.state == "flying":
+            self.flying_timer -= 1
+            if self.flying_timer <= 0:
+                self.state = "landing"
+                self.frame_index = 0
+                self.speed = 1.0
+        
+        if self.state == "landing" and self.frame_index >= len(self.end_fly_left_images) - 1:
+            self.state = "walking"
+            self.frame_index = 0
+            self.direction = pygame.Vector2(0, 0)
+        
+        if self.state == "flying":
+            if self.direction.length_squared() > 0:
+                actual_speed = self.get_speed() * dt
+                movement = self.direction * actual_speed
+                self.rect.x += movement.x
+                self.rect.y += movement.y
+                if movement.x > 0:
+                    self.last_direction = "right"
+                elif movement.x < 0:
+                    self.last_direction = "left"
+            self.animate_stand()
+        else:
+            super().update(dt, player, nearby_objects, nearby_mobs)
+        
+        if not self.is_alive:
+            self.image = self.idle_left_images[0] if self.idle_left_images else self.image
+    
+    def animate_stand(self):
+        if self.state == "walking":
+            if self.last_direction == "right":
+                frames = self.idle_right_images
+            else:
+                frames = self.idle_left_images
+            self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+            self.image = frames[int(self.frame_index)]
+        elif self.state == "flying":
+            if self.frame_index < len(self.start_fly_left_images):
+                frames = self.start_fly_right_images if self.last_direction == "right" else self.start_fly_left_images
+                self.frame_index += self.animation_speed
+                if self.frame_index >= len(self.start_fly_left_images):
+                    self.frame_index = 0
+                self.image = frames[int(min(self.frame_index, len(frames) - 1))]
+            else:
+                frames = self.fly_right_images if self.last_direction == "right" else self.fly_left_images
+                self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+                self.image = frames[int(self.frame_index)]
+        elif self.state == "landing":
+            frames = self.end_fly_right_images if self.last_direction == "right" else self.end_fly_left_images
+            self.frame_index = min(self.frame_index + self.animation_speed, len(frames) - 1)
+            self.image = frames[int(self.frame_index)]
+    
+    def animate_walk(self):
+        if self.state == "walking":
+            if self.direction.x > 0:
+                self.last_direction = "right"
+            elif self.direction.x < 0:
+                self.last_direction = "left"
+            
+            frames = self.walk_right_images if self.last_direction == "right" else self.walk_left_images
+            self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+            self.image = frames[int(self.frame_index)]
+        else:
+            self.animate_stand()
