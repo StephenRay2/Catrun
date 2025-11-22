@@ -336,7 +336,7 @@ items_list = [
     },
     {
         "item_name": "Raw Chicken",
-        "icon": "RawChicken.png",
+        "icon": "RawBirdMeat.png",
         "stack_size": 100,
         "weight": .3,
         "type": "raw_material",
@@ -384,7 +384,7 @@ items_list = [
     },
     {
         "item_name": "Gila Meat",
-        "icon": "GilaMeat.png",
+        "icon": "RawReptileMeat.png",
         "stack_size": 100,
         "weight": .3,
         "type": "raw_material",
@@ -1026,7 +1026,7 @@ items_list = [
     },
     {
         "item_name": "Cooked Chicken",
-        "icon": "CookedChicken.png",
+        "icon": "CookedBirdMeat.png",
         "stack_size": 100,
         "weight": .3,
         "type": "consumable",
@@ -1074,7 +1074,7 @@ items_list = [
     },
     {
         "item_name": "Cooked Gila Meat",
-        "icon": "CookedGilaMeat.png",
+        "icon": "CookedReptileMeat.png",
         "stack_size": 100,
         "weight": .3,
         "type": "consumable",
@@ -1223,7 +1223,7 @@ items_list = [
     },
     {
         "item_name": "Torch",
-        "icon": "Torch1.png",
+        "icon": "Torch.png",
         "stack_size": 100,
         "weight": 1,
         "type": "tool",
@@ -1303,7 +1303,7 @@ items_list = [
     },
     {
         "item_name": "Campfire",
-        "icon": "Campfire1.png",
+        "icon": "Campfire.png",
         "stack_size": 100,
         "weight": 2,
         "type": "structure",
@@ -1319,7 +1319,7 @@ items_list = [
     },
     {
         "item_name": "Oil Lamp",
-        "icon": "OilLamp1.png",
+        "icon": "OilLamp.png",
         "stack_size": 100,
         "weight": 1,
         "type": "tool",
@@ -1708,7 +1708,7 @@ items_list = [
     },
     {
         "item_name": "Cooking Pot",
-        "icon": "CookingPot1.png",
+        "icon": "CookingPot.png",
         "stack_size": 1,
         "weight": 10,
         "type": "structure",
@@ -1836,7 +1836,7 @@ items_list = [
     },
     {
         "item_name": "Lantern",
-        "icon": "Lantern1.png",
+        "icon": "Lantern.png",
         "stack_size": 100,
         "weight": 3,
         "type": "tool",
@@ -1913,6 +1913,34 @@ items_list = [
         "crafting_medium": "workbench",
         "tags": ["food", "meat"],
         "output_amount": 1
+    },
+    {
+        "item_name": "Metal Axe",
+        "icon": "MetalAxe.png",
+        "stack_size": 1,
+        "weight": 8,
+        "type": "tool",
+        "description": "A sturdy metal axe. Perfect for chopping wood and solving problems.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 5000,
+        "recipe": [{"item": "Metal Ingot", "amount": 8}, {"item": "Oak Wood", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "weapon"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "MetalAxeRightHeld.png",
+            "right": "MetalAxeRightHeld.png",
+            "up": "MetalAxeUpHeld.png",
+            "down": "MetalAxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (3, 22),
+            "right": (18, 22),
+            "up": (0, -20),
+            "down": (0, 20)
+        }
     },
     # Crafted through Gameplay
     {
@@ -2494,6 +2522,16 @@ for item in items_list:
             pygame.image.load(f"{image_path}/{item['icon']}").convert_alpha(),
             (60, 60)
         )
+    
+    if "held_item_frames" in item:
+        item["held_item_images"] = {}
+        itemframes_path = "assets/sprites/itemFrames"
+        for direction, frame_name in item["held_item_frames"].items():
+            try:
+                img = pygame.image.load(f"{itemframes_path}/{frame_name}").convert_alpha()
+                item["held_item_images"][direction] = img
+            except:
+                item["held_item_images"][direction] = None
 
 class Inventory():
     def __init__(self, capacity):

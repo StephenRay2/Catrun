@@ -1,4 +1,5 @@
 import pygame
+import math
 pygame.init()
 from buttons import *
 from mob_placement import *
@@ -440,6 +441,14 @@ while running:
             
             inventory.inventory_list = [None] * inventory.capacity
             inventory.hotbar_slots = [None] * inventory.hotbar_size
+            
+            # Debug: Add Metal Axe to first hotbar slot
+            for item in items_list:
+                if item["item_name"] == "Metal Axe":
+                    axe_copy = item.copy()
+                    axe_copy["quantity"] = 1
+                    inventory.hotbar_slots[0] = axe_copy
+                    break
 
             inventory_resources = []
             collection_messages = []
@@ -1091,7 +1100,11 @@ while running:
             
             if hasattr(obj, 'breath_image') and obj.breath_image:
                 screen.blit(obj.breath_image, (obj.breath_image_x - cam_x, obj.breath_image_y))
-
+        
+        player_redraw_image = None
+        player_redraw_x = 0
+        player_redraw_y = 0
+        
         if not player_drawn:
             if player.swimming and player.current_liquid:
                 liquid_center_x = player.current_liquid.rect.centerx
@@ -1115,8 +1128,88 @@ while running:
                 
                 y_offset = sinking_ratio * 4
                 screen.blit(clipped_image, (player_pos.x - size/2, player_pos.y - size/2 + y_offset))
+                player_redraw_image = clipped_image
+                player_redraw_x = player_pos.x - size/2
+                player_redraw_y = player_pos.y - size/2 + y_offset
             else:
                 screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size/2))
+                player_redraw_image = player_current_image
+                player_redraw_x = player_pos.x - size/2
+                player_redraw_y = player_pos.y - size/2
+
+        current_hotbar_slot = inventory.hotbar_slots[inventory.selected_hotbar_slot]
+        if current_hotbar_slot is not None:
+            for item in items_list:
+                if item["item_name"] == current_hotbar_slot["item_name"] and "held_item_images" in item:
+                    is_attacking = pygame.mouse.get_pressed()[0] and not player.exhausted
+                    held_image = item["held_item_images"].get(player.last_direction)
+                    
+                    if held_image and is_attacking:
+                        is_moving = keys[pygame.K_w] or keys[pygame.K_a] or keys[pygame.K_s] or keys[pygame.K_d]
+                        
+                        if is_moving:
+                            if player.last_direction == "down":
+                                num_frames = len(player_walk_down_attack_images)
+                            elif player.last_direction == "up":
+                                num_frames = len(player_walk_up_attack_images)
+                            elif player.last_direction == "left":
+                                num_frames = len(player_walk_left_attack_images)
+                            elif player.last_direction == "right":
+                                num_frames = len(player_walk_right_attack_images)
+                            else:
+                                num_frames = 3
+                        else:
+                            num_frames = 3
+                        
+                        rotation_angle = (player_frame_index / num_frames) * 180 - 90
+                        swing_progress = (player_frame_index + 0.5) / num_frames
+                        swing_distance = 12 * math.sin(swing_progress * math.pi)
+                        
+                        base_offset = item.get("held_item_offset", {}).get(player.last_direction, (0, 0))
+                        
+                        if player.last_direction == "right":
+                            swing_offset = (base_offset[0] + swing_distance, base_offset[1])
+                        elif player.last_direction == "left":
+                            swing_offset = (base_offset[0] - swing_distance, base_offset[1])
+                        elif player.last_direction == "down":
+                            swing_offset = (base_offset[0], base_offset[1] + swing_distance)
+                        elif player.last_direction == "up":
+                            swing_offset = (base_offset[0], base_offset[1] - swing_distance)
+                        else:
+                            swing_offset = base_offset
+                        
+                        rotated_image = pygame.transform.rotate(held_image, rotation_angle)
+                        
+                        if player.last_direction == "left":
+                            rotated_image = pygame.transform.flip(rotated_image, True, False)
+                        
+                        scale_factor = 0.65
+                        scaled_size = (int(rotated_image.get_width() * scale_factor), int(rotated_image.get_height() * scale_factor))
+                        rotated_image = pygame.transform.scale(rotated_image, scaled_size)
+                        
+                        held_x = player_pos.x - size/2 + swing_offset[0]
+                        held_y = player_pos.y - size/2 + swing_offset[1]
+                        
+                        if player.last_direction in ["left", "up"]:
+                            screen.blit(rotated_image, (held_x, held_y))
+                            if player_redraw_image:
+                                screen.blit(player_redraw_image, (player_redraw_x, player_redraw_y))
+                        else:
+                            screen.blit(rotated_image, (held_x, held_y))
+                    elif held_image:
+                        offset = item.get("held_item_offset", {}).get(player.last_direction, (0, 0))
+                        held_x = player_pos.x - size/2 + offset[0]
+                        held_y = player_pos.y - size/2 + offset[1]
+                        
+                        if player.last_direction == "left":
+                            held_image = pygame.transform.flip(held_image, True, False)
+                        
+                        scale_factor = 0.65
+                        scaled_size = (int(held_image.get_width() * scale_factor), int(held_image.get_height() * scale_factor))
+                        held_image = pygame.transform.scale(held_image, scaled_size)
+                        
+                        screen.blit(held_image, (held_x, held_y))
+                    break
 
         # Draw thrown items
         for thrown in thrown_items:
@@ -1489,7 +1582,11 @@ while running:
                                 player_current_image = player_stand_attack_down_images[player_frame_index]
                                 player_animation_timer = 0
                         else:
-                            player_current_image = player_stand_image
+                            player_animation_timer += dt
+                            if player_animation_timer > .2:
+                                player_frame_index = (player_frame_index + 1) % len(player_idle_down_images)
+                                player_current_image = player_idle_down_images[player_frame_index]
+                                player_animation_timer = 0
                     elif player.last_direction == "up":
                         if pygame.mouse.get_pressed()[0] and not player.exhausted:
                             player_animation_timer += dt
@@ -1498,7 +1595,11 @@ while running:
                                 player_current_image = player_stand_attack_up_images[player_frame_index]
                                 player_animation_timer = 0
                         else:
-                            player_current_image = player_stand_up
+                            player_animation_timer += dt
+                            if player_animation_timer > .2:
+                                player_frame_index = (player_frame_index + 1) % len(player_idle_up_images)
+                                player_current_image = player_idle_up_images[player_frame_index]
+                                player_animation_timer = 0
                     elif player.last_direction == "left":
                         if pygame.mouse.get_pressed()[0] and not player.exhausted:
                             player_animation_timer += dt
@@ -1507,7 +1608,11 @@ while running:
                                 player_current_image = player_stand_attack_left_images[player_frame_index]
                                 player_animation_timer = 0
                         else:
-                            player_current_image = player_stand_left
+                            player_animation_timer += dt
+                            if player_animation_timer > .2:
+                                player_frame_index = (player_frame_index + 1) % len(player_idle_left_images)
+                                player_current_image = player_idle_left_images[player_frame_index]
+                                player_animation_timer = 0
                     elif player.last_direction == "right":
                         if pygame.mouse.get_pressed()[0] and not player.exhausted:
                             player_animation_timer += dt
@@ -1516,7 +1621,11 @@ while running:
                                 player_current_image = player_stand_attack_right_images[player_frame_index]
                                 player_animation_timer = 0
                         else:
-                            player_current_image = player_stand_right
+                            player_animation_timer += dt
+                            if player_animation_timer > .2:
+                                player_frame_index = (player_frame_index + 1) % len(player_idle_right_images)
+                                player_current_image = player_idle_right_images[player_frame_index]
+                                player_animation_timer = 0
                 
                 if keys[pygame.K_w] and (player_pos.y - (size/2)) >= 0:
                     if not up_collision:

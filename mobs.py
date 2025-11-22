@@ -10,19 +10,22 @@ size = 64
 ############ PLAYER IMAGES #################
 
 
-player_stand_image = pygame.image.load("assets/sprites/player/CharacterCorynnFrontStanding.png")
-player_stand_image_back = pygame.image.load("assets/sprites/player/CharacterCorynnBackStanding.png")
-player_stand_left = pygame.image.load("assets/sprites/player/CharacterCorynnLeftStanding.png")
-player_stand_right = pygame.image.load("assets/sprites/player/CharacterCorynnRightStanding.png")
-player_walk_down_images = [pygame.image.load("assets/sprites/player/CorynnWalkDown1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDown6.png").convert_alpha()]
-player_walk_up_images = [pygame.image.load("assets/sprites/player/CorynnWalkUp1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUp6.png").convert_alpha()]
-player_walk_left_images = [pygame.image.load("assets/sprites/player/CorynnWalkLeft1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft6.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeft7.png").convert_alpha()]
-player_stand_attack_down_images = [pygame.image.load("assets/sprites/player/CorynnFrontStandAttack1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnFrontStandAttack2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnFrontStandAttack3.png").convert_alpha()]
-player_stand_attack_up_images = [pygame.image.load("assets/sprites/player/CorynnBackStandAttack1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnBackStandAttack2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnBackStandAttack3.png").convert_alpha()]
-player_stand_attack_left_images = [pygame.image.load("assets/sprites/player/CorynnLeftStandAttack1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnLeftStandAttack2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnLeftStandAttack3.png").convert_alpha()]
-player_walk_down_attack_images = [pygame.image.load("assets/sprites/player/CorynnWalkDownAttack1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDownAttack2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDownAttack3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDownAttack4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDownAttack5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkDownAttack6.png").convert_alpha()]
-player_walk_up_attack_images = [pygame.image.load("assets/sprites/player/CorynnWalkUpAttack1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUpAttack2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUpAttack3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUpAttack4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUpAttack5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkUpAttack6.png").convert_alpha()]
-player_walk_left_attack_images = [pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack1.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack2.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack3.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack4.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack5.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack6.png").convert_alpha(), pygame.image.load("assets/sprites/player/CorynnWalkLeftAttack7.png").convert_alpha()] 
+player_stand_image = pygame.image.load("assets/sprites/player/GlenjaminFrontIdle1.png")
+player_stand_image_back = pygame.image.load("assets/sprites/player/GlenjaminUpIdle1.png")
+player_stand_left = pygame.transform.flip(pygame.image.load("assets/sprites/player/GlenjaminRightIdle1.png"), True, False)
+player_stand_right = pygame.image.load("assets/sprites/player/GlenjaminRightIdle1.png")
+player_walk_down_images = [pygame.image.load(f"assets/sprites/player/GlenjaminDownWalk{i}.png").convert_alpha() for i in range(1, 9)]
+player_walk_up_images = [pygame.image.load(f"assets/sprites/player/GlenjaminUpWalk{i}.png").convert_alpha() for i in range(1, 9)]
+player_walk_left_images = [pygame.transform.flip(pygame.image.load(f"assets/sprites/player/GlenjaminRightWalk{i}.png"), True, False).convert_alpha() for i in range(1, 9)]
+player_stand_attack_down_images = [pygame.image.load(f"assets/sprites/player/GlenjaminDownAttack{i}.png").convert_alpha() for i in range(1, 5)]
+player_stand_attack_up_images = [pygame.image.load(f"assets/sprites/player/GlenjaminUpAttack{i}.png").convert_alpha() for i in range(1, 5)]
+player_stand_attack_left_images = [pygame.transform.flip(pygame.image.load(f"assets/sprites/player/GlenjaminRightWalkAttack{i}.png"), True, False).convert_alpha() for i in range(1, 5)]
+player_walk_down_attack_images = [pygame.image.load(f"assets/sprites/player/GlenjaminDownWalkAttack{i}.png").convert_alpha() for i in range(1, 9)]
+player_walk_up_attack_images = [pygame.image.load(f"assets/sprites/player/GlenjaminUpWalkAttack{i}.png").convert_alpha() for i in range(1, 9)]
+player_walk_left_attack_images = [pygame.transform.flip(pygame.image.load(f"assets/sprites/player/GlenjaminRightWalkAttack{i}.png"), True, False).convert_alpha() for i in range(1, 9)]
+player_idle_down_images = [pygame.image.load(f"assets/sprites/player/GlenjaminFrontIdle{i}.png").convert_alpha() for i in range(1, 4)]
+player_idle_up_images = [pygame.image.load(f"assets/sprites/player/GlenjaminUpIdle{i}.png").convert_alpha() for i in range(1, 4)]
+player_idle_left_images = [pygame.transform.flip(pygame.image.load(f"assets/sprites/player/GlenjaminRightIdle{i}.png"), True, False).convert_alpha() for i in range(1, 4)]
 
 player_stand_image = pygame.transform.scale(player_stand_image, (size, size))
 player_stand_up = pygame.transform.scale(player_stand_image_back, (size, size))
@@ -40,6 +43,10 @@ player_walk_down_attack_images = [pygame.transform.scale(img, (size, size)) for 
 player_walk_up_attack_images = [pygame.transform.scale(img, (size, size)) for img in player_walk_up_attack_images]
 player_walk_left_attack_images = [pygame.transform.scale(img, (size, size)) for img in player_walk_left_attack_images]
 player_walk_right_attack_images = [pygame.transform.flip(img, True, False) for img in player_walk_left_attack_images]
+player_idle_down_images = [pygame.transform.scale(img, (size, size)) for img in player_idle_down_images]
+player_idle_up_images = [pygame.transform.scale(img, (size, size)) for img in player_idle_up_images]
+player_idle_left_images = [pygame.transform.scale(img, (size, size)) for img in player_idle_left_images]
+player_idle_right_images = [pygame.transform.flip(img, True, False) for img in player_idle_left_images]
 
 player_frame_index = 0
 player_animation_timer = 0
