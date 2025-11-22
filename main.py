@@ -1160,14 +1160,125 @@ while running:
                 collectibles.remove(col)
 
         player_drawn = False
+        player_redraw_image = None
+        player_redraw_x = 0
+        player_redraw_y = 0
 
         for obj in visible_liquids:
             obj.update_animation(dt)
             obj.draw(screen, cam_x)
 
+        def draw_held_item():
+            current_hotbar_slot = inventory.hotbar_slots[inventory.selected_hotbar_slot]
+            if current_hotbar_slot is not None:
+                for item in items_list:
+                    if item["item_name"] == current_hotbar_slot["item_name"] and "held_item_images" in item:
+                        is_attacking = pygame.mouse.get_pressed()[0] and not player.exhausted
+                        held_image = item["held_item_images"].get(player.last_direction)
+                        
+                        if held_image and is_attacking:
+                            is_moving = keys[pygame.K_w] or keys[pygame.K_a] or keys[pygame.K_s] or keys[pygame.K_d]
+                            
+                            if is_moving:
+                                if player.last_direction == "down":
+                                    num_frames = len(player_walk_down_attack_images)
+                                elif player.last_direction == "up":
+                                    num_frames = len(player_walk_up_attack_images)
+                                elif player.last_direction == "left":
+                                    num_frames = len(player_walk_left_attack_images)
+                                elif player.last_direction == "right":
+                                    num_frames = len(player_walk_right_attack_images)
+                                else:
+                                    num_frames = 3
+                            else:
+                                num_frames = 3
+                            
+                            frame_index = int(player_frame_index) % num_frames
+                            attack_frame_data = item.get("attack_frame_data", {}).get(player.last_direction)
+                            
+                            if attack_frame_data and len(attack_frame_data) > 0:
+                                attack_frame_index = frame_index % len(attack_frame_data)
+                                frame_info = attack_frame_data[attack_frame_index]
+                                swing_offset = frame_info["offset"]
+                                rotation_angle = frame_info["rotation"]
+                            else:
+                                rotation_angle = (player_frame_index / num_frames) * 180 - 90
+                                base_offset = item.get("held_item_offset", {}).get(player.last_direction, (0, 0))
+                                swing_offset = calculate_held_item_offset(base_offset, player_frame_index, num_frames, player.last_direction, is_attacking=True, is_moving=is_moving)
+                            
+                            rotated_image = pygame.transform.rotate(held_image, rotation_angle)
+                            
+                            if player.last_direction == "left":
+                                rotated_image = pygame.transform.flip(rotated_image, True, False)
+                            
+                            scale_factor = 0.65
+                            scaled_size = (int(rotated_image.get_width() * scale_factor), int(rotated_image.get_height() * scale_factor))
+                            rotated_image = pygame.transform.scale(rotated_image, scaled_size)
+                            
+                            held_x = player_pos.x - size/2 + swing_offset[0]
+                            held_y = player_pos.y - size/2 + swing_offset[1]
+                            
+                            screen.blit(rotated_image, (held_x, held_y))
+                        elif held_image:
+                            is_moving = keys[pygame.K_w] or keys[pygame.K_a] or keys[pygame.K_s] or keys[pygame.K_d]
+                            base_offset = item.get("held_item_offset", {}).get(player.last_direction, (0, 0))
+                            
+                            movement_rotation = 0
+                            vertical_bob = 0
+                            if is_moving:
+                                if player.last_direction == "down":
+                                    num_frames = len(player_walk_down_images)
+                                elif player.last_direction == "up":
+                                    num_frames = len(player_walk_up_images)
+                                elif player.last_direction == "left":
+                                    num_frames = len(player_walk_left_images)
+                                elif player.last_direction == "right":
+                                    num_frames = len(player_walk_right_images)
+                                else:
+                                    num_frames = 3
+                                
+                                frame_index = int(player_frame_index) % num_frames
+                                movement_frame_data = item.get("movement_frame_data", {}).get(player.last_direction)
+                                
+                                if movement_frame_data and frame_index < len(movement_frame_data):
+                                    frame_info = movement_frame_data[frame_index]
+                                    offset = frame_info["offset"]
+                                    movement_rotation = frame_info["rotation"]
+                                else:
+                                    offset = calculate_held_item_offset(base_offset, player_frame_index, num_frames, player.last_direction, is_attacking=False, is_moving=True)
+                                    pendulum_offset = offset[0] - base_offset[0]
+                                    movement_rotation = calculate_movement_rotation(player_frame_index, num_frames, player.last_direction, pendulum_offset)
+                                    
+                                    progress = player_frame_index / num_frames
+                                    vertical_bob = -4 * math.sin(progress * math.pi * 2)
+                                    offset = (offset[0], offset[1] + vertical_bob)
+                            else:
+                                offset = base_offset
+                            
+                            held_x = player_pos.x - size/2 + offset[0]
+                            held_y = player_pos.y - size/2 + offset[1]
+                            
+                            if player.last_direction == "left":
+                                held_image = pygame.transform.flip(held_image, True, False)
+                            
+                            scale_factor = 0.65
+                            scaled_size = (int(held_image.get_width() * scale_factor), int(held_image.get_height() * scale_factor))
+                            held_image = pygame.transform.scale(held_image, scaled_size)
+                            
+                            if movement_rotation != 0:
+                                held_image = pygame.transform.rotate(held_image, movement_rotation)
+                            
+                            screen.blit(held_image, (held_x, held_y))
+                        break
+
         for obj in visible_objects:
             object_mid_y = obj.rect.y + obj.rect.height / 2
             if not player_drawn and (player.rect.centery + 20) <= object_mid_y:
+                # Draw axe first for left/up directions (behind the player)
+                if player.last_direction in ["left", "up"]:
+                    draw_held_item()
+                
+                # Draw player
                 if player.swimming and player.current_liquid:
                     liquid_center_x = player.current_liquid.rect.centerx
                     liquid_center_y = player.current_liquid.rect.centery
@@ -1192,17 +1303,21 @@ while running:
                     screen.blit(clipped_image, (player_pos.x - size/2, player_pos.y - size/2 + y_offset))
                 else:
                     screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size/2))
+                
+                # Draw axe after for right/down directions (in front of the player)
+                if player.last_direction in ["right", "down"]:
+                    draw_held_item()
+                
                 player_drawn = True
             obj.draw(screen, cam_x)
             
             if hasattr(obj, 'breath_image') and obj.breath_image:
                 screen.blit(obj.breath_image, (obj.breath_image_x - cam_x, obj.breath_image_y))
         
-        player_redraw_image = None
-        player_redraw_x = 0
-        player_redraw_y = 0
-        
         if not player_drawn:
+            if player.last_direction in ["left", "up"]:
+                draw_held_item()
+            
             if player.swimming and player.current_liquid:
                 liquid_center_x = player.current_liquid.rect.centerx
                 liquid_center_y = player.current_liquid.rect.centery
@@ -1225,121 +1340,11 @@ while running:
                 
                 y_offset = sinking_ratio * 4
                 screen.blit(clipped_image, (player_pos.x - size/2, player_pos.y - size/2 + y_offset))
-                player_redraw_image = clipped_image
-                player_redraw_x = player_pos.x - size/2
-                player_redraw_y = player_pos.y - size/2 + y_offset
             else:
                 screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size/2))
-                player_redraw_image = player_current_image
-                player_redraw_x = player_pos.x - size/2
-                player_redraw_y = player_pos.y - size/2
-
-        current_hotbar_slot = inventory.hotbar_slots[inventory.selected_hotbar_slot]
-        if current_hotbar_slot is not None:
-            for item in items_list:
-                if item["item_name"] == current_hotbar_slot["item_name"] and "held_item_images" in item:
-                    is_attacking = pygame.mouse.get_pressed()[0] and not player.exhausted
-                    held_image = item["held_item_images"].get(player.last_direction)
-                    
-                    if held_image and is_attacking:
-                        is_moving = keys[pygame.K_w] or keys[pygame.K_a] or keys[pygame.K_s] or keys[pygame.K_d]
-                        
-                        if is_moving:
-                            if player.last_direction == "down":
-                                num_frames = len(player_walk_down_attack_images)
-                            elif player.last_direction == "up":
-                                num_frames = len(player_walk_up_attack_images)
-                            elif player.last_direction == "left":
-                                num_frames = len(player_walk_left_attack_images)
-                            elif player.last_direction == "right":
-                                num_frames = len(player_walk_right_attack_images)
-                            else:
-                                num_frames = 3
-                        else:
-                            num_frames = 3
-                        
-                        frame_index = int(player_frame_index) % num_frames
-                        attack_frame_data = item.get("attack_frame_data", {}).get(player.last_direction)
-                        
-                        if attack_frame_data and len(attack_frame_data) > 0:
-                            attack_frame_index = frame_index % len(attack_frame_data)
-                            frame_info = attack_frame_data[attack_frame_index]
-                            swing_offset = frame_info["offset"]
-                            rotation_angle = frame_info["rotation"]
-                        else:
-                            rotation_angle = (player_frame_index / num_frames) * 180 - 90
-                            base_offset = item.get("held_item_offset", {}).get(player.last_direction, (0, 0))
-                            swing_offset = calculate_held_item_offset(base_offset, player_frame_index, num_frames, player.last_direction, is_attacking=True, is_moving=is_moving)
-                        
-                        rotated_image = pygame.transform.rotate(held_image, rotation_angle)
-                        
-                        if player.last_direction == "left":
-                            rotated_image = pygame.transform.flip(rotated_image, True, False)
-                        
-                        scale_factor = 0.65
-                        scaled_size = (int(rotated_image.get_width() * scale_factor), int(rotated_image.get_height() * scale_factor))
-                        rotated_image = pygame.transform.scale(rotated_image, scaled_size)
-                        
-                        held_x = player_pos.x - size/2 + swing_offset[0]
-                        held_y = player_pos.y - size/2 + swing_offset[1]
-                        
-                        if player.last_direction in ["left", "up"]:
-                            screen.blit(rotated_image, (held_x, held_y))
-                            if player_redraw_image:
-                                screen.blit(player_redraw_image, (player_redraw_x, player_redraw_y))
-                        else:
-                            screen.blit(rotated_image, (held_x, held_y))
-                    elif held_image:
-                        is_moving = keys[pygame.K_w] or keys[pygame.K_a] or keys[pygame.K_s] or keys[pygame.K_d]
-                        base_offset = item.get("held_item_offset", {}).get(player.last_direction, (0, 0))
-                        
-                        movement_rotation = 0
-                        vertical_bob = 0
-                        if is_moving:
-                            if player.last_direction == "down":
-                                num_frames = len(player_walk_down_images)
-                            elif player.last_direction == "up":
-                                num_frames = len(player_walk_up_images)
-                            elif player.last_direction == "left":
-                                num_frames = len(player_walk_left_images)
-                            elif player.last_direction == "right":
-                                num_frames = len(player_walk_right_images)
-                            else:
-                                num_frames = 3
-                            
-                            frame_index = int(player_frame_index) % num_frames
-                            movement_frame_data = item.get("movement_frame_data", {}).get(player.last_direction)
-                            
-                            if movement_frame_data and frame_index < len(movement_frame_data):
-                                frame_info = movement_frame_data[frame_index]
-                                offset = frame_info["offset"]
-                                movement_rotation = frame_info["rotation"]
-                            else:
-                                offset = calculate_held_item_offset(base_offset, player_frame_index, num_frames, player.last_direction, is_attacking=False, is_moving=True)
-                                pendulum_offset = offset[0] - base_offset[0]
-                                movement_rotation = calculate_movement_rotation(player_frame_index, num_frames, player.last_direction, pendulum_offset)
-                                
-                                progress = player_frame_index / num_frames
-                                vertical_bob = -4 * math.sin(progress * math.pi * 2)
-                                offset = (offset[0], offset[1] + vertical_bob)
-                        else:
-                            offset = base_offset
-                        
-                        held_x = player_pos.x - size/2 + offset[0]
-                        held_y = player_pos.y - size/2 + offset[1]
-                        
-                        if player.last_direction == "left":
-                            held_image = pygame.transform.flip(held_image, True, False)
-                        
-                        scale_factor = 0.65
-                        scaled_size = (int(held_image.get_width() * scale_factor), int(held_image.get_height() * scale_factor))
-                        held_image = pygame.transform.scale(held_image, scaled_size)
-                        
-                        if movement_rotation != 0:
-                            held_image = pygame.transform.rotate(held_image, movement_rotation)
-                        
-                        screen.blit(held_image, (held_x, held_y))
-                    break
+            
+            if player.last_direction in ["right", "down"]:
+                draw_held_item()
 
         # Draw thrown items
         for thrown in thrown_items:
