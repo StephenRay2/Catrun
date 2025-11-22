@@ -33,6 +33,8 @@ cat_name_input = ""
 
 paused = False
 inventory_in_use = False
+debug_step_mode = False
+debug_should_step_frame = False
 
 step_sound_timer = 0
 step_sound_delay = 0.4
@@ -54,6 +56,9 @@ max_throw_power = 8
 min_throw_hold_time = 0.15  # Minimum hold time (in seconds) to trigger throw instead of pickup
 thrown_items = []
 loaded_item_sprites = {}  # Cache for loaded item sprites
+
+# Debug variables
+debug_movement_rotation = 15
 
 def calculate_throw_trajectory(start_x, start_y, target_x, target_y, throw_power):
     delta_x = target_x - start_x
@@ -184,6 +189,88 @@ def add_collection_message(resource_name, count):
     
     collection_messages.insert(0, [text_surface, bg_surface, rect, 3.0, 3.0])
 
+def calculate_held_item_offset(base_offset, frame_index, num_frames, direction, is_attacking, is_moving):
+    if is_attacking:
+        return calculate_attack_arc_offset(base_offset, frame_index, num_frames, direction)
+    elif is_moving:
+        return calculate_movement_offset(base_offset, frame_index, num_frames, direction)
+    else:
+        return base_offset
+
+def calculate_attack_arc_offset(base_offset, frame_index, num_frames, direction):
+    progress = frame_index / num_frames
+    
+    x_offset, y_offset = base_offset
+    
+    if direction == "right":
+        arc_x = 20 * math.sin(progress * math.pi)
+        arc_y = -25 * math.sin(progress * math.pi)
+        return (x_offset + arc_x, y_offset + arc_y)
+    elif direction == "left":
+        arc_x = -20 * math.sin(progress * math.pi)
+        arc_y = -25 * math.sin(progress * math.pi)
+        return (x_offset + arc_x, y_offset + arc_y)
+    elif direction == "down":
+        arc_x = 0
+        arc_y = 20 * math.sin(progress * math.pi)
+        return (x_offset + arc_x, y_offset + arc_y)
+    elif direction == "up":
+        arc_x = 0
+        arc_y = -20 * math.sin(progress * math.pi)
+        return (x_offset + arc_x, y_offset + arc_y)
+    
+    return base_offset
+
+def calculate_movement_offset(base_offset, frame_index, num_frames, direction):
+    progress = frame_index / num_frames
+    
+    x_offset, y_offset = base_offset
+    
+    if direction == "right":
+        pendulum_x = 8 * math.sin(progress * math.pi * 2)
+        return (x_offset + pendulum_x, y_offset)
+    elif direction == "left":
+        pendulum_x = -8 * math.sin(progress * math.pi * 2)
+        return (x_offset + pendulum_x, y_offset)
+    elif direction == "down":
+        bob_y = 6 * math.sin(progress * math.pi * 2)
+        return (x_offset, y_offset + bob_y)
+    elif direction == "up":
+        bob_y = 6 * math.sin(progress * math.pi * 2)
+        return (x_offset, y_offset + bob_y)
+    
+    return base_offset
+
+def calculate_movement_rotation(frame_index, num_frames, direction, pendulum_offset):
+    if direction in ["right", "left"]:
+        rotation = (pendulum_offset / 8.0) * debug_movement_rotation
+        return rotation
+    
+    return 0
+
+def handle_debug_rotation_input(event):
+    global debug_movement_rotation
+    if event.type == pygame.KEYDOWN:
+        if event.key == pygame.K_EQUALS or event.key == pygame.K_PLUS:
+            debug_movement_rotation += 1
+            print(f"Movement rotation: {debug_movement_rotation}°")
+        elif event.key == pygame.K_MINUS:
+            debug_movement_rotation -= 1
+            print(f"Movement rotation: {debug_movement_rotation}°")
+
+def handle_debug_step_input(event):
+    global debug_step_mode, debug_should_step_frame
+    if event.type == pygame.KEYDOWN:
+        if event.key == pygame.K_h:
+            debug_step_mode = not debug_step_mode
+            if debug_step_mode:
+                print("DEBUG: Frame step mode ENABLED - Press SPACE to advance one frame")
+            else:
+                print("DEBUG: Frame step mode DISABLED")
+        elif event.key == pygame.K_SPACE and debug_step_mode:
+            debug_should_step_frame = True
+            print("DEBUG: Stepping one frame")
+
 while running:
     if state != previous_state:
         if state == "menu":
@@ -252,9 +339,16 @@ while running:
         dt = clock.tick(60) / 1000
 
     elif state == "game":
-        dungeon_depth = absolute_cam_x
-        total_elapsed_time += dt
-        time_of_day = (12 + (total_elapsed_time / 60)) % 24
+        should_process_frame = not debug_step_mode or debug_should_step_frame
+        if debug_should_step_frame:
+            debug_should_step_frame = False
+        
+        if should_process_frame:
+            dungeon_depth = absolute_cam_x
+            total_elapsed_time += dt
+            time_of_day = (12 + (total_elapsed_time / 60)) % 24
+        else:
+            dt = 0
 
         
         if game_just_started:
@@ -467,6 +561,9 @@ while running:
         current_time = pygame.time.get_ticks()
 
         for event in pygame.event.get():
+            handle_debug_rotation_input(event)
+            handle_debug_step_input(event)
+            
             if event.type == pygame.QUIT:
                 running = False
 
@@ -1161,22 +1258,18 @@ while running:
                         else:
                             num_frames = 3
                         
-                        rotation_angle = (player_frame_index / num_frames) * 180 - 90
-                        swing_progress = (player_frame_index + 0.5) / num_frames
-                        swing_distance = 12 * math.sin(swing_progress * math.pi)
+                        frame_index = int(player_frame_index) % num_frames
+                        attack_frame_data = item.get("attack_frame_data", {}).get(player.last_direction)
                         
-                        base_offset = item.get("held_item_offset", {}).get(player.last_direction, (0, 0))
-                        
-                        if player.last_direction == "right":
-                            swing_offset = (base_offset[0] + swing_distance, base_offset[1])
-                        elif player.last_direction == "left":
-                            swing_offset = (base_offset[0] - swing_distance, base_offset[1])
-                        elif player.last_direction == "down":
-                            swing_offset = (base_offset[0], base_offset[1] + swing_distance)
-                        elif player.last_direction == "up":
-                            swing_offset = (base_offset[0], base_offset[1] - swing_distance)
+                        if attack_frame_data and len(attack_frame_data) > 0:
+                            attack_frame_index = frame_index % len(attack_frame_data)
+                            frame_info = attack_frame_data[attack_frame_index]
+                            swing_offset = frame_info["offset"]
+                            rotation_angle = frame_info["rotation"]
                         else:
-                            swing_offset = base_offset
+                            rotation_angle = (player_frame_index / num_frames) * 180 - 90
+                            base_offset = item.get("held_item_offset", {}).get(player.last_direction, (0, 0))
+                            swing_offset = calculate_held_item_offset(base_offset, player_frame_index, num_frames, player.last_direction, is_attacking=True, is_moving=is_moving)
                         
                         rotated_image = pygame.transform.rotate(held_image, rotation_angle)
                         
@@ -1197,7 +1290,41 @@ while running:
                         else:
                             screen.blit(rotated_image, (held_x, held_y))
                     elif held_image:
-                        offset = item.get("held_item_offset", {}).get(player.last_direction, (0, 0))
+                        is_moving = keys[pygame.K_w] or keys[pygame.K_a] or keys[pygame.K_s] or keys[pygame.K_d]
+                        base_offset = item.get("held_item_offset", {}).get(player.last_direction, (0, 0))
+                        
+                        movement_rotation = 0
+                        vertical_bob = 0
+                        if is_moving:
+                            if player.last_direction == "down":
+                                num_frames = len(player_walk_down_images)
+                            elif player.last_direction == "up":
+                                num_frames = len(player_walk_up_images)
+                            elif player.last_direction == "left":
+                                num_frames = len(player_walk_left_images)
+                            elif player.last_direction == "right":
+                                num_frames = len(player_walk_right_images)
+                            else:
+                                num_frames = 3
+                            
+                            frame_index = int(player_frame_index) % num_frames
+                            movement_frame_data = item.get("movement_frame_data", {}).get(player.last_direction)
+                            
+                            if movement_frame_data and frame_index < len(movement_frame_data):
+                                frame_info = movement_frame_data[frame_index]
+                                offset = frame_info["offset"]
+                                movement_rotation = frame_info["rotation"]
+                            else:
+                                offset = calculate_held_item_offset(base_offset, player_frame_index, num_frames, player.last_direction, is_attacking=False, is_moving=True)
+                                pendulum_offset = offset[0] - base_offset[0]
+                                movement_rotation = calculate_movement_rotation(player_frame_index, num_frames, player.last_direction, pendulum_offset)
+                                
+                                progress = player_frame_index / num_frames
+                                vertical_bob = -4 * math.sin(progress * math.pi * 2)
+                                offset = (offset[0], offset[1] + vertical_bob)
+                        else:
+                            offset = base_offset
+                        
                         held_x = player_pos.x - size/2 + offset[0]
                         held_y = player_pos.y - size/2 + offset[1]
                         
@@ -1207,6 +1334,9 @@ while running:
                         scale_factor = 0.65
                         scaled_size = (int(held_image.get_width() * scale_factor), int(held_image.get_height() * scale_factor))
                         held_image = pygame.transform.scale(held_image, scaled_size)
+                        
+                        if movement_rotation != 0:
+                            held_image = pygame.transform.rotate(held_image, movement_rotation)
                         
                         screen.blit(held_image, (held_x, held_y))
                     break

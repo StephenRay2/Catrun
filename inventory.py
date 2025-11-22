@@ -1235,7 +1235,19 @@ items_list = [
         "recipe": [{"item": "Sticks", "amount": 5}, {"item": "Flint", "amount": 1}],
         "crafting_medium": "hand",
         "tags": ["tool"],
-        "output_amount": 1
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "Torch1.png",
+            "right": "Torch1.png",
+            "up": "Torch1.png",
+            "down": "Torch1.png"
+        },
+        "held_item_offset": {
+            "left": (5, 18),
+            "right": (15, 18),
+            "up": (13, 10),
+            "down": (0, 18)
+        }
     },
     {
         "item_name": "Small Orange Juice",
@@ -1936,10 +1948,78 @@ items_list = [
             "down": "MetalAxeDownHeld.png"
         },
         "held_item_offset": {
-            "left": (3, 22),
-            "right": (18, 22),
-            "up": (0, -20),
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
             "down": (0, 20)
+        },
+        "movement_frame_data": {
+            "right": [
+                {"offset": (15, 21), "rotation": 2},
+                {"offset": (21, 18), "rotation": 7},
+                {"offset": (17, 3), "rotation": 45},
+                {"offset": (21, 18), "rotation": 7},
+                {"offset": (15, 21), "rotation": 0},
+                {"offset": (11, 21), "rotation": 0},
+                {"offset": (7, 21), "rotation": 0},
+                {"offset": (11, 21), "rotation": 0},
+            ],
+            "left": [
+                {"offset": (5, 21), "rotation": 0},
+                {"offset": (4, 19), "rotation": 25},
+                {"offset": (2, 19), "rotation": -5},
+                {"offset": (4, 19), "rotation": -30},
+                {"offset": (5, 21), "rotation": 0},
+                {"offset": (4, 19), "rotation": 25},
+                {"offset": (2, 19), "rotation": -5},
+                {"offset": (4, 19), "rotation": -30},
+            ],
+            "up": [
+                {"offset": (0, -20), "rotation": 0},
+                {"offset": (1, -21), "rotation": 5},
+                {"offset": (0, -22), "rotation": 0},
+                {"offset": (-1, -21), "rotation": -5},
+                {"offset": (0, -20), "rotation": 0},
+                {"offset": (1, -21), "rotation": 5},
+                {"offset": (0, -22), "rotation": 0},
+                {"offset": (-1, -21), "rotation": -5},
+            ],
+            "down": [
+                {"offset": (0, 20), "rotation": 0},
+                {"offset": (-1, 21), "rotation": -5},
+                {"offset": (0, 22), "rotation": 0},
+                {"offset": (1, 21), "rotation": 5},
+                {"offset": (0, 20), "rotation": 0},
+                {"offset": (-1, 21), "rotation": -5},
+                {"offset": (0, 22), "rotation": 0},
+                {"offset": (1, 21), "rotation": 5},
+            ]
+        },
+        "attack_frame_data": {
+            "right": [
+                {"offset": (10, 10), "rotation": -45},
+                {"offset": (20, 0), "rotation": 0},
+                {"offset": (10, 25), "rotation": 45},
+                {"offset": (8, 15), "rotation": 15},
+            ],
+            "left": [
+                {"offset": (10, 10), "rotation": 45},
+                {"offset": (0, 0), "rotation": 0},
+                {"offset": (10, 25), "rotation": -45},
+                {"offset": (8, 15), "rotation": -15},
+            ],
+            "up": [
+                {"offset": (-5, -30), "rotation": -45},
+                {"offset": (0, -20), "rotation": 0},
+                {"offset": (5, -10), "rotation": 45},
+                {"offset": (0, -25), "rotation": 15},
+            ],
+            "down": [
+                {"offset": (-5, 10), "rotation": -45},
+                {"offset": (0, 20), "rotation": 0},
+                {"offset": (5, 30), "rotation": 45},
+                {"offset": (0, 25), "rotation": -15},
+            ]
         }
     },
     # Crafted through Gameplay
