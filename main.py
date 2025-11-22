@@ -1191,7 +1191,7 @@ while running:
                                 else:
                                     num_frames = 3
                             else:
-                                num_frames = 3
+                                num_frames = 4
                             
                             frame_index = int(player_frame_index) % num_frames
                             attack_frame_data = item.get("attack_frame_data", {}).get(player.last_direction)
