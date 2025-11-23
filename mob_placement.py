@@ -1,5 +1,5 @@
 from mobs import *
-player = Player(width/2, height/2, "Corynn")
+player = Player(width/2, height/2, "Glenjamin")
 
 
 num_deers = 50

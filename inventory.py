@@ -7,7 +7,7 @@ from sounds import sound_manager
 
 hotbar_image = pygame.image.load("assets/sprites/buttons/hotbar.png").convert_alpha()
 hotbar_image = pygame.transform.scale(hotbar_image, (514, 55))
-player_inventory_image = pygame.image.load("assets/sprites/player/CharacterCorynnFrontStanding.png")
+player_inventory_image = pygame.image.load("assets/sprites/player/GlenjaminFrontIdle1.png")
 player_inventory_image = pygame.transform.scale(player_inventory_image, (500, 500))
 
 image_path = "assets/sprites/items"
@@ -2643,6 +2643,10 @@ class Inventory():
         self.crafting_slot_positions = {}
         self.last_click_time = 0
         self.last_click_slot = None
+        self.crafting_completion_flash = False
+        self.crafting_completion_slot = None
+        self.crafting_completion_time = 0
+        self.crafting_flash_duration = 0.3  # 0.3 second flash
 
     def draw_inventory(self, screen):
         
@@ -2655,7 +2659,7 @@ class Inventory():
             pygame.draw.rect(inventory_surface, (0, 0, 0, 150), screen.get_rect())
             screen.blit(inventory_surface, (0, 0))
             screen.blit(self.inventory_image, (x_pos, y_pos - 20))
-            screen.blit(player_inventory_image, (700, 130))
+            screen.blit(player_inventory_image, (700, 90))
 
             screen.blit(inventory_tab, (width // 2 - 533, height // 2 - 303))
             crafting_tab_unused.draw(screen)
@@ -2680,7 +2684,7 @@ class Inventory():
             pygame.draw.rect(inventory_surface, (0, 0, 0, 150), screen.get_rect())
             screen.blit(inventory_surface, (0, 0))
             screen.blit(self.level_up_image, (x_pos, y_pos - 20))
-            screen.blit(player_inventory_image, (700, 130))
+            screen.blit(player_inventory_image, (700, 90))
 
             inventory_tab_unused.draw(screen)
             crafting_tab_unused.draw(screen)
@@ -2982,7 +2986,14 @@ class Inventory():
             screen.blit(item["image"], (x, y))
             
             self.crafting_slot_positions[idx] = (x, y, item)
-        
+
+        # Draw crafting completion flash
+        if self.crafting_completion_flash and self.crafting_completion_slot:
+            x, y = self.crafting_completion_slot
+            flash_surface = pygame.Surface((self.slot_size, self.slot_size), pygame.SRCALPHA)
+            pygame.draw.rect(flash_surface, (255, 255, 255, 150), (0, 0, self.slot_size, self.slot_size))
+            screen.blit(flash_surface, (x, y))
+
         if hasattr(self, 'selected_crafting_item') and self.selected_crafting_item is not None:
             item = self.selected_crafting_item
             
@@ -3154,10 +3165,15 @@ class Inventory():
             if x <= mouse_pos[0] <= x + self.slot_size and y <= mouse_pos[1] <= y + self.slot_size:
                 if self.last_click_slot == idx and (current_time - self.last_click_time) < 0.3:
                     if self.has_materials_for_recipe(item["recipe"]):
-                        success = self.craft_item(item)
+                        # Craft immediately and trigger flash
+                        self.craft_item(item)
+                        # Trigger completion flash
+                        self.crafting_completion_flash = True
+                        self.crafting_completion_time = pygame.time.get_ticks() / 1000.0
+                        self.crafting_completion_slot = (x, y)
                         self.last_click_slot = None
                         self.last_click_time = 0
-                        return success
+                        return True
                 else:
                     self.selected_crafting_item = item
                     self.last_click_slot = idx
@@ -3165,7 +3181,16 @@ class Inventory():
                     return False
         
         return False
-    
+
+    def update_flash(self, dt):
+        """Update completion flash timer"""
+        if self.crafting_completion_flash:
+            current_time = pygame.time.get_ticks() / 1000.0
+            if current_time - self.crafting_completion_time >= self.crafting_flash_duration:
+                self.crafting_completion_flash = False
+                self.crafting_completion_slot = None
+                self.crafting_completion_time = 0
+
     def start_drag(self, slot_index, is_hotbar):
         if is_hotbar:
             slot = self.hotbar_slots[slot_index]

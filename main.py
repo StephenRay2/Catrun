@@ -347,6 +347,8 @@ while running:
             dungeon_depth = absolute_cam_x
             total_elapsed_time += dt
             time_of_day = (12 + (total_elapsed_time / 60)) % 24
+            # Update crafting flash
+            inventory.update_flash(dt)
         else:
             dt = 0
 
