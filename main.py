@@ -63,63 +63,284 @@ placement_item = None
 placement_position = (0, 0)
 placed_structures = []
 
-# Placement size tuning (edit values here to change how big each object is)
 default_placeable_sprite_size = (64, 64)
-default_placeable_collision_size = (44, 14)
+
 placeable_size_settings = {
-    "Torch": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Workbench": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Campfire": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Oil Lamp": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Cooking Pot": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Smelter": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Empty Cage": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Alchemy Bench": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Fence": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Chest": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Tent": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Lantern": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Mortar And Pestle": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Tamed Black Cat": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Tamed Salt and Pepper Cat": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Tamed White Cat": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Tamed Black and White Cat": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Tamed Sandy Cat": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Tamed Orange Cat": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Tamed Calico Cat": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Tamed Gray Cat": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
-    "Tamed Orange and White Cat": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size}
+    "Torch": {
+        "sprite": (24, 24),
+        "collision": {
+            "width_ratio": 0.5,
+            "height_ratio": 0.3,
+            "offset_x_ratio": -0.5,
+            "offset_y_ratio": -1.0
+        }
+    },
+    "Workbench": {
+        "sprite": (64, 64),
+        "collision": {
+            "width_ratio": 0.8,
+            "height_ratio": 0.4,
+            "offset_x_ratio": -0.5,
+            "offset_y_ratio": -1.0
+        }
+    },
+    "Campfire": {
+        "sprite": (48, 48),
+        "collision": {
+            "width_ratio": 0.6,
+            "height_ratio": 0.3,
+            "offset_x_ratio": -0.5,
+            "offset_y_ratio": -1.0
+        }
+    },
+    "Oil Lamp": {
+        "sprite": (32, 32),
+        "collision": {
+            "width_ratio": 0.4,
+            "height_ratio": 0.25,
+            "offset_x_ratio": -0.5,
+            "offset_y_ratio": -1.0
+        }
+    },
+    "Cooking Pot": {
+        "sprite": (32, 32),
+        "collision": {
+            "width_ratio": 0.5,
+            "height_ratio": 0.3,
+            "offset_x_ratio": -0.5,
+            "offset_y_ratio": -1.0
+        }
+    },
+    "Smelter": {
+        "sprite": (64, 64),
+        "collision": {
+            "width_ratio": 0.6,
+            "height_ratio": 0.2,
+            "offset_x_ratio": -0.5,
+            "offset_y_ratio": -.75
+        }
+    },
+    "Empty Cage": {
+        "sprite": (48, 48),
+        "collision": {
+            "width_ratio": 0.7,
+            "height_ratio": 0.5,
+            "offset_x_ratio": -0.5,
+            "offset_y_ratio": -1.0
+        }
+    },
+    "Alchemy Bench": {
+        "sprite": (64, 64),
+        "collision": {
+            "width_ratio": 0.8,
+            "height_ratio": 0.4,
+            "offset_x_ratio": -0.5,
+            "offset_y_ratio": -1.0
+        }
+    },
+    "Fence": {
+        "sprite": (48, 48),
+        "collision": {
+            "width_ratio": 0.9,
+            "height_ratio": 0.6,
+            "offset_x_ratio": -0.5,
+            "offset_y_ratio": -1.0
+        }
+    },
+    "Chest": {
+        "sprite": (48, 48),
+        "collision": {
+            "width_ratio": 0.6,
+            "height_ratio": 0.3,
+            "offset_x_ratio": -0.5,
+            "offset_y_ratio": -1.0
+        }
+    },
+    "Tent": {
+        "sprite": (96, 96),
+        "collision": {
+            "width_ratio": 0.8,
+            "height_ratio": 0.5,
+            "offset_x_ratio": -0.5,
+            "offset_y_ratio": -1.0
+        }
+    },
+    "Lantern": {
+        "sprite": (24, 24),
+        "collision": {
+            "width_ratio": 0.4,
+            "height_ratio": 0.25,
+            "offset_x_ratio": -0.5,
+            "offset_y_ratio": -1.0
+        }
+    },
+    "Mortar And Pestle": {
+        "sprite": (24, 24),
+        "collision": {
+            "width_ratio": 0.45,
+            "height_ratio": 0.25,
+            "offset_x_ratio": -0.6,
+            "offset_y_ratio": -5
+        }
+    },
 }
 
 # Debug variables
 debug_movement_rotation = 15
 
+def calculate_proportional_collision(sprite_width, sprite_height, custom_collision=None):
+    """Generate a collision box proportionate to the sprite scale.
+    
+    Args:
+        sprite_width: Width of the sprite
+        sprite_height: Height of the sprite
+        custom_collision: Optional dict with 'width_ratio', 'height_ratio', 'offset_x_ratio', 'offset_y_ratio'
+    
+    Returns:
+        Tuple of (collision_x_offset, collision_y_offset, collision_width, collision_height)
+    """
+    if custom_collision:
+        # Use custom collision settings
+        width_ratio = custom_collision.get("width_ratio", 0.55)
+        height_ratio = custom_collision.get("height_ratio", 0.25)
+        offset_x_ratio = custom_collision.get("offset_x_ratio", -0.5)
+        offset_y_ratio = custom_collision.get("offset_y_ratio", -1.0)
+    else:
+        # Use default proportional settings
+        width_ratio = 0.55
+        height_ratio = 0.25
+        offset_x_ratio = -0.5
+        offset_y_ratio = -1
+
+    collision_width = max(1, int(sprite_width * width_ratio))
+    collision_height = max(1, int(sprite_height * height_ratio))
+
+    collision_x_offset = int(collision_width * offset_x_ratio)
+    collision_y_offset = int(collision_height * offset_y_ratio)
+
+    return (collision_x_offset, collision_y_offset, collision_width, collision_height)
+
+
 def get_placeable_sizes(item_data):
     """Return sprite and collision sizes for a placeable item."""
     if not item_data:
-        return default_placeable_sprite_size, default_placeable_collision_size
+        return (
+            default_placeable_sprite_size,
+            calculate_proportional_collision(*default_placeable_sprite_size),
+        )
     
     item_name = item_data.get("item_name")
     size_settings = placeable_size_settings.get(item_name, {})
     sprite_size = size_settings.get("sprite", default_placeable_sprite_size)
-    collision_size = size_settings.get("collision", default_placeable_collision_size)
+    
+    # Get custom collision settings if available, otherwise use default proportions
+    collision_settings = size_settings.get("collision", None)
+    collision_size = calculate_proportional_collision(sprite_size[0], sprite_size[1], collision_settings)
+    
     return sprite_size, collision_size
 
-def add_placeable_items_to_inventory():
-    """Add one of each placeable item to the main inventory (not the hotbar)."""
+
+def update_placeable_collision(item_name, collision_settings):
+    """Update collision settings for a specific placeable item.
+    
+    Args:
+        item_name: Name of the placeable item
+        collision_settings: Dict with collision parameters:
+            - width_ratio: Fraction of sprite width for collision box (0.0 to 1.0)
+            - height_ratio: Fraction of sprite height for collision box (0.0 to 1.0)  
+            - offset_x_ratio: Horizontal offset as fraction of collision width (-1.0 to 1.0)
+            - offset_y_ratio: Vertical offset as fraction of collision height (-2.0 to 1.0)
+    
+    Example:
+        update_placeable_collision("Workbench", {
+            "width_ratio": 0.8,
+            "height_ratio": 0.4,
+            "offset_x_ratio": -0.5,
+            "offset_y_ratio": -1.0
+        })
+    """
+    if item_name in placeable_size_settings:
+        if "collision" not in placeable_size_settings[item_name]:
+            placeable_size_settings[item_name]["collision"] = {}
+        
+        placeable_size_settings[item_name]["collision"].update(collision_settings)
+    else:
+        # Create new entry for the item
+        placeable_size_settings[item_name] = {
+            "sprite": default_placeable_sprite_size,
+            "collision": collision_settings
+        }
+
+
+# COLLISION BOX EDITING EXAMPLES
+# ================================
+# 
+# You can customize collision boxes for any placeable item using the update_placeable_collision() function:
+# 
+# # Make Torch have a smaller, centered collision box
+# update_placeable_collision("Torch", {
+#     "width_ratio": 0.3,
+#     "height_ratio": 0.2,
+#     "offset_x_ratio": 0.0,
+#     "offset_y_ratio": -1.0
+# })
+# 
+# # Make Tent have a wider collision box  
+# update_placeable_collision("Tent", {
+#     "width_ratio": 1.0,
+#     "height_ratio": 0.6,
+#     "offset_x_ratio": -0.5,
+#     "offset_y_ratio": -1.0
+# })
+# 
+# # Make Chest have a taller collision box
+# update_placeable_collision("Chest", {
+#     "width_ratio": 0.6,
+#     "height_ratio": 0.5,
+#     "offset_x_ratio": -0.5,
+#     "offset_y_ratio": -1.0
+# })
+#
+# COLLISION PARAMETER EXPLANATIONS:
+# =================================
+# - width_ratio: How wide the collision box is relative to sprite width (0.1 = 10% of sprite width)
+# - height_ratio: How tall the collision box is relative to sprite height (0.2 = 20% of sprite height)  
+# - offset_x_ratio: Horizontal positioning (-0.5 = center, -1.0 = left edge, 0.0 = right edge)
+# - offset_y_ratio: Vertical positioning (-1.0 = bottom aligned, -0.5 = center, 0.0 = top aligned)
+
+
+def populate_test_inventory():
+    """Add one of each placeable item to the main inventory for testing purposes."""
+    items_added = 0
+    
     for item_name in placeable_size_settings.keys():
+        # Find the item in items_list
         item_data = next((itm for itm in items_list if itm["item_name"] == item_name), None)
         if not item_data:
+            print(f"Warning: Item '{item_name}' not found in items_list")
             continue
         
+        # Create a copy of the item with quantity 1
         new_item = item_data.copy()
         new_item["quantity"] = 1
         
-        target_slot = next((idx for idx, slot in enumerate(inventory.inventory_list) if slot is None), None)
-        if target_slot is None:
-            break
+        # Find the first empty slot in inventory
+        target_slot = None
+        for idx, slot in enumerate(inventory.inventory_list):
+            if slot is None:
+                target_slot = idx
+                break
         
-        inventory.inventory_list[target_slot] = new_item
+        if target_slot is not None:
+            inventory.inventory_list[target_slot] = new_item
+            items_added += 1
+            print(f"Added {item_name} to inventory slot {target_slot}")
+        else:
+            print(f"Warning: No empty inventory slots available for {item_name}")
+            break
+    
+    print(f"Successfully added {items_added} placeable items to inventory for testing")
+    return items_added
 
 def calculate_throw_trajectory(start_x, start_y, target_x, target_y, throw_power):
     delta_x = target_x - start_x
@@ -266,9 +487,18 @@ def cancel_placement():
 def check_placement_collision(x, y, item_data):
     """Check if placement position collides with world objects or mobs"""
     # Define collision bounds based on item sizing
-    _, (collision_width, collision_height) = get_placeable_sizes(item_data)
+    _, collision_size = get_placeable_sizes(item_data)
+    
+    # Handle both old format (width, height) and new format (x_offset, y_offset, width, height)
+    if len(collision_size) == 4:
+        collision_x_offset, collision_y_offset, collision_width, collision_height = collision_size
+    else:
+        # Fallback for old format - center the collision box
+        collision_width, collision_height = collision_size
+        collision_x_offset = -collision_width // 2
+        collision_y_offset = -collision_height // 2
 
-    collision_rect = pygame.Rect(x - collision_width//2, y - collision_height//2, collision_width, collision_height)
+    collision_rect = pygame.Rect(x + collision_x_offset, y + collision_y_offset, collision_width, collision_height)
 
     # Check collision with world objects
     from world import rocks, boulders, trees, berry_bushes, ponds, lavas, dead_bushes, grasses, sticks, stones, savannah_grasses, mushrooms, fruit_plants, ferns
@@ -338,7 +568,15 @@ def place_structure(x, y, item_data):
     global placed_structures
 
     sprite_size, collision_size = get_placeable_sizes(item_data)
-    collision_width, collision_height = collision_size
+    
+    # Handle both old format (width, height) and new format (x_offset, y_offset, width, height)
+    if len(collision_size) == 4:
+        collision_x_offset, collision_y_offset, collision_width, collision_height = collision_size
+    else:
+        # Fallback for old format - center the collision box
+        collision_width, collision_height = collision_size
+        collision_x_offset = -collision_width // 2
+        collision_y_offset = -collision_height // 2
 
     # Create structure data
     structure = {
@@ -349,7 +587,7 @@ def place_structure(x, y, item_data):
         'placed_time': pygame.time.get_ticks(),
         'sprite_size': sprite_size,
         'collision_size': collision_size,
-        'rect': pygame.Rect(x - collision_width // 2, y - collision_height // 2, collision_width, collision_height)
+        'rect': pygame.Rect(x + collision_x_offset, y + collision_y_offset, collision_width, collision_height)
     }
 
     placed_structures.append(structure)
@@ -772,7 +1010,7 @@ while running:
                     inventory.hotbar_slots[2] = mortar_copy
                     break
 
-            add_placeable_items_to_inventory()
+            populate_test_inventory()
 
             inventory_resources = []
             collection_messages = []
