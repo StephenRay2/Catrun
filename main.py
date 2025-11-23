@@ -63,8 +63,63 @@ placement_item = None
 placement_position = (0, 0)
 placed_structures = []
 
+# Placement size tuning (edit values here to change how big each object is)
+default_placeable_sprite_size = (64, 64)
+default_placeable_collision_size = (44, 14)
+placeable_size_settings = {
+    "Torch": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Workbench": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Campfire": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Oil Lamp": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Cooking Pot": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Smelter": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Empty Cage": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Alchemy Bench": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Fence": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Chest": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Tent": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Lantern": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Mortar And Pestle": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Tamed Black Cat": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Tamed Salt and Pepper Cat": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Tamed White Cat": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Tamed Black and White Cat": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Tamed Sandy Cat": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Tamed Orange Cat": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Tamed Calico Cat": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Tamed Gray Cat": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size},
+    "Tamed Orange and White Cat": {"sprite": default_placeable_sprite_size, "collision": default_placeable_collision_size}
+}
+
 # Debug variables
 debug_movement_rotation = 15
+
+def get_placeable_sizes(item_data):
+    """Return sprite and collision sizes for a placeable item."""
+    if not item_data:
+        return default_placeable_sprite_size, default_placeable_collision_size
+    
+    item_name = item_data.get("item_name")
+    size_settings = placeable_size_settings.get(item_name, {})
+    sprite_size = size_settings.get("sprite", default_placeable_sprite_size)
+    collision_size = size_settings.get("collision", default_placeable_collision_size)
+    return sprite_size, collision_size
+
+def add_placeable_items_to_inventory():
+    """Add one of each placeable item to the main inventory (not the hotbar)."""
+    for item_name in placeable_size_settings.keys():
+        item_data = next((itm for itm in items_list if itm["item_name"] == item_name), None)
+        if not item_data:
+            continue
+        
+        new_item = item_data.copy()
+        new_item["quantity"] = 1
+        
+        target_slot = next((idx for idx, slot in enumerate(inventory.inventory_list) if slot is None), None)
+        if target_slot is None:
+            break
+        
+        inventory.inventory_list[target_slot] = new_item
 
 def calculate_throw_trajectory(start_x, start_y, target_x, target_y, throw_power):
     delta_x = target_x - start_x
@@ -210,9 +265,8 @@ def cancel_placement():
 
 def check_placement_collision(x, y, item_data):
     """Check if placement position collides with world objects or mobs"""
-    # Define collision bounds (same as placed structures - smaller like rocks)
-    collision_width = 44
-    collision_height = 14
+    # Define collision bounds based on item sizing
+    _, (collision_width, collision_height) = get_placeable_sizes(item_data)
 
     collision_rect = pygame.Rect(x - collision_width//2, y - collision_height//2, collision_width, collision_height)
 
@@ -283,6 +337,9 @@ def place_structure(x, y, item_data):
     """Place a structure at the given position"""
     global placed_structures
 
+    sprite_size, collision_size = get_placeable_sizes(item_data)
+    collision_width, collision_height = collision_size
+
     # Create structure data
     structure = {
         'item_name': item_data['item_name'],
@@ -290,7 +347,9 @@ def place_structure(x, y, item_data):
         'x': x,
         'y': y,
         'placed_time': pygame.time.get_ticks(),
-        'rect': pygame.Rect(x - 22, y - 18, 44, 14)  # Smaller collision box like rocks (44x14 centered on position)
+        'sprite_size': sprite_size,
+        'collision_size': collision_size,
+        'rect': pygame.Rect(x - collision_width // 2, y - collision_height // 2, collision_width, collision_height)
     }
 
     placed_structures.append(structure)
@@ -713,6 +772,8 @@ while running:
                     inventory.hotbar_slots[2] = mortar_copy
                     break
 
+            add_placeable_items_to_inventory()
+
             inventory_resources = []
             collection_messages = []
             thrown_items = []
@@ -809,10 +870,12 @@ while running:
                         
                         # Check ONLY the selected hotbar slot
                         selected_hotbar = inventory.hotbar_slots[inventory.selected_hotbar_slot]
-                        if selected_hotbar and "cat_object" in selected_hotbar:
-                            cat_in_inventory = selected_hotbar
-                            cat_slot_index = inventory.selected_hotbar_slot
-                            cat_is_hotbar = True
+                        if selected_hotbar:
+                            cat_object_candidate = selected_hotbar.get("cat_object")
+                            if cat_object_candidate:
+                                cat_in_inventory = selected_hotbar
+                                cat_slot_index = inventory.selected_hotbar_slot
+                                cat_is_hotbar = True
                         
                         # If cat found in selected hotbar slot, place it
                         if cat_in_inventory:
@@ -905,10 +968,12 @@ while running:
                         
                         # Check ONLY the selected hotbar slot
                         selected_hotbar = inventory.hotbar_slots[inventory.selected_hotbar_slot]
-                        if selected_hotbar and "cat_object" in selected_hotbar:
-                            cat_in_inventory = selected_hotbar
-                            cat_slot_index = inventory.selected_hotbar_slot
-                            cat_is_hotbar = True
+                        if selected_hotbar:
+                            cat_object_candidate = selected_hotbar.get("cat_object")
+                            if cat_object_candidate:
+                                cat_in_inventory = selected_hotbar
+                                cat_slot_index = inventory.selected_hotbar_slot
+                                cat_is_hotbar = True
                         
                         # If cat in selected hotbar slot, throw it
                         if cat_in_inventory:
@@ -1521,17 +1586,18 @@ while running:
             if isinstance(obj, dict) and 'item_name' in obj:
                 # Draw placed structure
                 struct_sprite = None
+                sprite_width, sprite_height = obj.get('sprite_size', default_placeable_sprite_size)
                 try:
                     icon_path = f"assets/sprites/items/{obj['icon']}"
                     struct_sprite = pygame.image.load(icon_path).convert_alpha()
-                    struct_sprite = pygame.transform.scale(struct_sprite, (64, 64))
+                    struct_sprite = pygame.transform.scale(struct_sprite, (sprite_width, sprite_height))
                 except:
                     # Fallback to colored rectangle
-                    struct_sprite = pygame.Surface((64, 64))
+                    struct_sprite = pygame.Surface((sprite_width, sprite_height))
                     struct_sprite.fill((100, 100, 100))
 
-                screen_x = obj['x'] - cam_x - 32
-                screen_y = obj['y'] - 32
+                screen_x = obj['x'] - cam_x - sprite_width // 2
+                screen_y = obj['y'] - sprite_height // 2
                 screen.blit(struct_sprite, (screen_x, screen_y))
             else:
                 obj.draw(screen, cam_x)
@@ -1591,13 +1657,15 @@ while running:
 
             # Load item sprite for preview
             item_sprite = None
+            sprite_size, _ = get_placeable_sizes(placement_item)
+            sprite_width, sprite_height = sprite_size
             try:
                 icon_path = f"assets/sprites/items/{placement_item['icon']}"
                 item_sprite = pygame.image.load(icon_path).convert_alpha()
-                item_sprite = pygame.transform.scale(item_sprite, (64, 64))  # Standard size for structures
+                item_sprite = pygame.transform.scale(item_sprite, (sprite_width, sprite_height))
             except:
                 # Fallback to colored rectangle
-                item_sprite = pygame.Surface((64, 64))
+                item_sprite = pygame.Surface((sprite_width, sprite_height))
                 item_sprite.fill((150, 150, 150))
 
             # Check for collision and tint accordingly
@@ -1612,7 +1680,7 @@ while running:
                 item_sprite.set_alpha(180)
 
             # Draw the preview
-            screen.blit(item_sprite, (preview_x - 32, preview_y - 32))
+            screen.blit(item_sprite, (preview_x - sprite_width // 2, preview_y - sprite_height // 2))
 
         # Draw charge indicator (only show after holding for min_throw_hold_time)
         if throw_charge_start is not None:
