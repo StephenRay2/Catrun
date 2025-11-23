@@ -2003,10 +2003,10 @@ items_list = [
                 {"offset": (16, 5), "rotation": 45},
             ],
             "left": [
-                {"offset": (10, 10), "rotation": 45},
-                {"offset": (0, 0), "rotation": 0},
-                {"offset": (10, 25), "rotation": -45},
-                {"offset": (8, 15), "rotation": -15},
+                {"offset": (0, 0), "rotation": 45},
+                {"offset": (14, -16), "rotation": 135},
+                {"offset": (-8, 0), "rotation": 90},
+                {"offset": (-9, 6), "rotation": 45},
             ],
             "up": [
                 {"offset": (8, 11), "rotation": -5},
