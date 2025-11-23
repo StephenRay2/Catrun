@@ -1870,7 +1870,7 @@ items_list = [
         "type": "tool",
         "description": "A mortar and pestle. Grinds ingredients for alchemy. Rock and roll, baby.",
         "use_effect": None,
-        "placeable": False,
+        "placeable": True,
         "consumable": False,
         "durability": None,
         "recipe": [{"item": "Stone", "amount": 25}, {"item": "Hide", "amount": 10}],

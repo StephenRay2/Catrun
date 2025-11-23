@@ -57,6 +57,12 @@ min_throw_hold_time = 0.15  # Minimum hold time (in seconds) to trigger throw in
 thrown_items = []
 loaded_item_sprites = {}  # Cache for loaded item sprites
 
+# Placement system variables
+placement_mode = False
+placement_item = None
+placement_position = (0, 0)
+placed_structures = []
+
 # Debug variables
 debug_movement_rotation = 15
 
@@ -162,7 +168,7 @@ def get_footstep_sounds(background):
     grass_backgrounds = [bg_grass, bg_compact]
     dirt_backgrounds = [bg_dirt, bg_duskstone, bg_wasteland, bg_blackstone, bg_redrock, bg_lavastone]
     sand_backgrounds = [bg_sand, bg_savannah]
-    
+
     if background in grass_backgrounds:
         return [f"footstep_grass{i}" for i in range(1, 7)]
     elif background in dirt_backgrounds:
@@ -171,6 +177,150 @@ def get_footstep_sounds(background):
         return [f"footstep_sand{i}" for i in range(1, 7)]
     else:
         return [f"footstep_grass{i}" for i in range(1, 7)]
+
+# Placement system functions
+def start_placement(item_data):
+    """Start placement mode for a placeable item"""
+    global placement_mode, placement_item, placement_position
+
+    if not item_data or not item_data.get("placeable", False):
+        return False
+
+    placement_mode = True
+    placement_item = item_data
+    # Start placement in front of player
+    placement_distance = 50
+    if player.last_direction == "right":
+        placement_position = (player_world_x + placement_distance, player_world_y)
+    elif player.last_direction == "left":
+        placement_position = (player_world_x - placement_distance, player_world_y)
+    elif player.last_direction == "up":
+        placement_position = (player_world_x, player_world_y - placement_distance)
+    else:  # "down"
+        placement_position = (player_world_x, player_world_y + placement_distance)
+
+    return True
+
+def cancel_placement():
+    """Cancel placement mode"""
+    global placement_mode, placement_item, placement_position
+    placement_mode = False
+    placement_item = None
+    placement_position = (0, 0)
+
+def check_placement_collision(x, y, item_data):
+    """Check if placement position collides with world objects or mobs"""
+    # Define collision bounds (same as placed structures - smaller like rocks)
+    collision_width = 44
+    collision_height = 14
+
+    collision_rect = pygame.Rect(x - collision_width//2, y - collision_height//2, collision_width, collision_height)
+
+    # Check collision with world objects
+    from world import rocks, boulders, trees, berry_bushes, ponds, lavas, dead_bushes, grasses, sticks, stones, savannah_grasses, mushrooms, fruit_plants, ferns
+
+    # Check rocks (use their actual collision rect in world space)
+    for rock in rocks:
+        if hasattr(rock, 'rect'):
+            rock_collision = pygame.Rect(
+                rock.rect.x + 10,
+                rock.rect.y + (rock.rect.height * 0.22),
+                rock.rect.width - 20,
+                rock.rect.height - 50
+            )
+            if rock_collision.colliderect(collision_rect):
+                return True
+
+    # Check boulders (use their actual collision rect in world space)
+    for boulder in boulders:
+        if hasattr(boulder, 'rect'):
+            boulder_collision = pygame.Rect(
+                boulder.rect.x + 10,
+                boulder.rect.y + (boulder.rect.height * 0.22),
+                boulder.rect.width - 20,
+                boulder.rect.height - 50
+            )
+            if boulder_collision.colliderect(collision_rect):
+                return True
+
+    # Check trees
+    for tree in trees:
+        if hasattr(tree, 'rect') and tree.rect.colliderect(collision_rect):
+            return True
+
+    # Check berry bushes
+    for bush in berry_bushes:
+        if hasattr(bush, 'rect') and bush.rect.colliderect(collision_rect):
+            return True
+
+    # Check ponds
+    for pond in ponds:
+        if hasattr(pond, 'rect') and pond.rect.colliderect(collision_rect):
+            return True
+
+    # Check lavas
+    for lava in lavas:
+        if hasattr(lava, 'rect') and lava.rect.colliderect(collision_rect):
+            return True
+
+    # Check mobs
+    from mob_placement import cats, squirrels, cows, chickens, crawlers, pocks, deers, black_bears, brown_bears, gilas, crows, duskwretches, fire_dragons, ice_dragons, electric_dragons, poison_dragons, dusk_dragons
+
+    all_mobs = cats + squirrels + cows + chickens + crawlers + pocks + deers + black_bears + brown_bears + gilas + crows + duskwretches + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
+
+    for mob in all_mobs:
+        if hasattr(mob, 'rect') and mob.rect.colliderect(collision_rect):
+            return True
+
+    # Check already placed structures
+    for structure in placed_structures:
+        if structure['rect'].colliderect(collision_rect):
+            return True
+
+    return False
+
+def place_structure(x, y, item_data):
+    """Place a structure at the given position"""
+    global placed_structures
+
+    # Create structure data
+    structure = {
+        'item_name': item_data['item_name'],
+        'icon': item_data['icon'],
+        'x': x,
+        'y': y,
+        'placed_time': pygame.time.get_ticks(),
+        'rect': pygame.Rect(x - 22, y - 18, 44, 14)  # Smaller collision box like rocks (44x14 centered on position)
+    }
+
+    placed_structures.append(structure)
+
+    # Remove item from inventory
+    selected_slot = inventory.hotbar_slots[inventory.selected_hotbar_slot]
+    if selected_slot and selected_slot['quantity'] > 0:
+        selected_slot['quantity'] -= 1
+        if selected_slot['quantity'] <= 0:
+            inventory.hotbar_slots[inventory.selected_hotbar_slot] = None
+
+    return True
+
+def update_placement_position():
+    """Update placement position to stay in front of the player"""
+    global placement_position
+
+    if not placement_mode:
+        return
+
+    # Keep item in front of player based on their facing direction
+    placement_distance = 50
+    if player.last_direction == "right":
+        placement_position = (player_world_x + placement_distance, player_world_y)
+    elif player.last_direction == "left":
+        placement_position = (player_world_x - placement_distance, player_world_y)
+    elif player.last_direction == "up":
+        placement_position = (player_world_x, player_world_y - placement_distance)
+    else:  # "down"
+        placement_position = (player_world_x, player_world_y + placement_distance)
 
 def group_resources_by_type(resource_list):
     resource_counts = {}
@@ -296,7 +446,6 @@ while running:
         visible_liquids = [obj for obj in (ponds + lavas) if obj.rect.x - cam_x > -1000 and obj.rect.x - cam_x < width + 1000]
         
         visible_objects.extend(visible_collectibles)
-        visible_objects.sort(key=lambda obj: obj.rect.y + obj.rect.height)
 
         player_drawn = False
 
@@ -349,6 +498,8 @@ while running:
             time_of_day = (12 + (total_elapsed_time / 60)) % 24
             # Update crafting flash
             inventory.update_flash(dt)
+            # Update placement position if in placement mode
+            update_placement_position()
         else:
             dt = 0
 
@@ -546,6 +697,22 @@ while running:
                     inventory.hotbar_slots[0] = axe_copy
                     break
 
+            # Debug: Add Smelter to second hotbar slot
+            for item in items_list:
+                if item["item_name"] == "Smelter":
+                    smelter_copy = item.copy()
+                    smelter_copy["quantity"] = 1
+                    inventory.hotbar_slots[1] = smelter_copy
+                    break
+
+             # Debug: Add Mortar and Pestle to third hotbar slot
+            for item in items_list:
+                if item["item_name"] == "Mortar And Pestle":
+                    mortar_copy = item.copy()
+                    mortar_copy["quantity"] = 1
+                    inventory.hotbar_slots[2] = mortar_copy
+                    break
+
             inventory_resources = []
             collection_messages = []
             thrown_items = []
@@ -583,7 +750,10 @@ while running:
                     continue
                 
                 if event.key == pygame.K_ESCAPE and not inventory_in_use:
-                    paused = not paused
+                    if placement_mode:
+                        cancel_placement()
+                    else:
+                        paused = not paused
                 
                 inventory.handle_keydown_hotbar(event, screen=None, use_on_press=False)
 
@@ -607,12 +777,24 @@ while running:
                         inventory.selection_mode = "hotbar"
                         inventory.selected_inventory_slot = None
 
-            # Throw mechanic - start charging
+            # Placement system - toggle placement mode with right-click
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3 and player.is_alive:
-                throw_charge_start = pygame.time.get_ticks()
+                if placement_mode:
+                    # Cancel placement mode
+                    cancel_placement()
+                else:
+                    # Check if selected hotbar item is placeable
+                    selected_item = inventory.get_selected_item()
+                    if selected_item and selected_item.get("placeable", False):
+                        start_placement(selected_item)
+                    else:
+                        # Fall back to throw mechanic
+                        throw_charge_start = pygame.time.get_ticks()
+
+
 
             # Throw mechanic - release and throw
-            elif event.type == pygame.MOUSEBUTTONUP and event.button == 3 and player.is_alive:
+            elif event.type == pygame.MOUSEBUTTONUP and event.button == 3 and player.is_alive and not placement_mode:
                 if throw_charge_start is not None:
                     charge_duration = (pygame.time.get_ticks() - throw_charge_start) / 1000.0
                     throw_power = min(charge_duration / max_throw_charge, 1.0)
@@ -815,14 +997,23 @@ while running:
                             inventory.start_drag(slot_index, is_hotbar)
 
             if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                if inventory.dragging:
+                if placement_mode:
+                    # Try to place the item
+                    x, y = placement_position
+                    if not check_placement_collision(x, y, placement_item):
+                        place_structure(x, y, placement_item)
+                        cancel_placement()  # Exit placement mode after successful placement
+                    # If collision detected, don't place but stay in placement mode
+                elif inventory.dragging:
                     mouse_pos = pygame.mouse.get_pos()
                     slot_index, is_hotbar = inventory.get_slot_at_mouse(mouse_pos, screen)
-                    
+
                     if slot_index is not None:
                         inventory.end_drag(slot_index, is_hotbar, screen)
                     else:
                         inventory.cancel_drag()
+
+
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
                 if event.button == 4:
@@ -1129,6 +1320,14 @@ while running:
         visible_liquids = [obj for obj in (ponds + lavas) if obj.rect.x - cam_x > -256 and obj.rect.x - cam_x < width + 256 and obj.rect.y > -256 and obj.rect.y < height + 256]
         visible_objects = [obj for obj in all_objects_no_liquids if obj.rect.x - cam_x > -256 and obj.rect.x - cam_x < width + 256 and obj.rect.y > -256 and obj.rect.y < height + 256]
         visible_mobs = [mob for mob in mobs if mob.rect.x - cam_x > -256 and mob.rect.x - cam_x < width + 256 and mob.rect.y > -256 and mob.rect.y < height + 256]
+
+        # Add visible placed structures
+        visible_structures = []
+        for structure in placed_structures:
+            struct_x = structure['x']
+            struct_y = structure['y']
+            if struct_x - cam_x > -256 and struct_x - cam_x < width + 256 and struct_y > -256 and struct_y < height + 256:
+                visible_structures.append(structure)
         
         for mob in visible_mobs:
             if isinstance(mob, Cat) and random.random() < 0.001:
@@ -1148,7 +1347,8 @@ while running:
         
         visible_objects.extend(visible_mobs)
         visible_objects.extend(visible_collectibles)
-        visible_objects.sort(key=lambda obj: obj.rect.y + obj.rect.height)
+        visible_objects.extend(visible_structures)
+        visible_objects.sort(key=lambda obj: (obj.rect.y + obj.rect.height) if hasattr(obj, 'rect') else obj['y'] + 32)
 
         for mob in list(visible_mobs):
             if mob.destroyed:
@@ -1274,7 +1474,12 @@ while running:
                         break
 
         for obj in visible_objects:
-            object_mid_y = obj.rect.y + obj.rect.height / 2
+            # Handle both regular objects with rect and placed structures (dictionaries)
+            if isinstance(obj, dict) and 'y' in obj:
+                object_mid_y = obj['y']
+            else:
+                object_mid_y = obj.rect.y + obj.rect.height / 2
+
             if not player_drawn and (player.rect.centery + 20) <= object_mid_y:
                 # Draw axe first for left/up directions (behind the player)
                 if player.last_direction in ["left", "up"]:
@@ -1311,8 +1516,26 @@ while running:
                     draw_held_item()
                 
                 player_drawn = True
-            obj.draw(screen, cam_x)
-            
+
+            # Handle drawing of placed structures (dictionaries)
+            if isinstance(obj, dict) and 'item_name' in obj:
+                # Draw placed structure
+                struct_sprite = None
+                try:
+                    icon_path = f"assets/sprites/items/{obj['icon']}"
+                    struct_sprite = pygame.image.load(icon_path).convert_alpha()
+                    struct_sprite = pygame.transform.scale(struct_sprite, (64, 64))
+                except:
+                    # Fallback to colored rectangle
+                    struct_sprite = pygame.Surface((64, 64))
+                    struct_sprite.fill((100, 100, 100))
+
+                screen_x = obj['x'] - cam_x - 32
+                screen_y = obj['y'] - 32
+                screen.blit(struct_sprite, (screen_x, screen_y))
+            else:
+                obj.draw(screen, cam_x)
+
             if hasattr(obj, 'breath_image') and obj.breath_image:
                 screen.blit(obj.breath_image, (obj.breath_image_x - cam_x, obj.breath_image_y))
         
@@ -1353,13 +1576,43 @@ while running:
             item_screen_x = int(thrown["x"] - cam_x)
             item_screen_y = int(thrown["y"])
             offset = thrown["sprite_size"] // 2
-            
+
             if thrown["sprite"]:
                 # Draw the item sprite
                 screen.blit(thrown["sprite"], (item_screen_x - offset, item_screen_y - offset))
             else:
                 # Fallback to circle if sprite not found
                 pygame.draw.circle(screen, (255, 200, 100), (item_screen_x, item_screen_y), 5)
+
+        # Draw placement preview
+        if placement_mode and placement_item:
+            preview_x = placement_position[0] - cam_x
+            preview_y = placement_position[1]
+
+            # Load item sprite for preview
+            item_sprite = None
+            try:
+                icon_path = f"assets/sprites/items/{placement_item['icon']}"
+                item_sprite = pygame.image.load(icon_path).convert_alpha()
+                item_sprite = pygame.transform.scale(item_sprite, (64, 64))  # Standard size for structures
+            except:
+                # Fallback to colored rectangle
+                item_sprite = pygame.Surface((64, 64))
+                item_sprite.fill((150, 150, 150))
+
+            # Check for collision and tint accordingly
+            has_collision = check_placement_collision(placement_position[0], placement_position[1], placement_item)
+
+            if not has_collision:
+                # Apply green tint for valid placement
+                green_tint = pygame.Surface(item_sprite.get_size())
+                green_tint.fill((0, 255, 0))
+                item_sprite.blit(green_tint, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+                # Make it semi-transparent
+                item_sprite.set_alpha(180)
+
+            # Draw the preview
+            screen.blit(item_sprite, (preview_x - 32, preview_y - 32))
 
         # Draw charge indicator (only show after holding for min_throw_hold_time)
         if throw_charge_start is not None:
@@ -1377,9 +1630,18 @@ while running:
 
         player.rect.center = (player_pos.x, player_pos.y)
             
-        nearby_objects = [obj for obj in all_objects 
-                    if abs(obj.rect.x - (player_pos.x + cam_x)) < 1500 
+        # Get nearby placed structures
+        nearby_structures = [structure for structure in placed_structures
+                           if abs(structure['rect'].x - (player_pos.x + cam_x)) < 1500
+                           and abs(structure['rect'].y - player_pos.y) < 800]
+
+        nearby_objects = [obj for obj in all_objects
+                    if abs(obj.rect.x - (player_pos.x + cam_x)) < 1500
                     and abs(obj.rect.y - player_pos.y) < 800]
+
+        # Add nearby structures to nearby_objects for mob collision detection
+        nearby_objects.extend(nearby_structures)
+
         nearby_mobs = [mob for mob in mobs
                     if abs(mob.rect.x - (player_pos.x + cam_x)) < 3000
                     and abs(mob.rect.y - player_pos.y) < 800]        
@@ -1559,9 +1821,15 @@ while running:
                 mob.is_visible = mob in visible_mob_set
 
             for mob in nearby_mobs:
-                mob_nearby_objects = [obj for obj in nearby_objects 
-                                    if abs(obj.rect.x - mob.rect.x) < 100 
-                                    and abs(obj.rect.y - mob.rect.y) < 100]
+                def get_obj_rect(obj):
+                    if isinstance(obj, dict) and 'rect' in obj:
+                        return obj['rect']
+                    else:
+                        return obj.rect
+
+                mob_nearby_objects = [obj for obj in nearby_objects
+                                    if abs(get_obj_rect(obj).x - mob.rect.x) < 100
+                                    and abs(get_obj_rect(obj).y - mob.rect.y) < 100]
                 
                 
                 
@@ -1640,27 +1908,40 @@ while running:
                 mob.collision_rect = mob.rect.inflate(-15, -15)
 
             # Exclude liquids from collision detection so player can enter them
-            all_nearby_solid = [obj for obj in (nearby_objects + nearby_mobs) 
+            all_nearby_solid = [obj for obj in (nearby_objects + nearby_mobs)
                                if not hasattr(obj, 'liquid_type')]
 
+            # Add placed structures to collision detection
+            all_collision_objects = all_nearby_solid + nearby_structures
+
+            def get_obj_collision_rect(obj, cam_x):
+                if hasattr(obj, 'get_collision_rect'):
+                    return obj.get_collision_rect(cam_x)
+                elif isinstance(obj, dict) and 'rect' in obj:
+                    # Convert structure rect from world to screen coordinates
+                    rect = obj['rect']
+                    return pygame.Rect(rect.x - cam_x, rect.y, rect.width, rect.height)
+                else:
+                    return obj.rect
+
             left_collision = any(
-                left_player_check.colliderect(obj.get_collision_rect(cam_x))
-                for obj in all_nearby_solid
+                left_player_check.colliderect(get_obj_collision_rect(obj, cam_x))
+                for obj in all_collision_objects
             )
 
             right_collision = any(
-                right_player_check.colliderect(obj.get_collision_rect(cam_x))
-                for obj in all_nearby_solid
+                right_player_check.colliderect(get_obj_collision_rect(obj, cam_x))
+                for obj in all_collision_objects
             )
 
             up_collision = any(
-                top_player_check.colliderect(obj.get_collision_rect(cam_x))
-                for obj in all_nearby_solid
+                top_player_check.colliderect(get_obj_collision_rect(obj, cam_x))
+                for obj in all_collision_objects
             )
 
             down_collision = any(
-                bottom_player_check.colliderect(obj.get_collision_rect(cam_x))
-                for obj in all_nearby_solid
+                bottom_player_check.colliderect(get_obj_collision_rect(obj, cam_x))
+                for obj in all_collision_objects
             )
 
             # Liquid collision detection - use bottom center point of player

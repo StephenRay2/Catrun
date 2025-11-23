@@ -782,17 +782,26 @@ class Mob(pygame.sprite.Sprite):
         solid_objects = [obj for obj in nearby_objects if not hasattr(obj, 'liquid_type')]
         all_nearby = solid_objects + nearby_mobs
 
+        def get_obj_collision_rect(obj):
+            if hasattr(obj, 'get_collision_rect'):
+                return obj.get_collision_rect(0)
+            elif isinstance(obj, dict) and 'rect' in obj:
+                # Structure collision rect is already in world coordinates
+                return obj['rect']
+            else:
+                return obj.rect
+
         collision_rect = self.get_collision_rect(0)
-        
+
         left_check = pygame.Rect(collision_rect.left - 1, collision_rect.top + 5, 1, collision_rect.height - 10)
         right_check = pygame.Rect(collision_rect.right, collision_rect.top + 5, 1, collision_rect.height - 10)
         top_check = pygame.Rect(collision_rect.left + 5, collision_rect.top - 1, collision_rect.width - 10, 1)
         bottom_check = pygame.Rect(collision_rect.left + 5, collision_rect.bottom, collision_rect.width - 10, 1)
 
-        left_collision = any(left_check.colliderect(obj.get_collision_rect(0)) for obj in all_nearby)
-        right_collision = any(right_check.colliderect(obj.get_collision_rect(0)) for obj in all_nearby)
-        up_collision = any(top_check.colliderect(obj.get_collision_rect(0)) for obj in all_nearby)
-        down_collision = any(bottom_check.colliderect(obj.get_collision_rect(0)) for obj in all_nearby)
+        left_collision = any(left_check.colliderect(get_obj_collision_rect(obj)) for obj in all_nearby)
+        right_collision = any(right_check.colliderect(get_obj_collision_rect(obj)) for obj in all_nearby)
+        up_collision = any(top_check.colliderect(get_obj_collision_rect(obj)) for obj in all_nearby)
+        down_collision = any(bottom_check.colliderect(get_obj_collision_rect(obj)) for obj in all_nearby)
 
         can_move_x = not ((direction.x > 0 and right_collision) or (direction.x < 0 and left_collision))
         can_move_y = not ((direction.y > 0 and down_collision) or (direction.y < 0 and up_collision))
