@@ -62,15 +62,12 @@ class CraftingBench:
             item_tag = req.get("item_tag")
             amount_needed = req.get("amount", 1)
             
-            total_amount = 0
             if item_name:
-                for slot in self.inventory.hotbar_slots + self.inventory.inventory_list:
-                    if slot and slot.get("item_name") == item_name:
-                        total_amount += slot.get("quantity", 1)
+                total_amount = self.inventory.get_item_count(item_name)
             elif item_tag:
-                for slot in self.inventory.hotbar_slots + self.inventory.inventory_list:
-                    if slot and item_tag in slot.get("tags", []):
-                        total_amount += slot.get("quantity", 1)
+                total_amount = self.inventory.get_items_by_tag_count(item_tag)
+            else:
+                total_amount = 0
             
             if total_amount < amount_needed:
                 return False
@@ -83,32 +80,10 @@ class CraftingBench:
             item_tag = req.get("item_tag")
             amount_needed = req.get("amount", 1)
             
-            remaining = amount_needed
-            all_slots = [(i, slot, True) for i, slot in enumerate(self.inventory.hotbar_slots)] + \
-                        [(i, slot, False) for i, slot in enumerate(self.inventory.inventory_list)]
-            
-            for idx, slot, is_hotbar in all_slots:
-                if remaining <= 0:
-                    break
-                if not slot:
-                    continue
-                
-                matches = False
-                if item_name and slot.get("item_name") == item_name:
-                    matches = True
-                elif item_tag and item_tag in slot.get("tags", []):
-                    matches = True
-                
-                if matches:
-                    take = min(slot.get("quantity", 1), remaining)
-                    slot["quantity"] -= take
-                    remaining -= take
-                    
-                    if slot["quantity"] <= 0:
-                        if is_hotbar:
-                            self.inventory.hotbar_slots[idx] = None
-                        else:
-                            self.inventory.inventory_list[idx] = None
+            if item_name:
+                self.inventory.remove_item(item_name, amount_needed)
+            elif item_tag:
+                self.inventory.remove_items_by_tag(item_tag, amount_needed)
     
     def craft_item(self, recipe, amount=1):
         for _ in range(amount):
@@ -427,15 +402,12 @@ class CraftingBench:
             item_tag = req.get("item_tag")
             amount_needed = req.get("amount", 1)
             
-            total_amount = 0
             if item_name:
-                for slot in self.inventory.hotbar_slots + self.inventory.inventory_list:
-                    if slot and slot.get("item_name") == item_name:
-                        total_amount += slot.get("quantity", 1)
+                total_amount = self.inventory.get_item_count(item_name)
             elif item_tag:
-                for slot in self.inventory.hotbar_slots + self.inventory.inventory_list:
-                    if slot and item_tag in slot.get("tags", []):
-                        total_amount += slot.get("quantity", 1)
+                total_amount = self.inventory.get_items_by_tag_count(item_tag)
+            else:
+                total_amount = 0
             
             if amount_needed > 0:
                 max_amount = min(max_amount, total_amount // amount_needed)
