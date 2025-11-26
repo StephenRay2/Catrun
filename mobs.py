@@ -841,6 +841,10 @@ class Mob(pygame.sprite.Sprite):
             screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
 
     def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
+        if not self.is_alive:
+            self.direction.xy = (0, 0)
+            return
+        
         if not hasattr(self, "cow") and self.move_timer <= 0 and self.is_alive and not self.fleeing:
             if random.random() < 0.02:
                 self.direction.xy = random.choice([(-1,0), (1,0), (0,-1), (0,1), (0,0), (0,0), (0,0)])
@@ -872,9 +876,6 @@ class Mob(pygame.sprite.Sprite):
             self.animate_walk()
         else:
             self.animate_stand()
-
-        if not self.is_alive:
-            self.direction.xy = (0, 0)
 
     def animate_walk(self):
         if self.direction.x > 0:
@@ -1649,6 +1650,11 @@ class Duskwretch(Enemy):
         if self.attacking:
             return
 
+        if not self.is_alive:
+            self.direction.xy = (0, 0)
+            self.image = duskwretch_dead_image_left if self.last_direction == "left" else duskwretch_dead_image_right
+            return
+
         self.is_moving = self.direction.length_squared() > 0 and self.is_alive
 
         if self.is_moving and not self.was_moving:
@@ -1686,9 +1692,6 @@ class Duskwretch(Enemy):
 
         self.animate_state(dt)
         self.was_moving = self.is_moving
-
-        if not self.is_alive:
-            self.image = duskwretch_dead_image_left if self.last_direction == "left" else duskwretch_dead_image_right
 
 
     def animate_state(self, dt):
@@ -2252,6 +2255,14 @@ class BlackBear(AggressiveMob):
         if self.attacking:
             return
         
+        if not self.is_alive:
+            self.direction.xy = (0, 0)
+            if self.last_direction == "right":
+                self.image = pygame.transform.flip(black_bear_dead_image, True, False)
+            else:
+                self.image = black_bear_dead_image
+            return
+        
         if self.chasing and self.aggressive:
             if self.direction.length_squared() > 0:
                 can_move_x, can_move_y = self.check_collision(self.direction, nearby_objects or [], nearby_mobs or [])
@@ -2280,12 +2291,6 @@ class BlackBear(AggressiveMob):
                 self.animate_stand()
         else:
             super().update(dt, player, nearby_objects, nearby_mobs)
-        
-        if not self.is_alive:
-            if self.last_direction == "right":
-                self.image = pygame.transform.flip(black_bear_dead_image, True, False)
-            else:
-                self.image = black_bear_dead_image
 
 class BrownBear(AggressiveMob):
     def __init__(self, x, y, name):
@@ -2416,6 +2421,14 @@ class BrownBear(AggressiveMob):
         if self.attacking:
             return
         
+        if not self.is_alive:
+            self.direction.xy = (0, 0)
+            if self.last_direction == "right":
+                self.image = pygame.transform.flip(brown_bear_dead_image, True, False)
+            else:
+                self.image = brown_bear_dead_image
+            return
+        
         if self.chasing and self.aggressive:
             if self.direction.length_squared() > 0:
                 can_move_x, can_move_y = self.check_collision(self.direction, nearby_objects or [], nearby_mobs or [])
@@ -2431,12 +2444,6 @@ class BrownBear(AggressiveMob):
                 self.animate_stand()
         else:
             super().update(dt, player, nearby_objects, nearby_mobs)
-        
-        if not self.is_alive:
-            if self.last_direction == "right":
-                self.image = pygame.transform.flip(brown_bear_dead_image, True, False)
-            else:
-                self.image = brown_bear_dead_image
 
 class Gila(AggressiveMob):
     def __init__(self, x, y, name):
@@ -2545,6 +2552,14 @@ class Gila(AggressiveMob):
         if self.attacking:
             return
         
+        if not self.is_alive:
+            self.direction.xy = (0, 0)
+            if self.last_direction == "right":
+                self.image = pygame.transform.flip(gila_dead_image, True, False)
+            else:
+                self.image = gila_dead_image
+            return
+        
         if self.chasing and self.aggressive:
             if self.direction.length_squared() > 0:
                 can_move_x, can_move_y = self.check_collision(self.direction, nearby_objects or [], nearby_mobs or [])
@@ -2560,12 +2575,6 @@ class Gila(AggressiveMob):
                 self.animate_stand()
         else:
             super().update(dt, player, nearby_objects, nearby_mobs)
-        
-        if not self.is_alive:
-            if self.last_direction == "right":
-                self.image = pygame.transform.flip(gila_dead_image, True, False)
-            else:
-                self.image = gila_dead_image
 
 
 class Crow(Mob):
@@ -2644,6 +2653,15 @@ class Crow(Mob):
         return super().check_collision(direction, nearby_objects, nearby_mobs)
     
     def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
+        if not self.is_alive:
+            self.direction.xy = (0, 0)
+            self.state = "walking"
+            if self.last_direction == "right":
+                self.image = pygame.transform.flip(crow_dead_image, True, False)
+            else:
+                self.image = crow_dead_image
+            return
+        
         if self.state == "walking" and random.random() < 0.001:
             self.state = "flying"
             self.frame_index = 0
@@ -2677,12 +2695,6 @@ class Crow(Mob):
             self.animate_stand()
         else:
             super().update(dt, player, nearby_objects, nearby_mobs)
-        
-        if not self.is_alive:
-            if self.last_direction == "right":
-                self.image = pygame.transform.flip(crow_dead_image, True, False)
-            else:
-                self.image = crow_dead_image
     
     def animate_stand(self):
         if self.state == "walking":
