@@ -4,6 +4,7 @@ pygame.init()
 from buttons import *
 from mob_placement import *
 from sounds import *
+from crafting_bench import CraftingBench
 
 clock = pygame.time.Clock()
 from inventory import *
@@ -62,6 +63,10 @@ placement_mode = False
 placement_item = None
 placement_position = (0, 0)
 placed_structures = []
+
+# Crafting bench variables
+crafting_bench = None
+crafting_bench_in_use = False
 
 default_placeable_sprite_size = (64, 64)
 
@@ -986,6 +991,8 @@ while running:
             inventory.inventory_list = [None] * inventory.capacity
             inventory.hotbar_slots = [None] * inventory.hotbar_size
             
+            globals()['crafting_bench'] = CraftingBench(inventory)
+            
             # Debug: Add Metal Axe to first hotbar slot
             for item in items_list:
                 if item["item_name"] == "Metal Axe":
@@ -1048,15 +1055,26 @@ while running:
                         cat_name_input += event.unicode
                     continue
                 
-                if event.key == pygame.K_ESCAPE and not inventory_in_use:
-                    if placement_mode:
-                        cancel_placement()
-                    else:
-                        paused = not paused
+                if event.key == pygame.K_ESCAPE:
+                    if crafting_bench_in_use:
+                        crafting_bench.close()
+                        crafting_bench_in_use = False
+                    elif not inventory_in_use:
+                        if placement_mode:
+                            cancel_placement()
+                        else:
+                            paused = not paused
+                    elif inventory_in_use:
+                        inventory_in_use = False
+                        inventory.selection_mode = "hotbar"
+                        inventory.selected_inventory_slot = None
                 
                 inventory.handle_keydown_hotbar(event, screen=None, use_on_press=False)
+                
+                if crafting_bench_in_use:
+                    crafting_bench.handle_key_event(event)
 
-                if event.key == pygame.K_f and not inventory_in_use and player.is_alive:
+                if event.key == pygame.K_f and not inventory_in_use and not crafting_bench_in_use and player.is_alive:
                     success, tags = inventory.consume_item()
                     if success:
                         if "food" in tags:
@@ -1064,7 +1082,7 @@ while running:
                         elif any(tag in tags for tag in ["liquid", "consumable"]):
                             sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
 
-                if event.key == pygame.K_q:
+                if event.key == pygame.K_q and not crafting_bench_in_use:
                     inventory_in_use = not inventory_in_use
                     if not inventory_in_use:
                         inventory.selection_mode = "hotbar"
@@ -1077,7 +1095,7 @@ while running:
                         inventory.selected_inventory_slot = None
 
             # Placement system - toggle placement mode with right-click
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3 and player.is_alive:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3 and player.is_alive and not crafting_bench_in_use:
                 if placement_mode:
                     # Cancel placement mode
                     cancel_placement()
@@ -1319,68 +1337,109 @@ while running:
 
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
-                if event.button == 4:
-                    inventory.selected_hotbar_slot = (inventory.selected_hotbar_slot - 1) % inventory.hotbar_size
-                elif event.button == 5:
-                    inventory.selected_hotbar_slot = (inventory.selected_hotbar_slot + 1) % inventory.hotbar_size
-                inventory.selection_mode = "hotbar"
+                if crafting_bench_in_use:
+                    mouse_pos = pygame.mouse.get_pos()
+                    if event.button == 4:
+                        crafting_bench.handle_mouse_scroll(1)
+                    else:
+                        crafting_bench.handle_mouse_scroll(-1)
+                else:
+                    if event.button == 4:
+                        inventory.selected_hotbar_slot = (inventory.selected_hotbar_slot - 1) % inventory.hotbar_size
+                    elif event.button == 5:
+                        inventory.selected_hotbar_slot = (inventory.selected_hotbar_slot + 1) % inventory.hotbar_size
+                    inventory.selection_mode = "hotbar"
+            
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button in (1, 3):
+                if crafting_bench_in_use:
+                    mouse_pos = pygame.mouse.get_pos()
+                    crafting_bench.handle_mouse_click(mouse_pos, event.button, screen)
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
-                for obj in visible_objects:
-                    if hasattr(obj, 'collect') and not obj.destroyed:
-                        if hasattr(obj, 'is_empty') and obj.is_empty:
-                            continue
-                        
-                        obj_collision = obj.get_collision_rect(0)
-                        horizontal_dist = abs(obj_collision.centerx - player_world_x)
-                        vertical_dist = abs(obj_collision.centery - player_world_y)
-                        collect_reach = 25
-                        horizontal_range = (obj_collision.width / 2) + collect_reach
-                        vertical_range = (obj_collision.height / 2) + collect_reach
-                        facing_object = False
-                        if player.last_direction == "right" and obj_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
-                            facing_object = True
-                        elif player.last_direction == "left" and obj_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
-                            facing_object = True
-                        elif player.last_direction == "up" and obj_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
-                            facing_object = True
-                        elif player.last_direction == "down" and obj_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
-                            facing_object = True
-                        if facing_object:
-                            resource = obj.collect(player)
-                            if resource:
-                                if hasattr(obj, 'berry'):
-                                    collected_item = obj.berry
-                                elif hasattr(obj, 'fruit'):
-                                    collected_item = obj.fruit
-                                elif hasattr(obj, 'resource'):
-                                    collected_item = obj.resource
-                                else:
-                                    collected_item = "Items"
-                                
-                                if inventory.add(resource):
-                                    if hasattr(obj, 'berry') or hasattr(obj, 'fruit'):
-                                        sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
-                                    elif hasattr(obj, 'resource'):
-                                        if obj.resource == "Sticks":
-                                            sound_manager.play_sound("pickup_stick")
-                                        elif obj.resource == "Stone":
-                                            sound_manager.play_sound(random.choice(["collect_stone1", "collect_stone2"]))
-                                        elif obj.resource == "Fiber":
-                                            sound_manager.play_sound(random.choice(["pickup_grass1", "pickup_grass2", "pickup_grass3"]))
-                                        elif obj.resource == "Mushroom" or obj.resource == "Poisonous Mushroom" or obj.resource == "Duskshroom" or obj.resource == "Dawnshroom":
-                                            sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
-                                    
-                                    resource_counts = group_resources_by_type(resource)
-                                    for resource_name, count in resource_counts.items():
-                                        add_collection_message(resource_name, count)
-                                else:
-                                    if hasattr(obj, 'is_empty'):
-                                        obj.is_empty = False
-                                    obj.destroyed = False
-                                
-                                collect_cooldown = current_time
+                if crafting_bench_in_use:
+                    crafting_bench.close()
+                    crafting_bench_in_use = False
+                else:
+                    for structure in nearby_structures:
+                        if structure['item_name'] == 'Workbench':
+                            struct_collision = structure['rect']
+                            horizontal_dist = abs(struct_collision.centerx - player_world_x)
+                            vertical_dist = abs(struct_collision.centery - player_world_y)
+                            workbench_reach = 40
+                            horizontal_range = (struct_collision.width / 2) + workbench_reach
+                            vertical_range = (struct_collision.height / 2) + workbench_reach
+                            
+                            facing_object = False
+                            if player.last_direction == "right" and struct_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                facing_object = True
+                            elif player.last_direction == "left" and struct_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                facing_object = True
+                            elif player.last_direction == "up" and struct_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                facing_object = True
+                            elif player.last_direction == "down" and struct_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                facing_object = True
+                            
+                            if facing_object:
+                                crafting_bench.open((structure['x'], structure['y']))
+                                crafting_bench_in_use = True
                                 break
+                
+                if not crafting_bench_in_use:
+                    for obj in visible_objects:
+                        if hasattr(obj, 'collect') and not obj.destroyed:
+                            if hasattr(obj, 'is_empty') and obj.is_empty:
+                                continue
+                            
+                            obj_collision = obj.get_collision_rect(0)
+                            horizontal_dist = abs(obj_collision.centerx - player_world_x)
+                            vertical_dist = abs(obj_collision.centery - player_world_y)
+                            collect_reach = 25
+                            horizontal_range = (obj_collision.width / 2) + collect_reach
+                            vertical_range = (obj_collision.height / 2) + collect_reach
+                            facing_object = False
+                            if player.last_direction == "right" and obj_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                facing_object = True
+                            elif player.last_direction == "left" and obj_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                facing_object = True
+                            elif player.last_direction == "up" and obj_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                facing_object = True
+                            elif player.last_direction == "down" and obj_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                facing_object = True
+                            if facing_object:
+                                resource = obj.collect(player)
+                                if resource:
+                                    if hasattr(obj, 'berry'):
+                                        collected_item = obj.berry
+                                    elif hasattr(obj, 'fruit'):
+                                        collected_item = obj.fruit
+                                    elif hasattr(obj, 'resource'):
+                                        collected_item = obj.resource
+                                    else:
+                                        collected_item = "Items"
+                                    
+                                    if inventory.add(resource):
+                                        if hasattr(obj, 'berry') or hasattr(obj, 'fruit'):
+                                            sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
+                                        elif hasattr(obj, 'resource'):
+                                            if obj.resource == "Sticks":
+                                                sound_manager.play_sound("pickup_stick")
+                                            elif obj.resource == "Stone":
+                                                sound_manager.play_sound(random.choice(["collect_stone1", "collect_stone2"]))
+                                            elif obj.resource == "Fiber":
+                                                sound_manager.play_sound(random.choice(["pickup_grass1", "pickup_grass2", "pickup_grass3"]))
+                                            elif obj.resource == "Mushroom" or obj.resource == "Poisonous Mushroom" or obj.resource == "Duskshroom" or obj.resource == "Dawnshroom":
+                                                sound_manager.play_sound(random.choice([f"pick_berry{i}" for i in range(1,5)]))
+                                        
+                                        resource_counts = group_resources_by_type(resource)
+                                        for resource_name, count in resource_counts.items():
+                                            add_collection_message(resource_name, count)
+                                    else:
+                                        if hasattr(obj, 'is_empty'):
+                                            obj.is_empty = False
+                                        obj.destroyed = False
+                                    
+                                    collect_cooldown = current_time
+                                    break
                 
                 for obj in visible_liquids:
                     if hasattr(obj, 'collect_from_pond') and hasattr(obj, 'destroyed') and not obj.destroyed:
@@ -2351,30 +2410,31 @@ while running:
                                 player_current_image = player_idle_right_images[player_frame_index]
                                 player_animation_timer = 0
                 
-                if keys[pygame.K_w] and (player_pos.y - (size/2)) >= 0:
-                    if not up_collision:
-                        player_pos.y -= player_speed * dt * shift_multiplier
-                
-                
-                if keys[pygame.K_s] and (player_pos.y + (size/2)) <= height:
-                    if not down_collision:
-                        player_pos.y += player_speed * dt * shift_multiplier
+                if not crafting_bench_in_use:
+                    if keys[pygame.K_w] and (player_pos.y - (size/2)) >= 0:
+                        if not up_collision:
+                            player_pos.y -= player_speed * dt * shift_multiplier
+                    
+                    
+                    if keys[pygame.K_s] and (player_pos.y + (size/2)) <= height:
+                        if not down_collision:
+                            player_pos.y += player_speed * dt * shift_multiplier
 
-                
-                if keys[pygame.K_a]:
-                    if not left_collision:
-                        absolute_cam_x -= player_speed * dt * shift_multiplier
-                        dungeon_depth = max(0, dungeon_depth - dungeon_traversal_speed * shift_multiplier)
+                    
+                    if keys[pygame.K_a]:
+                        if not left_collision:
+                            absolute_cam_x -= player_speed * dt * shift_multiplier
+                            dungeon_depth = max(0, dungeon_depth - dungeon_traversal_speed * shift_multiplier)
 
-                
-                if keys[pygame.K_d]:
-                    if not right_collision:
-                        absolute_cam_x += player_speed * dt * shift_multiplier
-                        dungeon_depth += dungeon_traversal_speed * shift_multiplier
+                    
+                    if keys[pygame.K_d]:
+                        if not right_collision:
+                            absolute_cam_x += player_speed * dt * shift_multiplier
+                            dungeon_depth += dungeon_traversal_speed * shift_multiplier
 
                 cam_x = int(absolute_cam_x)
 
-                if keys[pygame.K_d] and pygame.mouse.get_pressed()[0] and not player.exhausted:
+                if not crafting_bench_in_use and (keys[pygame.K_d] and pygame.mouse.get_pressed()[0] and not player.exhausted):
                     player.last_direction = "right"
                     player_animation_timer += dt
                     if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
@@ -2389,7 +2449,7 @@ while running:
                             player_current_image = player_walk_right_attack_images[player_frame_index]
                             player_animation_timer = 0
 
-                elif keys[pygame.K_d]:
+                elif not crafting_bench_in_use and keys[pygame.K_d]:
                     player.last_direction = "right"
                     player_animation_timer += dt
                     if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
@@ -2404,7 +2464,7 @@ while running:
                             player_animation_timer = 0
                 
 
-                elif keys[pygame.K_a] and pygame.mouse.get_pressed()[0] and not player.exhausted:
+                elif not crafting_bench_in_use and (keys[pygame.K_a] and pygame.mouse.get_pressed()[0] and not player.exhausted):
                     player.last_direction = "left"
                     player_animation_timer += dt
                     if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
@@ -2419,7 +2479,7 @@ while running:
                             player_current_image = player_walk_left_attack_images[player_frame_index]
                             player_animation_timer = 0
 
-                elif keys[pygame.K_a]:
+                elif not crafting_bench_in_use and keys[pygame.K_a]:
                     player.last_direction = "left"
                     player_animation_timer += dt
                     if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
@@ -2435,7 +2495,7 @@ while running:
                             player_animation_timer = 0
 
 
-                elif keys[pygame.K_w] and pygame.mouse.get_pressed()[0] and not player.exhausted:
+                elif not crafting_bench_in_use and (keys[pygame.K_w] and pygame.mouse.get_pressed()[0] and not player.exhausted):
                     player.last_direction = "up"
                     player_animation_timer += dt
                     if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
@@ -2450,7 +2510,7 @@ while running:
                             player_current_image = player_walk_up_attack_images[player_frame_index]
                             player_animation_timer = 0
 
-                elif keys[pygame.K_w]:
+                elif not crafting_bench_in_use and keys[pygame.K_w]:
                     player.last_direction = "up"
                     player_animation_timer += dt
                     if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
@@ -2466,7 +2526,7 @@ while running:
                 
                 
 
-                elif keys[pygame.K_s] and pygame.mouse.get_pressed()[0] and not player.exhausted:
+                elif not crafting_bench_in_use and (keys[pygame.K_s] and pygame.mouse.get_pressed()[0] and not player.exhausted):
                     player.last_direction = "down"
                     player_animation_timer += dt
                     if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
@@ -2481,7 +2541,7 @@ while running:
                             player_current_image = player_walk_down_attack_images[player_frame_index]
                             player_animation_timer = 0
 
-                elif keys[pygame.K_s]:
+                elif not crafting_bench_in_use and keys[pygame.K_s]:
                     player.last_direction = "down"
                     player_animation_timer += dt
                     if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
@@ -2595,7 +2655,10 @@ while running:
         screen.blit(time_surface, (time_rect.x + 8, time_rect.y + 22))
         screen.blit(time_text, (time_rect.x + 13, time_rect.y + 27))
 
-        if not paused and not inventory_in_use and naming_cat is None:
+        if crafting_bench_in_use:
+            crafting_bench.draw(screen)
+
+        if not paused and not inventory_in_use and naming_cat is None and not crafting_bench_in_use:
             if keys[pygame.K_o]:
                 dungeon_depth -= 500
                 absolute_cam_x -= 500
