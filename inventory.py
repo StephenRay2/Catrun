@@ -655,12 +655,12 @@ items_list = [
         "output_amount": 1
     },
     {
-        "item_name": "Snake Fangs",
-        "icon": "SnakeFangs.png",
+        "item_name": "Fangs",
+        "icon": "Fangs.png",
         "stack_size": 100,
         "weight": .3,
         "type": "raw_material",
-        "description": "Sharp front fangs of a giant snake. Useful for crafting and ripping through flesh, if you're into that kind of thing.",
+        "description": "Sharp front fangs of a giant animal. Useful for crafting and ripping through flesh, if you're into that kind of thing.",
         "use_effect": None,
         "placeable": False,
         "consumable": False,
@@ -1697,7 +1697,7 @@ items_list = [
         "placeable": False,
         "consumable": False,
         "durability": None,
-        "recipe": [{"item": "Metal Ingot", "amount": 2}, {"item": "Medium Metal Amulet", "amount": 1}, {"item": "Snake Fangs", "amount": 3}],
+        "recipe": [{"item": "Metal Ingot", "amount": 2}, {"item": "Medium Metal Amulet", "amount": 1}, {"item": "Fangs", "amount": 3}],
         "crafting_medium": "workbench",
         "tags": ["material", "ore"],
         "output_amount": 1
@@ -1729,7 +1729,7 @@ items_list = [
         "placeable": True,
         "consumable": False,
         "durability": None,
-        "recipe": [{"item": "Metal Ingot", "amount": 10}, {"item": "Campfire", "amount": 1}, {"item": "Hide", "amount": 2}],
+        "recipe": [{"item": "Metal Ingot", "amount": 10}, {"item": "Campfire", "amount": 1}, {"item": "Sticks", "amount": 2}],
         "crafting_medium": "workbench",
         "tags": ["item"],
         "output_amount": 1
