@@ -12,6 +12,80 @@ player_inventory_image = pygame.transform.scale(player_inventory_image, (500, 50
 
 image_path = "assets/sprites/items"
 
+
+def get_weapon_animation_data():
+    return {
+        "movement_frame_data": {
+            "right": [
+                {"offset": (15, 21), "rotation": 2},
+                {"offset": (21, 18), "rotation": 7},
+                {"offset": (17, 3), "rotation": 45},
+                {"offset": (21, 18), "rotation": 7},
+                {"offset": (15, 21), "rotation": 0},
+                {"offset": (11, 21), "rotation": 0},
+                {"offset": (7, 21), "rotation": 0},
+                {"offset": (11, 21), "rotation": 0},
+            ],
+            "left": [
+                {"offset": (5, 21), "rotation": 0},
+                {"offset": (9, 21), "rotation": 2},
+                {"offset": (11, 21), "rotation": 4},
+                {"offset": (9, 21), "rotation": 2},
+                {"offset": (5, 21), "rotation": 0},
+                {"offset": (-5, 16), "rotation": -9},
+                {"offset": (-13, 2), "rotation": -45},
+                {"offset": (-5, 16), "rotation": -9},
+            ],
+            "up": [
+                {"offset": (13, 20), "rotation": 0},
+                {"offset": (9, 17), "rotation": 2},
+                {"offset": (8, 11), "rotation": 5},
+                {"offset": (9, 17), "rotation": 2},
+                {"offset": (13, 20), "rotation": 0},
+                {"offset": (9, 17), "rotation": 2},
+                {"offset": (8, 15), "rotation": 5},
+                {"offset": (9, 17), "rotation": 2},
+            ],
+            "down": [
+                {"offset": (0, 20), "rotation": 0},
+                {"offset": (1, 18), "rotation": -5},
+                {"offset": (3, 16), "rotation": 0},
+                {"offset": (1, 18), "rotation": 5},
+                {"offset": (0, 20), "rotation": 0},
+                {"offset": (1, 18), "rotation": -5},
+                {"offset": (3, 16), "rotation": 0},
+                {"offset": (1, 18), "rotation": 5},
+            ]
+        },
+        "attack_frame_data": {
+            "right": [
+                {"offset": (7, 0), "rotation": 45},
+                {"offset": (-7, -16), "rotation": 135},
+                {"offset": (30, 4), "rotation": 90},
+                {"offset": (16, 5), "rotation": 45},
+            ],
+            "left": [
+                {"offset": (0, 0), "rotation": 45},
+                {"offset": (14, -16), "rotation": 135},
+                {"offset": (-8, 0), "rotation": 90},
+                {"offset": (-9, 6), "rotation": 45},
+            ],
+            "up": [
+                {"offset": (8, 11), "rotation": -5},
+                {"offset": (5, 3), "rotation": -10},
+                {"offset": (9, 17), "rotation": 2},
+                {"offset": (13, 20), "rotation": 0},
+            ],
+            "down": [
+                {"offset": (-2, 4), "rotation": -5},
+                {"offset": (2, -1), "rotation": -10},
+                {"offset": (0, 20), "rotation": 2},
+                {"offset": (2, 16), "rotation": 0},
+            ]
+        }
+    }
+
+
 items_list = [
     # Raw Materials
     {
@@ -1247,7 +1321,8 @@ items_list = [
             "right": (15, 18),
             "up": (13, 10),
             "down": (0, 18)
-        }
+        },
+        **get_weapon_animation_data()
     },
     {
         "item_name": "Small Orange Juice",
@@ -1953,74 +2028,2047 @@ items_list = [
             "up": (13, 20),
             "down": (0, 20)
         },
-        "movement_frame_data": {
-            "right": [
-                {"offset": (15, 21), "rotation": 2},
-                {"offset": (21, 18), "rotation": 7},
-                {"offset": (17, 3), "rotation": 45},
-                {"offset": (21, 18), "rotation": 7},
-                {"offset": (15, 21), "rotation": 0},
-                {"offset": (11, 21), "rotation": 0},
-                {"offset": (7, 21), "rotation": 0},
-                {"offset": (11, 21), "rotation": 0},
-            ],
-            "left": [
-                {"offset": (5, 21), "rotation": 0},
-                {"offset": (9, 21), "rotation": 2},
-                {"offset": (11, 21), "rotation": 4},
-                {"offset": (9, 21), "rotation": 2},
-                {"offset": (5, 21), "rotation": 0},
-                {"offset": (-5, 16), "rotation": -9},
-                {"offset": (-13, 2), "rotation": -45},
-                {"offset": (-5, 16), "rotation": -9},
-            ],
-            "up": [
-                {"offset": (13, 20), "rotation": 0},
-                {"offset": (9, 17), "rotation": 2},
-                {"offset": (8, 11), "rotation": 5},
-                {"offset": (9, 17), "rotation": 2},
-                {"offset": (13, 20), "rotation": 0},
-                {"offset": (9, 17), "rotation": 2},
-                {"offset": (8, 15), "rotation": 5},
-                {"offset": (9, 17), "rotation": 2},
-            ],
-            "down": [
-                {"offset": (0, 20), "rotation": 0},
-                {"offset": (1, 18), "rotation": -5},
-                {"offset": (3, 16), "rotation": 0},
-                {"offset": (1, 18), "rotation": 5},
-                {"offset": (0, 20), "rotation": 0},
-                {"offset": (1, 18), "rotation": -5},
-                {"offset": (3, 16), "rotation": 0},
-                {"offset": (1, 18), "rotation": 5},
-            ]
+        **get_weapon_animation_data()
+    },
+    # Bone Weapons
+    {
+        "item_name": "Bone Axe",
+        "icon": "BoneAxe.png",
+        "stack_size": 1,
+        "weight": 6,
+        "type": "tool",
+        "description": "An axe crafted from bone. Surprisingly effective.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 800,
+        "recipe": [{"item": "Bone", "amount": 6}, {"item_tag": "wood", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "weapon"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "BoneAxeRightHeld.png",
+            "right": "BoneAxeRightHeld.png",
+            "up": "BoneAxeUpHeld.png",
+            "down": "BoneAxeDownHeld.png"
         },
-        "attack_frame_data": {
-            "right": [
-                {"offset": (7, 0), "rotation": 45},
-                {"offset": (-7, -16), "rotation": 135},
-                {"offset": (30, 4), "rotation": 90},
-                {"offset": (16, 5), "rotation": 45},
-            ],
-            "left": [
-                {"offset": (0, 0), "rotation": 45},
-                {"offset": (14, -16), "rotation": 135},
-                {"offset": (-8, 0), "rotation": 90},
-                {"offset": (-9, 6), "rotation": 45},
-            ],
-            "up": [
-                {"offset": (8, 11), "rotation": -5},
-                {"offset": (5, 3), "rotation": -10},
-                {"offset": (9, 17), "rotation": 2},
-                {"offset": (13, 20), "rotation": 0},
-            ],
-            "down": [
-                {"offset": (-2, 4), "rotation": -5},
-                {"offset": (2, -1), "rotation": -10},
-                {"offset": (0, 20), "rotation": 2},
-                {"offset": (2, 16), "rotation": 0},
-            ]
-        }
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Bone Sword",
+        "icon": "BoneSword.png",
+        "stack_size": 1,
+        "weight": 2,
+        "type": "weapon",
+        "description": "A sword made from bone. Surprisingly sharp.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 600,
+        "recipe": [{"item": "Bone", "amount": 4}, {"item": "Stick", "amount": 2}, {"item": "Hide", "amount": 1}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "BoneSwordRightHeld.png",
+            "right": "BoneSwordRightHeld.png",
+            "up": "BoneSwordUpHeld.png",
+            "down": "BoneSwordDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (3, 22),
+            "right": (17, 22),
+            "up": (12, 21),
+            "down": (1, 21)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Bone Spear",
+        "icon": "BoneSpear.png",
+        "stack_size": 1,
+        "weight": 2,
+        "type": "weapon",
+        "description": "A spear tipped with bone. Good for ranged combat.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 500,
+        "recipe": [{"item": "Bone", "amount": 3}, {"item": "Stick", "amount": 6}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "BoneSpearRightHeld.png",
+            "right": "BoneSpearRightHeld.png",
+            "up": "BoneSpearUpHeld.png",
+            "down": "BoneSpearDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 20),
+            "right": (15, 20),
+            "up": (13, 19),
+            "down": (0, 19)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Bone Mace",
+        "icon": "BoneMace.png",
+        "stack_size": 1,
+        "weight": 3,
+        "type": "weapon",
+        "description": "A mace with a bone head. Useful for crushing.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 700,
+        "recipe": [{"item": "Bone", "amount": 5}, {"item": "Stick", "amount": 3}, {"item": "Twine", "amount": 3}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "BoneMaceRightHeld.png",
+            "right": "BoneMaceRightHeld.png",
+            "up": "BoneMaceUpHeld.png",
+            "down": "BoneMaceDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Bone Pickaxe",
+        "icon": "BonePickaxe.png",
+        "stack_size": 1,
+        "weight": 4,
+        "type": "tool",
+        "description": "A pickaxe with a bone head. Useful for mining.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 700,
+        "recipe": [{"item": "Bone", "amount": 5}, {"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "mining"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "BonePickaxeRightHeld.png",
+            "right": "BonePickaxeRightHeld.png",
+            "up": "BonePickaxeUpHeld.png",
+            "down": "BonePickaxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Bone Shovel",
+        "icon": "BoneShovel.png",
+        "stack_size": 1,
+        "weight": 3,
+        "type": "tool",
+        "description": "A shovel with a bone blade. Good for digging.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 600,
+        "recipe": [{"item": "Bone", "amount": 4}, {"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "digging"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "BoneShovelRightHeld.png",
+            "right": "BoneShovelRightHeld.png",
+            "up": "BoneShovelUpHeld.png",
+            "down": "BoneShovelDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Bone Hoe",
+        "icon": "BoneHoe.png",
+        "stack_size": 1,
+        "weight": 1.5,
+        "type": "tool",
+        "description": "A hoe with a bone blade. Perfect for tending gardens.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 500,
+        "recipe": [{"item": "Bone", "amount": 2}, {"item_tag": "wood", "amount": 1}, {"item": "Twine", "amount": 1}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "gardening"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "BoneHoeRightHeld.png",
+            "right": "BoneHoeRightHeld.png",
+            "up": "BoneHoeUpHeld.png",
+            "down": "BoneHoeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    # Gold Weapons
+    {
+        "item_name": "Gold Axe",
+        "icon": "GoldAxe.png",
+        "stack_size": 1,
+        "weight": 7,
+        "type": "tool",
+        "description": "A golden axe. Beautiful and deadly.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 900,
+        "recipe": [{"item": "Gold Ingot", "amount": 8}, {"item_tag": "wood", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "weapon"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "GoldAxeRightHeld.png",
+            "right": "GoldAxeRightHeld.png",
+            "up": "GoldAxeUpHeld.png",
+            "down": "GoldAxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Gold Sword",
+        "icon": "GoldSword.png",
+        "stack_size": 1,
+        "weight": 2.5,
+        "type": "weapon",
+        "description": "A golden sword. Luxurious and effective.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 700,
+        "recipe": [{"item": "Gold Ingot", "amount": 8}, {"item": "Stick", "amount": 2}, {"item": "Hide", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "GoldSwordRightHeld.png",
+            "right": "GoldSwordRightHeld.png",
+            "up": "GoldSwordUpHeld.png",
+            "down": "GoldSwordDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (3, 22),
+            "right": (17, 22),
+            "up": (12, 21),
+            "down": (1, 21)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Gold Spear",
+        "icon": "GoldSpear.png",
+        "stack_size": 1,
+        "weight": 2.5,
+        "type": "weapon",
+        "description": "A golden spear. Elegant and deadly.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 600,
+        "recipe": [{"item": "Gold Ingot", "amount": 4}, {"item": "Stick", "amount": 6}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "GoldSpearRightHeld.png",
+            "right": "GoldSpearRightHeld.png",
+            "up": "GoldSpearUpHeld.png",
+            "down": "GoldSpearDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 20),
+            "right": (15, 20),
+            "up": (13, 19),
+            "down": (0, 19)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Gold Mace",
+        "icon": "GoldMace.png",
+        "stack_size": 1,
+        "weight": 3.5,
+        "type": "weapon",
+        "description": "A golden mace. Heavy and precious.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 800,
+        "recipe": [{"item": "Gold Ingot", "amount": 5}, {"item": "Stick", "amount": 3}, {"item": "Twine", "amount": 3}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "GoldMaceRightHeld.png",
+            "right": "GoldMaceRightHeld.png",
+            "up": "GoldMaceUpHeld.png",
+            "down": "GoldMaceDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Gold Pickaxe",
+        "icon": "GoldPickaxe.png",
+        "stack_size": 1,
+        "weight": 4.5,
+        "type": "tool",
+        "description": "A golden pickaxe. As valuable as it is useful.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 800,
+        "recipe": [{"item": "Gold Ingot", "amount": 5}, {"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "mining"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "GoldPickaxeRightHeld.png",
+            "right": "GoldPickaxeRightHeld.png",
+            "up": "GoldPickaxeUpHeld.png",
+            "down": "GoldPickaxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Gold Shovel",
+        "icon": "GoldShovel.png",
+        "stack_size": 1,
+        "weight": 3.5,
+        "type": "tool",
+        "description": "A golden shovel. Surprisingly practical.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 700,
+        "recipe": [{"item": "Gold Ingot", "amount": 4}, {"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "digging"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "GoldShovelRightHeld.png",
+            "right": "GoldShovelRightHeld.png",
+            "up": "GoldShovelUpHeld.png",
+            "down": "GoldShovelDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Gold Hoe",
+        "icon": "GoldHoe.png",
+        "stack_size": 1,
+        "weight": 2,
+        "type": "tool",
+        "description": "A golden hoe. Perfect for tending valuable gardens.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 600,
+        "recipe": [{"item": "Gold Ingot", "amount": 2}, {"item_tag": "wood", "amount": 1}, {"item": "Twine", "amount": 1}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "gardening"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "GoldHoeRightHeld.png",
+            "right": "GoldHoeRightHeld.png",
+            "up": "GoldHoeUpHeld.png",
+            "down": "GoldHoeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    # Obsidian Weapons
+    {
+        "item_name": "Obsidian Axe",
+        "icon": "ObsidianAxe.png",
+        "stack_size": 1,
+        "weight": 7,
+        "type": "tool",
+        "description": "An obsidian axe. Sharp and powerful.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1100,
+        "recipe": [{"item": "Obsidian Shard", "amount": 8}, {"item_tag": "wood", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "weapon"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "ObsidianAxeRightHeld.png",
+            "right": "ObsidianAxeRightHeld.png",
+            "up": "ObsidianAxeUpHeld.png",
+            "down": "ObsidianAxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Obsidian Sword",
+        "icon": "ObsidianSword.png",
+        "stack_size": 1,
+        "weight": 3,
+        "type": "weapon",
+        "description": "An obsidian sword. Wickedly sharp.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 900,
+        "recipe": [{"item": "Obsidian Shard", "amount": 8}, {"item": "Stick", "amount": 2}, {"item": "Hide", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "ObsidianSwordRightHeld.png",
+            "right": "ObsidianSwordRightHeld.png",
+            "up": "ObsidianSwordUpHeld.png",
+            "down": "ObsidianSwordDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (3, 22),
+            "right": (17, 22),
+            "up": (12, 21),
+            "down": (1, 21)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Obsidian Spear",
+        "icon": "ObsidianSpear.png",
+        "stack_size": 1,
+        "weight": 3,
+        "type": "weapon",
+        "description": "An obsidian spear. Deadly and elegant.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 800,
+        "recipe": [{"item": "Obsidian Shard", "amount": 4}, {"item": "Stick", "amount": 6}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "ObsidianSpearRightHeld.png",
+            "right": "ObsidianSpearRightHeld.png",
+            "up": "ObsidianSpearUpHeld.png",
+            "down": "ObsidianSpearDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 20),
+            "right": (15, 20),
+            "up": (13, 19),
+            "down": (0, 19)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Obsidian Mace",
+        "icon": "ObsidianMace.png",
+        "stack_size": 1,
+        "weight": 4,
+        "type": "weapon",
+        "description": "An obsidian mace. Devastating.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1000,
+        "recipe": [{"item": "Obsidian Shard", "amount": 5}, {"item": "Stick", "amount": 3}, {"item": "Twine", "amount": 3}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "ObsidianMaceRightHeld.png",
+            "right": "ObsidianMaceRightHeld.png",
+            "up": "ObsidianMaceUpHeld.png",
+            "down": "ObsidianMaceDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Obsidian Pickaxe",
+        "icon": "ObsidianPickaxe.png",
+        "stack_size": 1,
+        "weight": 5,
+        "type": "tool",
+        "description": "An obsidian pickaxe. Perfect for mining hard rock.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1000,
+        "recipe": [{"item": "Obsidian Shard", "amount": 5}, {"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "mining"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "ObsidianPickaxeRightHeld.png",
+            "right": "ObsidianPickaxeRightHeld.png",
+            "up": "ObsidianPickaxeUpHeld.png",
+            "down": "ObsidianPickaxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Obsidian Shovel",
+        "icon": "ObsidianShovel.png",
+        "stack_size": 1,
+        "weight": 4,
+        "type": "tool",
+        "description": "An obsidian shovel. Great for moving dark earth.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 900,
+        "recipe": [{"item": "Obsidian Shard", "amount": 4}, {"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "digging"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "ObsidianShovelRightHeld.png",
+            "right": "ObsidianShovelRightHeld.png",
+            "up": "ObsidianShovelUpHeld.png",
+            "down": "ObsidianShovelDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Obsidian Hoe",
+        "icon": "ObsidianHoe.png",
+        "stack_size": 1,
+        "weight": 2.5,
+        "type": "tool",
+        "description": "An obsidian hoe. Perfect for serious gardening.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 800,
+        "recipe": [{"item": "Obsidian Shard", "amount": 2}, {"item_tag": "wood", "amount": 1}, {"item": "Twine", "amount": 1}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "gardening"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "ObsidianHoeRightHeld.png",
+            "right": "ObsidianHoeRightHeld.png",
+            "up": "ObsidianHoeUpHeld.png",
+            "down": "ObsidianHoeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    # Stone Weapons
+    {
+        "item_name": "Stone Axe",
+        "icon": "StoneAxe.png",
+        "stack_size": 1,
+        "weight": 5,
+        "type": "tool",
+        "description": "A stone axe. One of humanity's first tools.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 700,
+        "recipe": [{"item": "Stone", "amount": 6}, {"item_tag": "wood", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "weapon"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "StoneAxeRightHeld.png",
+            "right": "StoneAxeRightHeld.png",
+            "up": "StoneAxeUpHeld.png",
+            "down": "StoneAxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Stone Sword",
+        "icon": "StoneSword.png",
+        "stack_size": 1,
+        "weight": 2,
+        "type": "weapon",
+        "description": "A stone sword. Better than sticks, anyway.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 500,
+        "recipe": [{"item": "Stone", "amount": 6}, {"item": "Stick", "amount": 2}, {"item": "Hide", "amount": 1}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "StoneSwordRightHeld.png",
+            "right": "StoneSwordRightHeld.png",
+            "up": "StoneSwordUpHeld.png",
+            "down": "StoneSwordDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (3, 22),
+            "right": (17, 22),
+            "up": (12, 21),
+            "down": (1, 21)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Stone Spear",
+        "icon": "StoneSpear.png",
+        "stack_size": 1,
+        "weight": 2,
+        "type": "weapon",
+        "description": "A spear tipped with stone. Primitive but effective.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 400,
+        "recipe": [{"item": "Stone", "amount": 3}, {"item": "Stick", "amount": 6}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "StoneSpearRightHeld.png",
+            "right": "StoneSpearRightHeld.png",
+            "up": "StoneSpearUpHeld.png",
+            "down": "StoneSpearDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 20),
+            "right": (15, 20),
+            "up": (13, 19),
+            "down": (0, 19)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Stone Mace",
+        "icon": "StoneMace.png",
+        "stack_size": 1,
+        "weight": 3,
+        "type": "weapon",
+        "description": "A stone mace. Heavy and brutal.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 600,
+        "recipe": [{"item": "Stone", "amount": 5}, {"item": "Stick", "amount": 3}, {"item": "Twine", "amount": 3}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "StoneMaceRightHeld.png",
+            "right": "StoneMaceRightHeld.png",
+            "up": "StoneMaceUpHeld.png",
+            "down": "StoneMaceDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Stone Pickaxe",
+        "icon": "StonePickaxe.png",
+        "stack_size": 1,
+        "weight": 3.5,
+        "type": "tool",
+        "description": "A stone pickaxe. Effective for mining.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 600,
+        "recipe": [{"item": "Stone", "amount": 5}, {"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "mining"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "StonePickaxeRightHeld.png",
+            "right": "StonePickaxeRightHeld.png",
+            "up": "StonePickaxeUpHeld.png",
+            "down": "StonePickaxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Stone Shovel",
+        "icon": "StoneShovel.png",
+        "stack_size": 1,
+        "weight": 2.5,
+        "type": "tool",
+        "description": "A stone shovel. Good for moving dirt.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 500,
+        "recipe": [{"item": "Stone", "amount": 4}, {"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "digging"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "StoneShovelRightHeld.png",
+            "right": "StoneShovelRightHeld.png",
+            "up": "StoneShovelUpHeld.png",
+            "down": "StoneShovelDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Stone Hoe",
+        "icon": "StoneHoe.png",
+        "stack_size": 1,
+        "weight": 1.5,
+        "type": "tool",
+        "description": "A stone hoe. Basic but reliable.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 400,
+        "recipe": [{"item": "Stone", "amount": 2}, {"item_tag": "wood", "amount": 1}, {"item": "Twine", "amount": 1}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "gardening"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "StoneHoeRightHeld.png",
+            "right": "StoneHoeRightHeld.png",
+            "up": "StoneHoeUpHeld.png",
+            "down": "StoneHoeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    # Wooden Weapons
+    {
+        "item_name": "Wooden Axe",
+        "icon": "WoodenAxe.png",
+        "stack_size": 1,
+        "weight": 4,
+        "type": "tool",
+        "description": "A wooden axe. Light and easy to swing.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 500,
+        "recipe": [{"item_tag": "wood", "amount": 5}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "weapon"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "WoodenAxeRightHeld.png",
+            "right": "WoodenAxeRightHeld.png",
+            "up": "WoodenAxeUpHeld.png",
+            "down": "WoodenAxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Wooden Sword",
+        "icon": "WoodenSword.png",
+        "stack_size": 1,
+        "weight": 1.5,
+        "type": "weapon",
+        "description": "A wooden sword. Good for training.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 300,
+        "recipe": [{"item_tag": "wood", "amount": 3}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "WoodenSwordRightHeld.png",
+            "right": "WoodenSwordRightHeld.png",
+            "up": "WoodenSwordUpHeld.png",
+            "down": "WoodenSwordDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (3, 22),
+            "right": (17, 22),
+            "up": (12, 21),
+            "down": (1, 21)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Wooden Spear",
+        "icon": "WoodenSpear.png",
+        "stack_size": 1,
+        "weight": 1.5,
+        "type": "weapon",
+        "description": "A wooden spear. A basic ranged weapon.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 250,
+        "recipe": [{"item_tag": "wood", "amount": 4}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "WoodenSpearRightHeld.png",
+            "right": "WoodenSpearRightHeld.png",
+            "up": "WoodenSpearUpHeld.png",
+            "down": "WoodenSpearDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 20),
+            "right": (15, 20),
+            "up": (13, 19),
+            "down": (0, 19)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Wooden Mace",
+        "icon": "WoodenMace.png",
+        "stack_size": 1,
+        "weight": 2,
+        "type": "weapon",
+        "description": "A wooden mace. Solid and straightforward.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 400,
+        "recipe": [{"item_tag": "wood", "amount": 4}, {"item": "Twine", "amount": 3}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "WoodenMaceRightHeld.png",
+            "right": "WoodenMaceRightHeld.png",
+            "up": "WoodenMaceUpHeld.png",
+            "down": "WoodenMaceDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Wooden Pickaxe",
+        "icon": "WoodenPickaxe.png",
+        "stack_size": 1,
+        "weight": 2.5,
+        "type": "tool",
+        "description": "A wooden pickaxe. For light mining.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 350,
+        "recipe": [{"item_tag": "wood", "amount": 4}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "mining"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "WoodenPickaxeRightHeld.png",
+            "right": "WoodenPickaxeRightHeld.png",
+            "up": "WoodenPickaxeUpHeld.png",
+            "down": "WoodenPickaxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Wooden Shovel",
+        "icon": "WoodenShovel.png",
+        "stack_size": 1,
+        "weight": 2,
+        "type": "tool",
+        "description": "A wooden shovel. Good for digging soft earth.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 300,
+        "recipe": [{"item_tag": "wood", "amount": 3}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "digging"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "WoodenShovelRightHeld.png",
+            "right": "WoodenShovelRightHeld.png",
+            "up": "WoodenShovelUpHeld.png",
+            "down": "WoodenShovelDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Wooden Hoe",
+        "icon": "WoodenHoe.png",
+        "stack_size": 1,
+        "weight": 1,
+        "type": "tool",
+        "description": "A wooden hoe. Perfect for starting a garden.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 250,
+        "recipe": [{"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 1}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "gardening"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "WoodenHoeRightHeld.png",
+            "right": "WoodenHoeRightHeld.png",
+            "up": "WoodenHoeUpHeld.png",
+            "down": "WoodenHoeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    # Dusk Dragon Scale Weapons
+    {
+        "item_name": "Dusk Dragon Scale Axe",
+        "icon": "DuskDragonScaleAxe.png",
+        "stack_size": 1,
+        "weight": 8,
+        "type": "tool",
+        "description": "An axe crafted from dusk dragon scales. Deadly and mystical.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1400,
+        "recipe": [{"item": "Dusk Dragon Scale", "amount": 8}, {"item_tag": "wood", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "weapon"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "DuskDragonScaleAxeRightHeld.png",
+            "right": "DuskDragonScaleAxeRightHeld.png",
+            "up": "DuskDragonScaleAxeUpHeld.png",
+            "down": "DuskDragonScaleAxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Dusk Dragon Scale Sword",
+        "icon": "DuskDragonScaleSword.png",
+        "stack_size": 1,
+        "weight": 3.5,
+        "type": "weapon",
+        "description": "A sword forged from dusk dragon scales. Elegant and powerful.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1000,
+        "recipe": [{"item": "Dusk Dragon Scale", "amount": 8}, {"item": "Stick", "amount": 2}, {"item": "Hide", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "DuskDragonScaleSwordRightHeld.png",
+            "right": "DuskDragonScaleSwordRightHeld.png",
+            "up": "DuskDragonScaleSwordUpHeld.png",
+            "down": "DuskDragonScaleSwordDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (3, 22),
+            "right": (17, 22),
+            "up": (12, 21),
+            "down": (1, 21)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Dusk Dragon Scale Spear",
+        "icon": "DuskDragonScaleSpear.png",
+        "stack_size": 1,
+        "weight": 3.5,
+        "type": "weapon",
+        "description": "A spear tipped with dusk dragon scales. Fearsome.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 900,
+        "recipe": [{"item": "Dusk Dragon Scale", "amount": 4}, {"item": "Stick", "amount": 6}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "DuskDragonScaleSpearRightHeld.png",
+            "right": "DuskDragonScaleSpearRightHeld.png",
+            "up": "DuskDragonScaleSpearUpHeld.png",
+            "down": "DuskDragonScaleSpearDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 20),
+            "right": (15, 20),
+            "up": (13, 19),
+            "down": (0, 19)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Dusk Dragon Scale Mace",
+        "icon": "DuskDragonScaleMace.png",
+        "stack_size": 1,
+        "weight": 4.5,
+        "type": "weapon",
+        "description": "A mace forged from dusk dragon scales. Crushingly effective.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1100,
+        "recipe": [{"item": "Dusk Dragon Scale", "amount": 5}, {"item": "Stick", "amount": 3}, {"item": "Twine", "amount": 3}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "DuskDragonScaleMaceRightHeld.png",
+            "right": "DuskDragonScaleMaceRightHeld.png",
+            "up": "DuskDragonScaleMaceUpHeld.png",
+            "down": "DuskDragonScaleMaceDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Dusk Dragon Scale Pickaxe",
+        "icon": "DuskDragonScalePickaxe.png",
+        "stack_size": 1,
+        "weight": 5.5,
+        "type": "tool",
+        "description": "A pickaxe forged from dusk dragon scales. Unbreakable.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1200,
+        "recipe": [{"item": "Dusk Dragon Scale", "amount": 5}, {"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "mining"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "DuskDragonScalePickaxeRightHeld.png",
+            "right": "DuskDragonScalePickaxeRightHeld.png",
+            "up": "DuskDragonScalePickaxeUpHeld.png",
+            "down": "DuskDragonScalePickaxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Dusk Dragon Scale Shovel",
+        "icon": "DuskDragonScaleShovel.png",
+        "stack_size": 1,
+        "weight": 4.5,
+        "type": "tool",
+        "description": "A shovel forged from dusk dragon scales. Perfect for dark tasks.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1000,
+        "recipe": [{"item": "Dusk Dragon Scale", "amount": 4}, {"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "digging"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "DuskDragonScaleShovelRightHeld.png",
+            "right": "DuskDragonScaleShovelRightHeld.png",
+            "up": "DuskDragonScaleShovelUpHeld.png",
+            "down": "DuskDragonScaleShovelDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Dusk Dragon Scale Hoe",
+        "icon": "DuskDragonScaleHoe.png",
+        "stack_size": 1,
+        "weight": 3,
+        "type": "tool",
+        "description": "A hoe forged from dusk dragon scales. For twilight gardens.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 900,
+        "recipe": [{"item": "Dusk Dragon Scale", "amount": 2}, {"item_tag": "wood", "amount": 1}, {"item": "Twine", "amount": 1}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "gardening"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "DuskDragonScaleHoeRightHeld.png",
+            "right": "DuskDragonScaleHoeRightHeld.png",
+            "up": "DuskDragonScaleHoeUpHeld.png",
+            "down": "DuskDragonScaleHoeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    # Electric Dragon Scale Weapons
+    {
+        "item_name": "Electric Dragon Scale Axe",
+        "icon": "ElectricDragonScaleAxe.png",
+        "stack_size": 1,
+        "weight": 8,
+        "type": "tool",
+        "description": "An axe forged from electric dragon scales. Crackling with power.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1400,
+        "recipe": [{"item": "Electric Dragon Scale", "amount": 8}, {"item_tag": "wood", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "weapon"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "ElectricDragonScaleAxeRightHeld.png",
+            "right": "ElectricDragonScaleAxeRightHeld.png",
+            "up": "ElectricDragonScaleAxeUpHeld.png",
+            "down": "ElectricDragonScaleAxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Electric Dragon Scale Sword",
+        "icon": "ElectricDragonScaleSword.png",
+        "stack_size": 1,
+        "weight": 3.5,
+        "type": "weapon",
+        "description": "A sword forged from electric dragon scales. Shocks enemies.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1000,
+        "recipe": [{"item": "Electric Dragon Scale", "amount": 8}, {"item": "Stick", "amount": 2}, {"item": "Hide", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "ElectricDragonScaleSwordRightHeld.png",
+            "right": "ElectricDragonScaleSwordRightHeld.png",
+            "up": "ElectricDragonScaleSwordUpHeld.png",
+            "down": "ElectricDragonScaleSwordDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (3, 22),
+            "right": (17, 22),
+            "up": (12, 21),
+            "down": (1, 21)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Electric Dragon Scale Spear",
+        "icon": "ElectricDragonScaleSpear.png",
+        "stack_size": 1,
+        "weight": 3.5,
+        "type": "weapon",
+        "description": "A spear tipped with electric dragon scales. Electrifying.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 900,
+        "recipe": [{"item": "Electric Dragon Scale", "amount": 4}, {"item": "Stick", "amount": 6}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "ElectricDragonScaleSpearRightHeld.png",
+            "right": "ElectricDragonScaleSpearRightHeld.png",
+            "up": "ElectricDragonScaleSpearUpHeld.png",
+            "down": "ElectricDragonScaleSpearDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 20),
+            "right": (15, 20),
+            "up": (13, 19),
+            "down": (0, 19)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Electric Dragon Scale Mace",
+        "icon": "ElectricDragonScaleMace.png",
+        "stack_size": 1,
+        "weight": 4.5,
+        "type": "weapon",
+        "description": "A mace forged from electric dragon scales. Powerful and shocking.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1100,
+        "recipe": [{"item": "Electric Dragon Scale", "amount": 5}, {"item": "Stick", "amount": 3}, {"item": "Twine", "amount": 3}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "ElectricDragonScaleMaceRightHeld.png",
+            "right": "ElectricDragonScaleMaceRightHeld.png",
+            "up": "ElectricDragonScaleMaceUpHeld.png",
+            "down": "ElectricDragonScaleMaceDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Electric Dragon Scale Pickaxe",
+        "icon": "ElectricDragonScalePickaxe.png",
+        "stack_size": 1,
+        "weight": 5.5,
+        "type": "tool",
+        "description": "A pickaxe forged from electric dragon scales. Breaks anything.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1200,
+        "recipe": [{"item": "Electric Dragon Scale", "amount": 5}, {"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "mining"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "ElectricDragonScalePickaxeRightHeld.png",
+            "right": "ElectricDragonScalePickaxeRightHeld.png",
+            "up": "ElectricDragonScalePickaxeUpHeld.png",
+            "down": "ElectricDragonScalePickaxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Electric Dragon Scale Shovel",
+        "icon": "ElectricDragonScaleShovel.png",
+        "stack_size": 1,
+        "weight": 4.5,
+        "type": "tool",
+        "description": "A shovel forged from electric dragon scales. For energetic digging.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1000,
+        "recipe": [{"item": "Electric Dragon Scale", "amount": 4}, {"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "digging"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "ElectricDragonScaleShovelRightHeld.png",
+            "right": "ElectricDragonScaleShovelRightHeld.png",
+            "up": "ElectricDragonScaleShovelUpHeld.png",
+            "down": "ElectricDragonScaleShovelDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Electric Dragon Scale Hoe",
+        "icon": "ElectricDragonScaleHoe.png",
+        "stack_size": 1,
+        "weight": 3,
+        "type": "tool",
+        "description": "A hoe forged from electric dragon scales. For shocking gardens.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 900,
+        "recipe": [{"item": "Electric Dragon Scale", "amount": 2}, {"item_tag": "wood", "amount": 1}, {"item": "Twine", "amount": 1}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "gardening"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "ElectricDragonScaleHoeRightHeld.png",
+            "right": "ElectricDragonScaleHoeRightHeld.png",
+            "up": "ElectricDragonScaleHoeUpHeld.png",
+            "down": "ElectricDragonScaleHoeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    # Fire Dragon Scale Weapons
+    {
+        "item_name": "Fire Dragon Scale Axe",
+        "icon": "FireDragonScaleAxe.png",
+        "stack_size": 1,
+        "weight": 8,
+        "type": "tool",
+        "description": "An axe forged from fire dragon scales. Burning with power.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1400,
+        "recipe": [{"item": "Fire Dragon Scale", "amount": 8}, {"item_tag": "wood", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "weapon"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "FireDragonScaleAxeRightHeld.png",
+            "right": "FireDragonScaleAxeRightHeld.png",
+            "up": "FireDragonScaleAxeUpHeld.png",
+            "down": "FireDragonScaleAxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Fire Dragon Scale Sword",
+        "icon": "FireDragonScaleSword.png",
+        "stack_size": 1,
+        "weight": 3.5,
+        "type": "weapon",
+        "description": "A sword forged from fire dragon scales. Sets enemies ablaze.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1000,
+        "recipe": [{"item": "Fire Dragon Scale", "amount": 8}, {"item": "Stick", "amount": 2}, {"item": "Hide", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "FireDragonScaleSwordRightHeld.png",
+            "right": "FireDragonScaleSwordRightHeld.png",
+            "up": "FireDragonScaleSwordUpHeld.png",
+            "down": "FireDragonScaleSwordDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (3, 22),
+            "right": (17, 22),
+            "up": (12, 21),
+            "down": (1, 21)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Fire Dragon Scale Spear",
+        "icon": "FireDragonScaleSpear.png",
+        "stack_size": 1,
+        "weight": 3.5,
+        "type": "weapon",
+        "description": "A spear tipped with fire dragon scales. Fiery and deadly.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 900,
+        "recipe": [{"item": "Fire Dragon Scale", "amount": 4}, {"item": "Stick", "amount": 6}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "FireDragonScaleSpearRightHeld.png",
+            "right": "FireDragonScaleSpearRightHeld.png",
+            "up": "FireDragonScaleSpearUpHeld.png",
+            "down": "FireDragonScaleSpearDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 20),
+            "right": (15, 20),
+            "up": (13, 19),
+            "down": (0, 19)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Fire Dragon Scale Mace",
+        "icon": "FireDragonScaleMace.png",
+        "stack_size": 1,
+        "weight": 4.5,
+        "type": "weapon",
+        "description": "A mace forged from fire dragon scales. Inferno in your hands.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1100,
+        "recipe": [{"item": "Fire Dragon Scale", "amount": 5}, {"item": "Stick", "amount": 3}, {"item": "Twine", "amount": 3}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "FireDragonScaleMaceRightHeld.png",
+            "right": "FireDragonScaleMaceRightHeld.png",
+            "up": "FireDragonScaleMaceUpHeld.png",
+            "down": "FireDragonScaleMaceDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Fire Dragon Scale Pickaxe",
+        "icon": "FireDragonScalePickaxe.png",
+        "stack_size": 1,
+        "weight": 5.5,
+        "type": "tool",
+        "description": "A pickaxe forged from fire dragon scales. Hot mining.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1200,
+        "recipe": [{"item": "Fire Dragon Scale", "amount": 5}, {"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "mining"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "FireDragonScalePickaxeRightHeld.png",
+            "right": "FireDragonScalePickaxeRightHeld.png",
+            "up": "FireDragonScalePickaxeUpHeld.png",
+            "down": "FireDragonScalePickaxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Fire Dragon Scale Shovel",
+        "icon": "FireDragonScaleShovel.png",
+        "stack_size": 1,
+        "weight": 4.5,
+        "type": "tool",
+        "description": "A shovel forged from fire dragon scales. For lava gardens.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1000,
+        "recipe": [{"item": "Fire Dragon Scale", "amount": 4}, {"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "digging"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "FireDragonScaleShovelRightHeld.png",
+            "right": "FireDragonScaleShovelRightHeld.png",
+            "up": "FireDragonScaleShovelUpHeld.png",
+            "down": "FireDragonScaleShovelDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Fire Dragon Scale Hoe",
+        "icon": "FireDragonScaleHoe.png",
+        "stack_size": 1,
+        "weight": 3,
+        "type": "tool",
+        "description": "A hoe forged from fire dragon scales. For volcanic soil.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 900,
+        "recipe": [{"item": "Fire Dragon Scale", "amount": 2}, {"item_tag": "wood", "amount": 1}, {"item": "Twine", "amount": 1}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "gardening"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "FireDragonScaleHoeRightHeld.png",
+            "right": "FireDragonScaleHoeRightHeld.png",
+            "up": "FireDragonScaleHoeUpHeld.png",
+            "down": "FireDragonScaleHoeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    # Ice Dragon Scale Weapons
+    {
+        "item_name": "Ice Dragon Scale Axe",
+        "icon": "IceDragonScaleAxe.png",
+        "stack_size": 1,
+        "weight": 8,
+        "type": "tool",
+        "description": "An axe forged from ice dragon scales. Freezing enemies in their tracks.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1400,
+        "recipe": [{"item": "Ice Dragon Scale", "amount": 8}, {"item_tag": "wood", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "weapon"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "IceDragonScaleAxeRightHeld.png",
+            "right": "IceDragonScaleAxeRightHeld.png",
+            "up": "IceDragonScaleAxeUpHeld.png",
+            "down": "IceDragonScaleAxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Ice Dragon Scale Sword",
+        "icon": "IceDragonScaleSword.png",
+        "stack_size": 1,
+        "weight": 3.5,
+        "type": "weapon",
+        "description": "A sword forged from ice dragon scales. Chills the blood.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1000,
+        "recipe": [{"item": "Ice Dragon Scale", "amount": 8}, {"item": "Stick", "amount": 2}, {"item": "Hide", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "IceDragonScaleSwordRightHeld.png",
+            "right": "IceDragonScaleSwordRightHeld.png",
+            "up": "IceDragonScaleSwordUpHeld.png",
+            "down": "IceDragonScaleSwordDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (3, 22),
+            "right": (17, 22),
+            "up": (12, 21),
+            "down": (1, 21)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Ice Dragon Scale Spear",
+        "icon": "IceDragonScaleSpear.png",
+        "stack_size": 1,
+        "weight": 3.5,
+        "type": "weapon",
+        "description": "A spear tipped with ice dragon scales. Deadly and cold.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 900,
+        "recipe": [{"item": "Ice Dragon Scale", "amount": 4}, {"item": "Stick", "amount": 6}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "IceDragonScaleSpearRightHeld.png",
+            "right": "IceDragonScaleSpearRightHeld.png",
+            "up": "IceDragonScaleSpearUpHeld.png",
+            "down": "IceDragonScaleSpearDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 20),
+            "right": (15, 20),
+            "up": (13, 19),
+            "down": (0, 19)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Ice Dragon Scale Mace",
+        "icon": "IceDragonScaleMace.png",
+        "stack_size": 1,
+        "weight": 4.5,
+        "type": "weapon",
+        "description": "A mace forged from ice dragon scales. Smash and freeze.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1100,
+        "recipe": [{"item": "Ice Dragon Scale", "amount": 5}, {"item": "Stick", "amount": 3}, {"item": "Twine", "amount": 3}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "IceDragonScaleMaceRightHeld.png",
+            "right": "IceDragonScaleMaceRightHeld.png",
+            "up": "IceDragonScaleMaceUpHeld.png",
+            "down": "IceDragonScaleMaceDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Ice Dragon Scale Pickaxe",
+        "icon": "IceDragonScalePickaxe.png",
+        "stack_size": 1,
+        "weight": 5.5,
+        "type": "tool",
+        "description": "A pickaxe forged from ice dragon scales. Cool mining.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1200,
+        "recipe": [{"item": "Ice Dragon Scale", "amount": 5}, {"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "mining"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "IceDragonScalePickaxeRightHeld.png",
+            "right": "IceDragonScalePickaxeRightHeld.png",
+            "up": "IceDragonScalePickaxeUpHeld.png",
+            "down": "IceDragonScalePickaxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Ice Dragon Scale Shovel",
+        "icon": "IceDragonScaleShovel.png",
+        "stack_size": 1,
+        "weight": 4.5,
+        "type": "tool",
+        "description": "A shovel forged from ice dragon scales. For frozen earth.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1000,
+        "recipe": [{"item": "Ice Dragon Scale", "amount": 4}, {"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "digging"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "IceDragonScaleShovelRightHeld.png",
+            "right": "IceDragonScaleShovelRightHeld.png",
+            "up": "IceDragonScaleShovelUpHeld.png",
+            "down": "IceDragonScaleShovelDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Ice Dragon Scale Hoe",
+        "icon": "IceDragonScaleHoe.png",
+        "stack_size": 1,
+        "weight": 3,
+        "type": "tool",
+        "description": "A hoe forged from ice dragon scales. For winter crops.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 900,
+        "recipe": [{"item": "Ice Dragon Scale", "amount": 2}, {"item_tag": "wood", "amount": 1}, {"item": "Twine", "amount": 1}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "gardening"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "IceDragonScaleHoeRightHeld.png",
+            "right": "IceDragonScaleHoeRightHeld.png",
+            "up": "IceDragonScaleHoeUpHeld.png",
+            "down": "IceDragonScaleHoeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    # Poison Dragon Scale Weapons
+    {
+        "item_name": "Poison Dragon Scale Axe",
+        "icon": "PoisonDragonScaleAxe.png",
+        "stack_size": 1,
+        "weight": 8,
+        "type": "tool",
+        "description": "An axe forged from poison dragon scales. Venomous.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1400,
+        "recipe": [{"item": "Poison Dragon Scale", "amount": 8}, {"item_tag": "wood", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "weapon"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "PoisonDragonScaleAxeRightHeld.png",
+            "right": "PoisonDragonScaleAxeRightHeld.png",
+            "up": "PoisonDragonScaleAxeUpHeld.png",
+            "down": "PoisonDragonScaleAxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Poison Dragon Scale Sword",
+        "icon": "PoisonDragonScaleSword.png",
+        "stack_size": 1,
+        "weight": 3.5,
+        "type": "weapon",
+        "description": "A sword forged from poison dragon scales. Toxic blade.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1000,
+        "recipe": [{"item": "Poison Dragon Scale", "amount": 8}, {"item": "Stick", "amount": 2}, {"item": "Hide", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "PoisonDragonScaleSwordRightHeld.png",
+            "right": "PoisonDragonScaleSwordRightHeld.png",
+            "up": "PoisonDragonScaleSwordUpHeld.png",
+            "down": "PoisonDragonScaleSwordDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (3, 22),
+            "right": (17, 22),
+            "up": (12, 21),
+            "down": (1, 21)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Poison Dragon Scale Spear",
+        "icon": "PoisonDragonScaleSpear.png",
+        "stack_size": 1,
+        "weight": 3.5,
+        "type": "weapon",
+        "description": "A spear tipped with poison dragon scales. Poisonous.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 900,
+        "recipe": [{"item": "Poison Dragon Scale", "amount": 4}, {"item": "Stick", "amount": 6}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "PoisonDragonScaleSpearRightHeld.png",
+            "right": "PoisonDragonScaleSpearRightHeld.png",
+            "up": "PoisonDragonScaleSpearUpHeld.png",
+            "down": "PoisonDragonScaleSpearDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 20),
+            "right": (15, 20),
+            "up": (13, 19),
+            "down": (0, 19)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Poison Dragon Scale Mace",
+        "icon": "PoisonDragonScaleMace.png",
+        "stack_size": 1,
+        "weight": 4.5,
+        "type": "weapon",
+        "description": "A mace forged from poison dragon scales. Causes severe poison.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1100,
+        "recipe": [{"item": "Poison Dragon Scale", "amount": 5}, {"item": "Stick", "amount": 3}, {"item": "Twine", "amount": 3}],
+        "crafting_medium": "workbench",
+        "tags": ["weapon", "melee"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "PoisonDragonScaleMaceRightHeld.png",
+            "right": "PoisonDragonScaleMaceRightHeld.png",
+            "up": "PoisonDragonScaleMaceUpHeld.png",
+            "down": "PoisonDragonScaleMaceDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Poison Dragon Scale Pickaxe",
+        "icon": "PoisonDragonScalePickaxe.png",
+        "stack_size": 1,
+        "weight": 5.5,
+        "type": "tool",
+        "description": "A pickaxe forged from poison dragon scales. Toxic mining.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1200,
+        "recipe": [{"item": "Poison Dragon Scale", "amount": 5}, {"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "mining"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "PoisonDragonScalePickaxeRightHeld.png",
+            "right": "PoisonDragonScalePickaxeRightHeld.png",
+            "up": "PoisonDragonScalePickaxeUpHeld.png",
+            "down": "PoisonDragonScalePickaxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Poison Dragon Scale Shovel",
+        "icon": "PoisonDragonScaleShovel.png",
+        "stack_size": 1,
+        "weight": 4.5,
+        "type": "tool",
+        "description": "A shovel forged from poison dragon scales. For toxic digging.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 1000,
+        "recipe": [{"item": "Poison Dragon Scale", "amount": 4}, {"item_tag": "wood", "amount": 2}, {"item": "Twine", "amount": 2}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "digging"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "PoisonDragonScaleShovelRightHeld.png",
+            "right": "PoisonDragonScaleShovelRightHeld.png",
+            "up": "PoisonDragonScaleShovelUpHeld.png",
+            "down": "PoisonDragonScaleShovelDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
+    },
+    {
+        "item_name": "Poison Dragon Scale Hoe",
+        "icon": "PoisonDragonScaleHoe.png",
+        "stack_size": 1,
+        "weight": 3,
+        "type": "tool",
+        "description": "A hoe forged from poison dragon scales. For venomous plants.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": 900,
+        "recipe": [{"item": "Poison Dragon Scale", "amount": 2}, {"item_tag": "wood", "amount": 1}, {"item": "Twine", "amount": 1}],
+        "crafting_medium": "workbench",
+        "tags": ["tool", "gardening"],
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "PoisonDragonScaleHoeRightHeld.png",
+            "right": "PoisonDragonScaleHoeRightHeld.png",
+            "up": "PoisonDragonScaleHoeUpHeld.png",
+            "down": "PoisonDragonScaleHoeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
     },
     # Crafted through Gameplay
     {
