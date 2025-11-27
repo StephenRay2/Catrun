@@ -5,6 +5,7 @@ from buttons import *
 from mob_placement import *
 from sounds import *
 from crafting_bench import CraftingBench
+from smelter import Smelter
 
 clock = pygame.time.Clock()
 from inventory import *
@@ -67,6 +68,8 @@ placed_structures = []
 # Crafting bench variables
 crafting_bench = None
 crafting_bench_in_use = False
+smelter = None
+smelter_in_use = False
 
 default_placeable_sprite_size = (64, 64)
 
@@ -319,17 +322,14 @@ def populate_test_inventory():
     items_added = 0
     
     for item_name in placeable_size_settings.keys():
-        # Find the item in items_list
         item_data = next((itm for itm in items_list if itm["item_name"] == item_name), None)
         if not item_data:
             print(f"Warning: Item '{item_name}' not found in items_list")
             continue
         
-        # Create a copy of the item with quantity 1
         new_item = item_data.copy()
         new_item["quantity"] = 1
         
-        # Find the first empty slot in inventory
         target_slot = None
         for idx, slot in enumerate(inventory.inventory_list):
             if slot is None:
@@ -800,6 +800,8 @@ while running:
             time_of_day = (12 + (total_elapsed_time / 60)) % 24
             # Update crafting flash
             inventory.update_flash(dt)
+            if smelter and smelter_in_use:
+                smelter.update(dt)
             # Update placement position if in placement mode
             update_placement_position()
         else:
@@ -992,31 +994,8 @@ while running:
             inventory.hotbar_slots = [None] * inventory.hotbar_size
             
             globals()['crafting_bench'] = CraftingBench(inventory)
+            globals()['smelter'] = Smelter(inventory)
             
-            # Debug: Add Metal Axe to first hotbar slot
-            for item in items_list:
-                if item["item_name"] == "Metal Axe":
-                    axe_copy = item.copy()
-                    axe_copy["quantity"] = 1
-                    inventory.hotbar_slots[0] = axe_copy
-                    break
-
-            # Debug: Add Smelter to second hotbar slot
-            for item in items_list:
-                if item["item_name"] == "Smelter":
-                    smelter_copy = item.copy()
-                    smelter_copy["quantity"] = 1
-                    inventory.hotbar_slots[1] = smelter_copy
-                    break
-
-             # Debug: Add Mortar and Pestle to third hotbar slot
-            for item in items_list:
-                if item["item_name"] == "Mortar And Pestle":
-                    mortar_copy = item.copy()
-                    mortar_copy["quantity"] = 1
-                    inventory.hotbar_slots[2] = mortar_copy
-                    break
-
             populate_test_inventory()
 
             inventory_resources = []
@@ -1359,6 +1338,9 @@ while running:
                 if crafting_bench_in_use:
                     crafting_bench.close()
                     crafting_bench_in_use = False
+                elif smelter_in_use:
+                    smelter.close()
+                    smelter_in_use = False
                 else:
                     for structure in nearby_structures:
                         if structure['item_name'] == 'Workbench':
@@ -1383,6 +1365,31 @@ while running:
                                 crafting_bench.open((structure['x'], structure['y']))
                                 crafting_bench_in_use = True
                                 break
+                    
+                    if not crafting_bench_in_use:
+                        for structure in nearby_structures:
+                            if structure['item_name'] == 'Smelter':
+                                struct_collision = structure['rect']
+                                horizontal_dist = abs(struct_collision.centerx - player_world_x)
+                                vertical_dist = abs(struct_collision.centery - player_world_y)
+                                smelter_reach = 40
+                                horizontal_range = (struct_collision.width / 2) + smelter_reach
+                                vertical_range = (struct_collision.height / 2) + smelter_reach
+                                
+                                facing_object = False
+                                if player.last_direction == "right" and struct_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                    facing_object = True
+                                elif player.last_direction == "left" and struct_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                    facing_object = True
+                                elif player.last_direction == "up" and struct_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                    facing_object = True
+                                elif player.last_direction == "down" and struct_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                    facing_object = True
+                                
+                                if facing_object:
+                                    smelter.open((structure['x'], structure['y']))
+                                    smelter_in_use = True
+                                    break
                 
                 if not crafting_bench_in_use:
                     for obj in visible_objects:
@@ -1530,7 +1537,7 @@ while running:
                     state = "menu"
                     paused = False
     
-        if not paused and not inventory_in_use and naming_cat is None and pygame.mouse.get_pressed()[0] and not player.exhausted:
+        if not paused and not inventory_in_use and not smelter_in_use and not crafting_bench_in_use and naming_cat is None and pygame.mouse.get_pressed()[0] and not player.exhausted:
             if current_time - harvest_cooldown > harvest_delay:
                 for obj in visible_objects:
                     if hasattr(obj, 'harvest') and hasattr(obj, 'destroyed') and not obj.destroyed:
@@ -1737,7 +1744,8 @@ while running:
             if current_hotbar_slot is not None:
                 for item in items_list:
                     if item["item_name"] == current_hotbar_slot["item_name"] and "held_item_images" in item:
-                        is_attacking = pygame.mouse.get_pressed()[0] and not player.exhausted
+                        # disable attacking while smelter UI is open
+                        is_attacking = pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use
                         held_image = item["held_item_images"].get(player.last_direction)
                         
                         if held_image and is_attacking:
@@ -2328,7 +2336,7 @@ while running:
             if not in_liquid:
                 player.exit_liquid()
 
-            if not inventory_in_use and naming_cat is None:
+            if not inventory_in_use and not smelter_in_use and not crafting_bench_in_use and naming_cat is None:
 
                 if (((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]) and (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT])) or pygame.mouse.get_pressed()[0]) and not player.exhausted:
                     if player.lose_stamina(screen, dt):
@@ -2358,7 +2366,7 @@ while running:
 
                 if not is_moving:
                     if player.last_direction == "down":
-                        if pygame.mouse.get_pressed()[0] and not player.exhausted:
+                        if pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use:
                             player_animation_timer += dt
                             if player_animation_timer > .07:
                                 player_frame_index = (player_frame_index + 1) % len(player_stand_attack_down_images)
@@ -2371,7 +2379,7 @@ while running:
                                 player_current_image = player_idle_down_images[player_frame_index]
                                 player_animation_timer = 0
                     elif player.last_direction == "up":
-                        if pygame.mouse.get_pressed()[0] and not player.exhausted:
+                        if pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use:
                             player_animation_timer += dt
                             if player_animation_timer > .07:
                                 player_frame_index = (player_frame_index + 1) % len(player_stand_attack_up_images)
@@ -2384,7 +2392,7 @@ while running:
                                 player_current_image = player_idle_up_images[player_frame_index]
                                 player_animation_timer = 0
                     elif player.last_direction == "left":
-                        if pygame.mouse.get_pressed()[0] and not player.exhausted:
+                        if pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use:
                             player_animation_timer += dt
                             if player_animation_timer > .07:
                                 player_frame_index = (player_frame_index + 1) % len(player_stand_attack_left_images)
@@ -2397,7 +2405,7 @@ while running:
                                 player_current_image = player_idle_left_images[player_frame_index]
                                 player_animation_timer = 0
                     elif player.last_direction == "right":
-                        if pygame.mouse.get_pressed()[0] and not player.exhausted:
+                        if pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use:
                             player_animation_timer += dt
                             if player_animation_timer > .07:
                                 player_frame_index = (player_frame_index + 1) % len(player_stand_attack_right_images)
@@ -2618,6 +2626,33 @@ while running:
             inventory.inventory_full_message_timer -= dt
 
 
+
+        if smelter_in_use:
+            smelter.render(screen)
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = pygame.mouse.get_pos()
+                slot_info = smelter.get_slot_at_mouse(mouse_pos, screen)
+                slot_index, slot_type = slot_info
+                
+                if hasattr(smelter, 'button_rect') and smelter.button_rect.collidepoint(mouse_pos):
+                    if smelter.fire_lit:
+                        smelter.put_out_fire()
+                    else:
+                        smelter.light_fire()
+                elif slot_index is not None:
+                    if smelter.dragging:
+                        smelter.end_drag(slot_info)
+                    else:
+                        smelter.start_drag(slot_info)
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if smelter.dragging:
+                    mouse_pos = pygame.mouse.get_pos()
+                    slot_info = smelter.get_slot_at_mouse(mouse_pos, screen)
+                    slot_index, slot_type = slot_info
+                    if slot_index is not None:
+                        smelter.end_drag(slot_info)
+                    else:
+                        smelter.cancel_drag()
 
         if inventory_in_use:
 
