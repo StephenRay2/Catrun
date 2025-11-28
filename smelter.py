@@ -70,7 +70,7 @@ class Smelter:
         self.last_fire_toggle = 0
         self.fire_toggle_cooldown = 200  # ms guard to prevent multi-click burn
         self.last_drag_time = 0
-        self.drag_cooldown = 0  # no delay between drags
+        self.drag_cooldown = 120  # debounce between drag starts (ms)
         
         self.dragging = False
         self.dragged_item = None
@@ -330,6 +330,13 @@ class Smelter:
         self.input_slots[slot_index]["quantity"] -= 1
     
     def start_drag(self, slot_info):
+        # Debounce to avoid accidental multi-pickups from rapid click events
+        now = pygame.time.get_ticks()
+        if self.dragging:
+            return
+        if now - self.last_drag_time < self.drag_cooldown:
+            return
+        self.last_drag_time = now
         slot_index, slot_type = slot_info
         
         source_container = None

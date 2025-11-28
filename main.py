@@ -1528,7 +1528,7 @@ while running:
                     
                     throw_charge_start = None
 
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not smelter_in_use:
                 mouse_pos = pygame.mouse.get_pos()
 
                 slot_index, is_hotbar = inventory.get_slot_at_mouse(mouse_pos, screen)
@@ -1546,7 +1546,7 @@ while running:
                         if slot_index is not None:
                             inventory.start_drag(slot_index, is_hotbar)
 
-            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and not smelter_in_use:
                 if placement_mode:
                     # Try to place the item
                     x, y = placement_position
@@ -2887,29 +2887,29 @@ while running:
 
 
 
-        if smelter_in_use:
-            smelter.render(screen)
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                mouse_pos = pygame.mouse.get_pos()
-                slot_info = smelter.get_slot_at_mouse(mouse_pos, screen)
-                slot_index, slot_type = slot_info
-                
-                if hasattr(smelter, 'button_rect') and smelter.button_rect.collidepoint(mouse_pos):
-                    smelter.toggle_fire()
-                elif slot_index is not None:
-                    if smelter.dragging:
-                        smelter.end_drag(slot_info)
-                    else:
-                        smelter.start_drag(slot_info)
-            elif event.type == pygame.MOUSEBUTTONUP:
-                if smelter.dragging:
+            if smelter_in_use:
+                smelter.render(screen)
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     mouse_pos = pygame.mouse.get_pos()
                     slot_info = smelter.get_slot_at_mouse(mouse_pos, screen)
                     slot_index, slot_type = slot_info
-                    if slot_index is not None:
-                        smelter.end_drag(slot_info)
-                    else:
-                        smelter.cancel_drag()
+                    
+                    if hasattr(smelter, 'button_rect') and smelter.button_rect.collidepoint(mouse_pos):
+                        smelter.toggle_fire()
+                    elif slot_index is not None:
+                        if smelter.dragging:
+                            smelter.end_drag(slot_info)
+                        else:
+                            smelter.start_drag(slot_info)
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    if smelter.dragging:
+                        mouse_pos = pygame.mouse.get_pos()
+                        slot_info = smelter.get_slot_at_mouse(mouse_pos, screen)
+                        slot_index, slot_type = slot_info
+                        if slot_index is not None:
+                            smelter.end_drag(slot_info)
+                        else:
+                            smelter.cancel_drag()
 
         if inventory_in_use:
 
