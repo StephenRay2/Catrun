@@ -1058,23 +1058,36 @@ while running:
             player.level = 1
             player.next_level_exp = 100
             player.level_up_timer = 0
+            player.temp_weight_increase = 1
 
             player.health_leveler = 1
             player.stamina_leveler = 1
             player.hunger_leveler = 1
             player.thirst_leveler = 1
             player.warmth_leveler = 1
-            player.max_health = 100 * player.health_leveler
-            player.max_stamina = 100 * player.stamina_leveler
-            player.max_hunger = 100 * player.hunger_leveler
-            player.max_thirst = 100 * player.thirst_leveler
+            player.weather_resistance_leveler = 1
+            player.weight_leveler = 1
+            player.strength_leveler = 1
+            player.strength_level_gain = 3
+            player.speed_leveler = 1
+            player.defense_leveler = 1
+            player.resilience_leveler = 1
+            player.max_health = int(round(100 * player.health_leveler))
+            player.max_stamina = int(round(100 * player.stamina_leveler))
+            player.max_hunger = int(round(100 * player.hunger_leveler))
+            player.max_thirst = int(round(100 * player.thirst_leveler))
             player.max_warmth = 100
+            player.max_heat_resistance = int(round(100 * player.weather_resistance_leveler))
+            player.max_cold_resistance = int(round(100 * player.weather_resistance_leveler))
+            player.max_weight = int(round(100 * player.weight_leveler * player.temp_weight_increase))
+            player.attack = int(round(player.damage + (player.strength_leveler - 1) * player.strength_level_gain))
+            player.speed = int(round(100 * player.speed_leveler))
+            player.defense = int(round(100 * player.defense_leveler))
+            player.resilience = 100 * player.resilience_leveler
 
-            player.damage = 50
-            player.attack = 1
+            player.damage = 5
             player.base_speed = 275
-            player.speed = 1
-            player.defense = 1
+            player.unspent_stat_points = 0
 
             player.inventory = []
             player.score = 0
@@ -2763,6 +2776,8 @@ while running:
                 inventory.state = "level_up"
             elif cats_tab_unused.is_clicked(event):
                 inventory.state = "cats"
+            if inventory.state == "level_up":
+                inventory.handle_level_up_event(event)
 
         if paused:
             screen.blit(temp_pause_surface, pause_menu_rect.topleft)

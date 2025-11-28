@@ -1,5 +1,6 @@
 import pygame
 import random
+import math
 from world import *
 from sounds import *
 font = pygame.font.Font(None, 24)
@@ -190,18 +191,18 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=(x, y)).inflate(-10, -20)
 
         self.health_leveler = 1
-        self.max_health = 100 * self.health_leveler
-        self.health = 100
+        self.max_health = int(round(100 * self.health_leveler))
+        self.health = self.max_health
         self.stamina_leveler = 1
-        self.max_stamina = 100 * self.stamina_leveler
-        self.stamina = 100
+        self.max_stamina = int(round(100 * self.stamina_leveler))
+        self.stamina = self.max_stamina
         self.hunger_leveler = 1
-        self.max_hunger = 100 * self.hunger_leveler
-        self.hunger = 100
+        self.max_hunger = int(round(100 * self.hunger_leveler))
+        self.hunger = self.max_hunger
         self.full_timer = 60
         self.thirst_leveler = 1
-        self.max_thirst = 100 * self.thirst_leveler
-        self.thirst = 100
+        self.max_thirst = int(round(100 * self.thirst_leveler))
+        self.thirst = self.max_thirst
         self.thirst_full_timer = 60
         self.weather_resistance_leveler = 1
         self.max_heat_resistance = 100 * self.weather_resistance_leveler
@@ -215,27 +216,35 @@ class Player(pygame.sprite.Sprite):
         self.max_torpidity = 100
         self.torpidity = 0
         self.temp_weight_increase = 1
+        self.weight_leveler = 1
+        self.max_weight = 100 * self.weight_leveler * self.temp_weight_increase
         self.weight = 0
-        self.max_weight = 100 * self.temp_weight_increase
         self.glow = False
         self.glow_time = 0
         self.poison = False
         self.poison_time = 0
-        self.damage = 50
+        self.damage = 5
         self.poison_strength = 1
-        self.attack = 1
+        self.strength_leveler = 1
+        self.strength_level_gain = 1
+        self.attack = int(self.damage + (self.strength_leveler - 1) * self.strength_level_gain)
         self.temp_attack_boost = 1
         self.base_speed = 275
-        self.speed = 1
-        self.defense = 1
+        self.speed_leveler = 1
+        self.speed = 100 * self.speed_leveler
+        self.defense_leveler = 1
+        self.defense = 100 * self.defense_leveler
+        self.resilience_leveler = 1
+        self.resilience = 100 * self.resilience_leveler
         self.level = 1
         self.experience = 0
         self.exp_total = 0
-        self.req_multiplier = .5
+        self.req_multiplier = .01
         self.next_level_exp = 100
         self.level_up_timer = 0
         self.stamina_timer = 0
         self.stamina_message_timer = 0
+        self.unspent_stat_points = 0
         self.health_bar_color = ()
         self.poisoned_health_color = ()
 
@@ -339,7 +348,8 @@ class Player(pygame.sprite.Sprite):
 
                     if facing_object and 1 <= mob.health:
                         old_health = mob.health
-                        mob.health -= self.damage * self.attack
+                        # Flat damage plus strength upgrades
+                        mob.health -= self.attack
                         if mob.health < 0:
                             mob.health = 0
 
@@ -366,8 +376,6 @@ class Player(pygame.sprite.Sprite):
                                 sound_manager.play_sound("squirrel_get_hit")
                             elif mob.__class__.__name__ == "Crow":
                                 sound_manager.play_sound(random.choice(["crow_caw1", "crow_caw2", "crow_caw"]))
-
-
 
     def determine_score(self, dungeon_depth):
         return int(self.exp_total / 100) + int(dungeon_depth)
@@ -411,7 +419,7 @@ class Player(pygame.sprite.Sprite):
     def level_up(self, screen):
         self.level += 1
         self.exp_total += self.next_level_exp
-        if self.level < 100:
+        if self.level > 0:
             self.next_level_exp += (self.next_level_exp * self.req_multiplier)
             if self.level <= 20:
                 self.req_multiplier -= .022
@@ -423,8 +431,70 @@ class Player(pygame.sprite.Sprite):
                 self.req_multiplier -= .00008
             elif self.level < 100:
                 self.req_multiplier -= .00003
+            if self.level >= 100:
+                self.req_multiplier += 1
         self.level_up_timer = 10
+        self.unspent_stat_points += 1
         sound_manager.play_sound("level_up")
+
+    def apply_stat_upgrade(self, stat_key):
+        if self.unspent_stat_points <= 0:
+            return False
+
+        upgraded = False
+        if stat_key == "health":
+            self.health_leveler = round(self.health_leveler + 0.1, 4)
+            self.max_health = int(100 * self.health_leveler)
+            self.health = self.max_health
+            upgraded = True
+        elif stat_key == "stamina":
+            self.stamina_leveler = round(self.stamina_leveler + 0.1, 4)
+            self.max_stamina = int(100 * self.stamina_leveler)
+            self.stamina = self.max_stamina
+            upgraded = True
+        elif stat_key == "hunger":
+            self.hunger_leveler = round(self.hunger_leveler + 0.1, 4)
+            self.max_hunger = int(100 * self.hunger_leveler)
+            self.hunger = self.max_hunger
+            upgraded = True
+        elif stat_key == "thirst":
+            self.thirst_leveler = round(self.thirst_leveler + 0.1, 4)
+            self.max_thirst = int(100 * self.thirst_leveler)
+            self.thirst = self.max_thirst
+            upgraded = True
+        elif stat_key == "weather":
+            self.weather_resistance_leveler = round(self.weather_resistance_leveler + 0.1, 4)
+            self.max_heat_resistance = int(100 * self.weather_resistance_leveler)
+            self.max_cold_resistance = int(100 * self.weather_resistance_leveler)
+            self.heat_resistance = self.max_heat_resistance
+            self.cold_resistance = self.max_cold_resistance
+            upgraded = True
+        elif stat_key == "weight":
+            self.weight_leveler = round(self.weight_leveler + 0.1, 4)
+            self.max_weight = int(100 * self.weight_leveler * self.temp_weight_increase)
+            upgraded = True
+        elif stat_key == "strength":
+            self.strength_leveler = round(self.strength_leveler + 1, 4)
+            self.attack = int(self.damage + (self.strength_leveler - 1) * self.strength_level_gain)
+            upgraded = True
+        elif stat_key == "speed":
+            self.speed_leveler = round(self.speed_leveler + 0.05, 4)
+            self.speed = int(100 * self.speed_leveler)
+            upgraded = True
+        elif stat_key == "defense":
+            self.defense_leveler = round(self.defense_leveler + 0.1, 4)
+            self.defense = int(100 * self.defense_leveler)
+            upgraded = True
+        elif stat_key == "resilience":
+            self.resilience_leveler = round(self.resilience_leveler + 0.1, 4)
+            self.resilience = int(100 * self.resilience_leveler)
+            upgraded = True
+
+        if upgraded:
+            self.unspent_stat_points -= 1
+            return True
+
+        return False
 
     def show_level_up_message(self, screen):
         level_up_text = large_font.render(
@@ -436,9 +506,8 @@ class Player(pygame.sprite.Sprite):
             20
         ))
 
-
     def get_speed(self):
-        return self.base_speed * self.speed
+        return self.base_speed * (self.speed / 100)
 
     def regain_health(self, dt):
         if 1 <= self.health <= self.max_health:
@@ -490,8 +559,8 @@ class Player(pygame.sprite.Sprite):
         elif self.thirst > 0:
             self.thirst -= dt / 40
 
-        if self.stamina > 10 and self.speed < 1:
-            self.speed = 1
+        if self.stamina > 10 and self.speed < 100:
+            self.speed = 100
         
         if self.stamina < 0:
             self.stamina = 0
@@ -500,9 +569,7 @@ class Player(pygame.sprite.Sprite):
         if self.thirst < 0:
             self.thirst = 0
 
-
     def lose_stamina(self, screen, dt):
-
         stamina_depleted = False
         if self.stamina > 0:
             self.stamina -= dt * 6
@@ -514,16 +581,16 @@ class Player(pygame.sprite.Sprite):
 
     def stamina_speed(self):
         if self.stamina <= 0:
-            self.speed = .3
+            self.speed = 30
             self.exhausted = True
         elif self.stamina <= 10: 
-            self.speed = .4
+            self.speed = 40
             self.exhausted = False
         elif self.stamina <= 20: 
-            self.speed = .6
+            self.speed = 60
             self.exhausted = False
         else:
-            self.speed = 1
+            self.speed = 100
             self.exhausted = False
 
     def lose_hunger(self, dt):
@@ -581,7 +648,7 @@ class Player(pygame.sprite.Sprite):
     def health_bar(self, screen):
         max_health = self.max_health
         health = self.health
-        bar_width = self.max_health * 2
+        bar_width = self.max_health * .5
         bar_height = 18
         x = 43
         y = 64
@@ -591,7 +658,6 @@ class Player(pygame.sprite.Sprite):
 
         pygame.draw.rect(screen, (60, 60, 60), pygame.Rect(x, y, bar_width, bar_height), border_radius=5)
         if self.poison:
-            # Purple bar when poisoned
             pygame.draw.rect(screen, (150, 80, 200), pygame.Rect(x, y, health_width, bar_height), border_radius=5)
         else:
             if health_ratio > .4:
@@ -602,7 +668,10 @@ class Player(pygame.sprite.Sprite):
 
         health_text = f"{int(health)} / {max_health}"
         text_surface = font.render(health_text, True, (255, 255, 255))
-        text_x = x + (bar_width / 2) - (text_surface.get_width() / 2)
+        if bar_width < 100:
+            text_x = x + bar_width + 8
+        else:
+            text_x = x + (bar_width / 2) - (text_surface.get_width() / 2)
         text_y = y + (bar_height / 2) - (text_surface.get_height() / 2)
         
         screen.blit(text_surface, (text_x, text_y))
@@ -610,7 +679,7 @@ class Player(pygame.sprite.Sprite):
     def stamina_bar(self, screen):
         max_stamina = self.max_stamina
         stamina = self.stamina
-        bar_width = max_stamina * 2
+        bar_width = max_stamina * .5
         bar_height = 18
         x = 43
         y = 82
@@ -627,16 +696,18 @@ class Player(pygame.sprite.Sprite):
 
         stamina_text = f"{int(stamina)} / {max_stamina}"
         text_surface = font.render(stamina_text, True, (255, 255, 255))
-        text_x = x + (bar_width / 2) - (text_surface.get_width() / 2)
+        if bar_width < 100:
+            text_x = x + bar_width + 8
+        else:
+            text_x = x + (bar_width / 2) - (text_surface.get_width() / 2)
         text_y = y + (bar_height / 2) - (text_surface.get_height() / 2)
         
         screen.blit(text_surface, (text_x, text_y))
 
-
     def hunger_bar(self, screen):
         max_hunger = self.max_hunger
         hunger = self.hunger
-        bar_width = max_hunger * 2
+        bar_width = max_hunger * .5
         bar_height = 18
         x = 43
         y = 100
@@ -653,7 +724,10 @@ class Player(pygame.sprite.Sprite):
 
         hunger_text = f"{int(hunger)} / {max_hunger}"
         text_surface = font.render(hunger_text, True, (255, 255, 255))
-        text_x = x + (bar_width / 2) - (text_surface.get_width() / 2)
+        if bar_width < 100:
+            text_x = x + bar_width + 8
+        else:
+            text_x = x + (bar_width / 2) - (text_surface.get_width() / 2)
         text_y = y + (bar_height / 2) - (text_surface.get_height() / 2)
         
         screen.blit(text_surface, (text_x, text_y))
@@ -661,7 +735,7 @@ class Player(pygame.sprite.Sprite):
     def thirst_bar(self, screen):
         max_thirst = self.max_thirst
         thirst = self.thirst
-        bar_width = self.max_thirst * 2
+        bar_width = self.max_thirst * .5
         bar_height = 18
         x = 43
         y = 118
@@ -678,7 +752,10 @@ class Player(pygame.sprite.Sprite):
 
         thirst_text = f"{int(thirst)} / {max_thirst}"
         text_surface = font.render(thirst_text, True, (255, 255, 255))
-        text_x = x + (bar_width / 2) - (text_surface.get_width() / 2)
+        if bar_width < 100:
+            text_x = x + bar_width + 8
+        else:
+            text_x = x + (bar_width / 2) - (text_surface.get_width() / 2)
         text_y = y + (bar_height / 2) - (text_surface.get_height() / 2)
         
         screen.blit(text_surface, (text_x, text_y))
@@ -692,7 +769,12 @@ class Player(pygame.sprite.Sprite):
         x = screen.get_width()//2 - bar_width // 2
         y = screen.get_height() - 75
 
-        experience_ratio = experience / next_level_exp
+        safe_next = next_level_exp if next_level_exp > 0 else 1
+        experience_ratio = experience / safe_next
+        # Clamp ratio to [0, 1] and guard against non-finite values
+        if not math.isfinite(experience_ratio):
+            experience_ratio = 1
+        experience_ratio = max(0, min(experience_ratio, 1))
         experience_width = int(bar_width * experience_ratio)
 
         pygame.draw.rect(screen, (60, 60, 60), pygame.Rect(x, y, bar_width, bar_height), border_radius=5)
@@ -701,8 +783,6 @@ class Player(pygame.sprite.Sprite):
         else:
             pygame.draw.rect(screen, (160, 120, 255), pygame.Rect(x, y, experience_width, bar_height), border_radius=5)
         pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=2, border_radius=5)
-
-
 
 class Mob(pygame.sprite.Sprite):
     def __init__(self, x, y, name):
@@ -939,8 +1019,11 @@ class Mob(pygame.sprite.Sprite):
         if not self.destroyed and not self.is_alive:
             resources = []
             
-            # Get primary resource (hide/meat)
-            resource_collected = min(self.resource_amount, (1 * player.attack))
+            # Get primary resource (hide/meat) - scale modestly with strength level, not raw attack damage
+            harvest_rate = 1
+            if player and hasattr(player, "strength_leveler"):
+                harvest_rate = max(1, int(player.strength_leveler))
+            resource_collected = min(self.resource_amount, harvest_rate)
             self.resource_amount -= resource_collected
             
             if resource_collected > 0:

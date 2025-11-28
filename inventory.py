@@ -5776,6 +5776,12 @@ class Inventory():
         self.crafting_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/crafting_screen.png").convert_alpha(), (1100, 600))
         self.level_up_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/level_up_screen.png").convert_alpha(), (1100, 600))
         self.cat_screen_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/cats_screen.png").convert_alpha(), (1100, 600))
+        self.level_up_skill_image = pygame.image.load("assets/sprites/buttons/level_up_skill_button.png").convert_alpha()
+        self.level_up_skill_flash_image = pygame.image.load("assets/sprites/buttons/level_up_skill_button_flash.png").convert_alpha()
+        self.level_up_button_rects = []
+        self.level_up_font = pygame.font.SysFont(None, 28)
+        self.level_up_value_font = pygame.font.SysFont(None, 22)
+        self.last_level_up_click_time = 0
         
         self.selected_crafting_item = None
         self.crafting_slot_positions = {}
@@ -5823,6 +5829,7 @@ class Inventory():
             screen.blit(inventory_surface, (0, 0))
             screen.blit(self.level_up_image, (x_pos, y_pos - 20))
             screen.blit(player_inventory_image, (700, 90))
+            self.draw_level_up(screen)
 
             inventory_tab_unused.draw(screen)
             crafting_tab_unused.draw(screen)
@@ -5839,6 +5846,123 @@ class Inventory():
             crafting_tab_unused.draw(screen)
             level_up_tab_unused.draw(screen)
             screen.blit(cats_tab, (width // 2 - 125, height // 2 - 303))
+
+    def draw_level_up(self, screen):
+        # Draw the stat list on the left of the level-up screen along with upgrade buttons.
+        start_x = (screen.get_width() / 2 - self.level_up_image.get_width() / 2) + 50
+        base_y = (screen.get_height() / 2 - self.level_up_image.get_height() / 2) + 90
+        start_y = base_y + 40
+        line_height = 45
+        button_x = start_x + 360
+        flash_cycle = player.unspent_stat_points > 0 and (pygame.time.get_ticks() // 400) % 2 == 0
+        mouse_pos = pygame.mouse.get_pos()
+
+        self.level_up_button_rects = []
+        
+        # Top text with Level, EXP, and Weight
+        top_text = self.level_up_font.render(
+            f"Level {player.level}  |  EXP: {int(player.experience)}/{int(player.next_level_exp)}  |  Weight: {round(player.weight, 1)}/{int(player.max_weight)}",
+            True,
+            (0, 0, 0)
+        )
+        points_text = self.level_up_font.render(f"Unspent Points: {player.unspent_stat_points}", True, (255, 220, 80))
+        screen.blit(top_text, (start_x, base_y - 20))
+        screen.blit(points_text, (start_x, base_y + 5))
+
+        preview_color = (20, 110, 20)
+
+        stats = [
+            {
+                "key": "health",
+                "label": "Max Health",
+                "base": int(player.max_health),
+                "preview": int(round((player.health_leveler + 0.1) * 100))
+            },
+            {
+                "key": "stamina",
+                "label": "Max Stamina",
+                "base": int(player.max_stamina),
+                "preview": int(round((player.stamina_leveler + 0.1) * 100))
+            },
+            {
+                "key": "hunger",
+                "label": "Max Hunger",
+                "base": int(player.max_hunger),
+                "preview": int(round((player.hunger_leveler + 0.1) * 100))
+            },
+            {
+                "key": "thirst",
+                "label": "Max Thirst",
+                "base": int(player.max_thirst),
+                "preview": int(round((player.thirst_leveler + 0.1) * 100))
+            },
+            {
+                "key": "weather",
+                "label": "Weather Res",
+                "base": int(player.heat_resistance),
+                "preview": int(round((player.weather_resistance_leveler + 0.1) * 100))
+            },
+            {
+                "key": "weight",
+                "label": "Max Weight",
+                "base": int(player.max_weight),
+                "preview": int(round((player.weight_leveler + 0.1) * 100 * player.temp_weight_increase))
+            },
+            {
+                "key": "strength",
+                "label": "Strength",
+                "base": int(player.attack),
+                "preview": int(player.damage + (player.strength_leveler) * player.strength_level_gain)
+            },
+            {
+                "key": "speed",
+                "label": "Speed",
+                "base": int(player.speed),
+                "preview": int(round((player.speed_leveler + 0.05) * 100))
+            },
+            {
+                "key": "defense",
+                "label": "Defense",
+                "base": int(player.defense),
+                "preview": int(round((player.defense_leveler + 0.1) * 100))
+            },
+            {
+                "key": "resilience",
+                "label": "Resilience",
+                "base": int(player.resilience),
+                "preview": int(round((player.resilience_leveler + 0.1) * 100))
+            },
+        ]
+
+        for idx, stat in enumerate(stats):
+            y = start_y + idx * line_height
+            label_text = self.level_up_font.render(stat["label"], True, (0, 0, 0))
+            value_str = f"{stat['base']}"
+            if player.unspent_stat_points > 0:
+                value_str = f"{stat['base']} -> {stat['preview']}"
+            value_text = self.level_up_value_font.render(value_str, True, preview_color if player.unspent_stat_points > 0 else (0, 0, 0))
+            screen.blit(label_text, (start_x, y))
+            screen.blit(value_text, (start_x + 160, y + 6))
+
+            button_rect = self.level_up_skill_image.get_rect(topleft=(button_x, y - 10))
+            hover = button_rect.collidepoint(mouse_pos)
+            button_image = self.level_up_skill_flash_image if (hover or flash_cycle) else self.level_up_skill_image
+            screen.blit(button_image, button_rect)
+            self.level_up_button_rects.append((button_rect, stat["key"]))
+
+    def handle_level_up_event(self, event):
+        if self.state != "level_up":
+            return
+        if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
+            return
+        now = pygame.time.get_ticks()
+        if now - self.last_level_up_click_time < 200:
+            return
+        for button_rect, stat_key in self.level_up_button_rects:
+            if button_rect.collidepoint(event.pos):
+                if player.apply_stat_upgrade(stat_key):
+                    self.last_level_up_click_time = now
+                break
 
     def draw_hotbar(self, screen):
         hotbar_x = screen.get_width() // 2 - hotbar_image.get_width() // 2
