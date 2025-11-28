@@ -8,6 +8,14 @@ large_font = pygame.font.Font(None, 40)
 xl_font = pygame.font.Font(None, 100)
 size = 64
 
+def draw_text_with_background(screen, text_surface, x, y, padding=4):
+    """Draw text with a semi-transparent black background box."""
+    bg_rect = text_surface.get_rect(topleft=(x, y)).inflate(padding * 2, padding)
+    bg_surface = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
+    bg_surface.fill((0, 0, 0, 150))
+    screen.blit(bg_surface, bg_rect.topleft)
+    screen.blit(text_surface, (x, y))
+
 ############ PLAYER IMAGES #################
 
 
@@ -215,6 +223,7 @@ class Player(pygame.sprite.Sprite):
         self.cold_resistance = 100 * self.temp_cold_resistance_increase
         self.max_torpidity = 100
         self.torpidity = 0
+        self.extreme_temp_timer = 0
         self.temp_weight_increase = 1
         self.weight_leveler = 1
         self.max_weight = 100 * self.weight_leveler * self.temp_weight_increase
@@ -236,6 +245,7 @@ class Player(pygame.sprite.Sprite):
         self.defense = 100 * self.defense_leveler
         self.resilience_leveler = 1
         self.resilience = 100 * self.resilience_leveler
+        self.temperature_resistance_leveler = 0
         self.level = 1
         self.experience = 0
         self.exp_total = 0
@@ -489,6 +499,9 @@ class Player(pygame.sprite.Sprite):
             self.resilience_leveler = round(self.resilience_leveler + 0.1, 4)
             self.resilience = int(100 * self.resilience_leveler)
             upgraded = True
+        elif stat_key == "temperature_resistance":
+            self.temperature_resistance_leveler += 1
+            upgraded = True
 
         if upgraded:
             self.unspent_stat_points -= 1
@@ -674,7 +687,10 @@ class Player(pygame.sprite.Sprite):
             text_x = x + (bar_width / 2) - (text_surface.get_width() / 2)
         text_y = y + (bar_height / 2) - (text_surface.get_height() / 2)
         
-        screen.blit(text_surface, (text_x, text_y))
+        if bar_width < 100:
+            draw_text_with_background(screen, text_surface, text_x, text_y)
+        else:
+            screen.blit(text_surface, (text_x, text_y))
 
     def stamina_bar(self, screen):
         max_stamina = self.max_stamina
@@ -702,7 +718,10 @@ class Player(pygame.sprite.Sprite):
             text_x = x + (bar_width / 2) - (text_surface.get_width() / 2)
         text_y = y + (bar_height / 2) - (text_surface.get_height() / 2)
         
-        screen.blit(text_surface, (text_x, text_y))
+        if bar_width < 100:
+            draw_text_with_background(screen, text_surface, text_x, text_y)
+        else:
+            screen.blit(text_surface, (text_x, text_y))
 
     def hunger_bar(self, screen):
         max_hunger = self.max_hunger
@@ -730,7 +749,10 @@ class Player(pygame.sprite.Sprite):
             text_x = x + (bar_width / 2) - (text_surface.get_width() / 2)
         text_y = y + (bar_height / 2) - (text_surface.get_height() / 2)
         
-        screen.blit(text_surface, (text_x, text_y))
+        if bar_width < 100:
+            draw_text_with_background(screen, text_surface, text_x, text_y)
+        else:
+            screen.blit(text_surface, (text_x, text_y))
 
     def thirst_bar(self, screen):
         max_thirst = self.max_thirst
@@ -758,7 +780,10 @@ class Player(pygame.sprite.Sprite):
             text_x = x + (bar_width / 2) - (text_surface.get_width() / 2)
         text_y = y + (bar_height / 2) - (text_surface.get_height() / 2)
         
-        screen.blit(text_surface, (text_x, text_y))
+        if bar_width < 100:
+            draw_text_with_background(screen, text_surface, text_x, text_y)
+        else:
+            screen.blit(text_surface, (text_x, text_y))
 
     def exp_bar(self, screen):
         from inventory import hotbar_image
@@ -1307,7 +1332,7 @@ class Cat(Mob):
             name_text = font.render(str(self.cat_name) + " Lvl " + str(self.level), True, (255, 255, 200))
             text_x = self.rect.centerx - cam_x - name_text.get_width() // 2
             text_y = self.rect.top + 5
-            screen.blit(name_text, (text_x, text_y))
+            draw_text_with_background(screen, name_text, text_x, text_y)
         
     def draw(self, screen, cam_x):
 
@@ -2939,7 +2964,7 @@ class Dragon(Enemy):
         level_font = pygame.font.SysFont(None, 16)
         level_text = level_font.render(f"Lv{self.level}", True, (255, 255, 255))
         level_rect = level_text.get_rect(center=(int(self.rect.centerx - cam_x), int(y + 15)))
-        screen.blit(level_text, level_rect)
+        draw_text_with_background(screen, level_text, level_rect.topleft[0], level_rect.topleft[1])
         
         self.last_health = self.health
         if self.health <= 0:

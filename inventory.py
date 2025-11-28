@@ -5897,10 +5897,10 @@ class Inventory():
                 "preview": int(round((player.thirst_leveler + 0.1) * 100))
             },
             {
-                "key": "weather",
+                "key": "temperature_resistance",
                 "label": "Temp Resist",
-                "base": int(player.heat_resistance),
-                "preview": int(round((player.weather_resistance_leveler + 0.1) * 100))
+                "base": int(player.temperature_resistance_leveler * 2),
+                "preview": int((player.temperature_resistance_leveler + 1) * 2)
             },
             {
                 "key": "weight",

@@ -459,7 +459,7 @@ def get_footstep_sounds(background):
     else:
         return [f"footstep_grass{i}" for i in range(1, 7)]
 
-def calculate_temperature(current_background, time_of_day, player_swimming=False, player_in_lava=False):
+def calculate_temperature(current_background, time_of_day, player_swimming=False, player_in_lava=False, player_temp_resistance=0):
     if player_in_lava:
         return 120
     
@@ -490,31 +490,36 @@ def calculate_temperature(current_background, time_of_day, player_swimming=False
         temp = max(10, min(110, temp))
         if player_swimming:
             temp -= 30
-        return max(10, min(110, temp))
-    
-    if current_background in biome_temperatures:
-        temp_data = biome_temperatures[current_background]
-        am_temp = temp_data["5am"]
-        pm_temp = temp_data["5pm"]
     else:
-        am_temp = 55
-        pm_temp = 65
-    
-    hour_normalized = (time_of_day % 24)
-    
-    if 5 <= hour_normalized < 17:
-        progress = (hour_normalized - 5) / 12
-        temp = am_temp + (pm_temp - am_temp) * progress
-    else:
-        if hour_normalized >= 17:
-            hours_into_cooling = hour_normalized - 17
+        if current_background in biome_temperatures:
+            temp_data = biome_temperatures[current_background]
+            am_temp = temp_data["5am"]
+            pm_temp = temp_data["5pm"]
         else:
-            hours_into_cooling = (24 - 17) + hour_normalized
-        progress = hours_into_cooling / 12
-        temp = pm_temp + (am_temp - pm_temp) * progress
+            am_temp = 55
+            pm_temp = 65
+        
+        hour_normalized = (time_of_day % 24)
+        
+        if 5 <= hour_normalized < 17:
+            progress = (hour_normalized - 5) / 12
+            temp = am_temp + (pm_temp - am_temp) * progress
+        else:
+            if hour_normalized >= 17:
+                hours_into_cooling = hour_normalized - 17
+            else:
+                hours_into_cooling = (24 - 17) + hour_normalized
+            progress = hours_into_cooling / 12
+            temp = pm_temp + (am_temp - pm_temp) * progress
+        
+        if player_swimming:
+            temp -= 30
     
-    if player_swimming:
-        temp -= 30
+    shift_amount = player_temp_resistance * 2
+    if temp > 60:
+        temp = max(60, temp - shift_amount)
+    elif temp < 60:
+        temp = min(60, temp + shift_amount)
     
     return max(0, min(120, temp))
 
@@ -526,6 +531,49 @@ def draw_temperature_gauge(screen, current_temperature, gauge_index):
     from buttons import temperature_gauges
     gauge_image = temperature_gauges[gauge_index]
     screen.blit(gauge_image, (20, height - 84))
+
+def apply_temperature_effects(player, gauge_index, dt):
+    if gauge_index == 0 or gauge_index == 6:
+        player.extreme_temp_timer += dt
+        
+        if player.extreme_temp_timer >= 180:
+            player.speed = int(100 * player.speed_leveler * (2/3))
+        
+        if gauge_index == 0:
+            player.health -= dt * 1
+            player.hunger -= dt * 0.5
+            if player.stamina_timer <= 0 and player.stamina < player.max_stamina:
+                if player.thirst == player.max_thirst:
+                    player.stamina += dt * 8
+                elif player.thirst > player.max_thirst * 0.7:
+                    player.stamina += dt * 5
+                elif player.thirst > player.max_thirst * 0.4:
+                    player.stamina += dt * 3
+                elif player.thirst > player.max_thirst * 0.1:
+                    player.stamina += dt * 1
+        else:
+            player.health -= dt * 1
+            player.thirst -= dt * 0.5
+            if player.stamina_timer <= 0 and player.stamina < player.max_stamina:
+                if player.thirst == player.max_thirst:
+                    player.stamina += dt * 8
+                elif player.thirst > player.max_thirst * 0.7:
+                    player.stamina += dt * 5
+                elif player.thirst > player.max_thirst * 0.4:
+                    player.stamina += dt * 3
+                elif player.thirst > player.max_thirst * 0.1:
+                    player.stamina += dt * 1
+    else:
+        if player.extreme_temp_timer > 0:
+            player.extreme_temp_timer -= dt
+            if player.extreme_temp_timer <= 0:
+                player.extreme_temp_timer = 0
+                player.speed = int(100 * player.speed_leveler)
+        
+        if gauge_index == 1:
+            player.hunger -= dt * 0.05
+        elif gauge_index == 5:
+            player.thirst -= dt * 0.05
 
 # Placement system functions
 def start_placement(item_data):
@@ -2867,10 +2915,20 @@ while running:
         screen.blit(time_surface, (time_rect.x + 8, time_rect.y + 22))
         screen.blit(time_text, (time_rect.x + 13, time_rect.y + 27))
 
+        if player.extreme_temp_timer >= 180:
+            fatigue_color = (255, 150, 100)
+            fatigue_text = font.render(f"FATIGUED ({player.extreme_temp_timer:.0f}s)", True, fatigue_color)
+            fatigue_rect = pygame.Rect(width - fatigue_text.get_width() - 30, 60, fatigue_text.get_width(), fatigue_text.get_height())
+            fatigue_surface = pygame.Surface((fatigue_rect.width + 10, fatigue_rect.height + 10), pygame.SRCALPHA)
+            fatigue_surface.fill((0, 0, 0, 100))
+            screen.blit(fatigue_surface, (fatigue_rect.x + 8, fatigue_rect.y + 22))
+            screen.blit(fatigue_text, (fatigue_rect.x + 13, fatigue_rect.y + 27))
+
         current_bg = get_current_background(player_world_x, tiles)
-        current_temperature = calculate_temperature(current_bg, time_of_day, player.swimming, player.in_lava)
+        current_temperature = calculate_temperature(current_bg, time_of_day, player.swimming, player.in_lava, player.temperature_resistance_leveler)
         gauge_idx = get_temperature_gauge_index(current_temperature)
         draw_temperature_gauge(screen, current_temperature, gauge_idx)
+        apply_temperature_effects(player, gauge_idx, dt)
 
         if crafting_bench_in_use:
             crafting_bench.draw(screen)
