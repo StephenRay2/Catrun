@@ -249,7 +249,7 @@ class Player(pygame.sprite.Sprite):
         self.level = 1
         self.experience = 0
         self.exp_total = 0
-        self.req_multiplier = .01
+        self.req_multiplier = .5
         self.next_level_exp = 100
         self.level_up_timer = 0
         self.stamina_timer = 0

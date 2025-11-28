@@ -347,6 +347,32 @@ def populate_test_inventory():
     print(f"Successfully added {items_added} placeable items to inventory for testing")
     return items_added
 
+
+def set_starting_hotbar():
+    """Populate starting hotbar with key materials and a tool."""
+    starting_items = [
+        ("Metal Pickaxe", 1),
+        ("Bucket of Sand", 100),
+        ("Clay", 10),
+        ("Raw Metal", 10),
+        ("Raw Gold", 10),
+    ]
+    
+    def add_to_hotbar(item_name, qty):
+        item_data = next((itm for itm in items_list if itm["item_name"] == item_name), None)
+        if not item_data:
+            print(f"Warning: starting hotbar item '{item_name}' not found.")
+            return
+        new_item = item_data.copy()
+        new_item["quantity"] = qty
+        for i in range(inventory.hotbar_size):
+            if inventory.hotbar_slots[i] is None:
+                inventory.hotbar_slots[i] = new_item
+                break
+    
+    for name, qty in starting_items:
+        add_to_hotbar(name, qty)
+
 def calculate_throw_trajectory(start_x, start_y, target_x, target_y, throw_power):
     delta_x = target_x - start_x
     delta_y = target_y - start_y
@@ -1005,7 +1031,7 @@ while running:
             time_of_day = (12 + (total_elapsed_time / 60)) % 24
             # Update crafting flash
             inventory.update_flash(dt)
-            if smelter and smelter_in_use:
+            if smelter:
                 smelter.update(dt)
             # Update placement position if in placement mode
             update_placement_position()
@@ -1215,6 +1241,7 @@ while running:
             globals()['smelter'] = Smelter(inventory)
             
             populate_test_inventory()
+            set_starting_hotbar()
 
             inventory_resources = []
             collection_messages = []
@@ -1256,6 +1283,9 @@ while running:
                     if crafting_bench_in_use:
                         crafting_bench.close()
                         crafting_bench_in_use = False
+                    elif smelter_in_use:
+                        smelter.close()
+                        smelter_in_use = False
                     elif not inventory_in_use:
                         if placement_mode:
                             cancel_placement()
@@ -1270,6 +1300,8 @@ while running:
                 
                 if crafting_bench_in_use:
                     crafting_bench.handle_key_event(event)
+                if smelter_in_use:
+                    continue
 
                 if event.key == pygame.K_f and not inventory_in_use and not crafting_bench_in_use and player.is_alive:
                     success, tags = inventory.consume_item()
@@ -1279,7 +1311,7 @@ while running:
                         elif any(tag in tags for tag in ["liquid", "consumable"]):
                             sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
 
-                if event.key == pygame.K_q and not crafting_bench_in_use:
+                if event.key == pygame.K_q and not crafting_bench_in_use and not smelter_in_use:
                     inventory_in_use = not inventory_in_use
                     if not inventory_in_use:
                         inventory.selection_mode = "hotbar"
@@ -1292,7 +1324,7 @@ while running:
                         inventory.selected_inventory_slot = None
 
             # Placement system - toggle placement mode with right-click
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3 and player.is_alive and not crafting_bench_in_use:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3 and player.is_alive and not crafting_bench_in_use and not smelter_in_use:
                 if placement_mode:
                     # Cancel placement mode
                     cancel_placement()
@@ -2115,10 +2147,15 @@ while running:
                 # Draw placed structure
                 struct_sprite = None
                 sprite_width, sprite_height = obj.get('sprite_size', default_placeable_sprite_size)
+                if obj.get('item_name') == 'Smelter' and smelter is not None:
+                    lit_sprite = smelter.get_world_sprite((sprite_width, sprite_height))
+                    if lit_sprite:
+                        struct_sprite = lit_sprite
                 try:
-                    icon_path = f"assets/sprites/items/{obj['icon']}"
-                    struct_sprite = pygame.image.load(icon_path).convert_alpha()
-                    struct_sprite = pygame.transform.scale(struct_sprite, (sprite_width, sprite_height))
+                    if struct_sprite is None:
+                        icon_path = f"assets/sprites/items/{obj['icon']}"
+                        struct_sprite = pygame.image.load(icon_path).convert_alpha()
+                        struct_sprite = pygame.transform.scale(struct_sprite, (sprite_width, sprite_height))
                 except:
                     # Fallback to colored rectangle
                     struct_sprite = pygame.Surface((sprite_width, sprite_height))
@@ -2858,10 +2895,7 @@ while running:
                 slot_index, slot_type = slot_info
                 
                 if hasattr(smelter, 'button_rect') and smelter.button_rect.collidepoint(mouse_pos):
-                    if smelter.fire_lit:
-                        smelter.put_out_fire()
-                    else:
-                        smelter.light_fire()
+                    smelter.toggle_fire()
                 elif slot_index is not None:
                     if smelter.dragging:
                         smelter.end_drag(slot_info)
