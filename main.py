@@ -25,6 +25,7 @@ dungeon_traversal_speed = .1
 time_of_day = 12.00
 total_elapsed_time = 00.00
 stamina_depleted_message_timer = 0
+need_pickaxe_message_timer = 0
 player_world_x = player_pos.x + cam_x
 player_world_y = player_pos.y
 
@@ -329,9 +330,8 @@ def populate_test_inventory():
         if not item_data:
             print(f"Warning: Item '{item_name}' not found in items_list")
             continue
-        
-        new_item = item_data.copy()
-        new_item["quantity"] = 1
+
+        new_item = inventory.create_item_instance(item_data, 1)
         
         target_slot = None
         for idx, slot in enumerate(inventory.inventory_list):
@@ -342,39 +342,44 @@ def populate_test_inventory():
         if target_slot is not None:
             inventory.inventory_list[target_slot] = new_item
             items_added += 1
-            print(f"Added {item_name} to inventory slot {target_slot}")
         else:
-            print(f"Warning: No empty inventory slots available for {item_name}")
             break
     
     print(f"Successfully added {items_added} placeable items to inventory for testing")
     return items_added
 
 
-def set_starting_hotbar():
-    """Populate starting hotbar with key materials and a tool."""
-    starting_items = [
-        ("Metal Pickaxe", 1),
-        ("Bucket of Sand", 100),
-        ("Clay", 10),
-        ("Raw Metal", 10),
-        ("Raw Gold", 10),
+def set_starting_loadout():
+    """Populate starting inventory with one of each weapon and clear everything else."""
+    loadout_items = [
+        # Clubs
+        "Wooden Club", "Spiked Wooden Club",
+        # Swords
+        "Wooden Sword", "Stone Sword", "Metal Sword", "Gold Sword", "Bone Sword", "Obsidian Sword",
+        "Dusk Dragon Scale Sword", "Electric Dragon Scale Sword", "Fire Dragon Scale Sword", "Ice Dragon Scale Sword", "Poison Dragon Scale Sword",
+        # Spears
+        "Wooden Spear", "Stone Spear", "Metal Spear", "Gold Spear", "Bone Spear", "Obsidian Spear",
+        "Dusk Dragon Scale Spear", "Electric Dragon Scale Spear", "Fire Dragon Scale Spear", "Ice Dragon Scale Spear", "Poison Dragon Scale Spear",
+        # Axes (weapons)
+        "Wooden Axe", "Stone Axe", "Metal Axe", "Gold Axe", "Bone Axe", "Obsidian Axe",
+        "Dusk Dragon Scale Axe", "Electric Dragon Scale Axe", "Fire Dragon Scale Axe", "Ice Dragon Scale Axe", "Poison Dragon Scale Axe",
+        # Pickaxes (included as weapons/tools)
+        "Wooden Pickaxe", "Stone Pickaxe", "Metal Pickaxe", "Gold Pickaxe", "Bone Pickaxe", "Obsidian Pickaxe",
+        "Dusk Dragon Scale Pickaxe", "Electric Dragon Scale Pickaxe", "Fire Dragon Scale Pickaxe", "Ice Dragon Scale Pickaxe", "Poison Dragon Scale Pickaxe",
     ]
-    
-    def add_to_hotbar(item_name, qty):
+
+    next_slot = 0
+    for item_name in loadout_items:
         item_data = next((itm for itm in items_list if itm["item_name"] == item_name), None)
         if not item_data:
-            print(f"Warning: starting hotbar item '{item_name}' not found.")
-            return
-        new_item = item_data.copy()
-        new_item["quantity"] = qty
-        for i in range(inventory.hotbar_size):
-            if inventory.hotbar_slots[i] is None:
-                inventory.hotbar_slots[i] = new_item
-                break
-    
-    for name, qty in starting_items:
-        add_to_hotbar(name, qty)
+            print(f"Warning: starting item '{item_name}' not found.")
+            continue
+        new_item = inventory.create_item_instance(item_data, 1)
+        while next_slot < inventory.capacity and inventory.inventory_list[next_slot] is not None:
+            next_slot += 1
+        if next_slot < inventory.capacity:
+            inventory.inventory_list[next_slot] = new_item
+            next_slot += 1
 
 def calculate_throw_trajectory(start_x, start_y, target_x, target_y, throw_power):
     delta_x = target_x - start_x
@@ -808,6 +813,101 @@ def is_axe_item(item):
     item_name = item.get("item_name", "").lower()
     return "axe" in item_name and "pickaxe" not in item_name
 
+def get_harvest_power(tool_item, resource_name):
+    """Return how many resources a single harvest hit should yield based on the held tool."""
+    base_power = 1
+    if not tool_item or not resource_name:
+        return base_power
+
+    tier = get_tool_tier(tool_item)
+    if not tier or tier not in tool_multipliers:
+        return base_power
+
+    is_pickaxe = is_pickaxe_item(tool_item)
+    is_axe = is_axe_item(tool_item)
+    is_special = resource_name in special_resources
+
+    if is_pickaxe and resource_name in mining_resources:
+        mult = tool_multipliers.get(tier, {"normal": 1, "special": 1})
+        return max(base_power, mult["special"] if is_special else mult["normal"])
+
+    if is_axe and is_wood_resource(resource_name):
+        mult = tool_multipliers.get(tier, {"normal": 1})
+        return max(base_power, mult.get("normal", 1))
+
+    # Future: shovel support for dirt/sand/etc.
+    return base_power
+
+def get_special_drop_multiplier(tool_item):
+    """Bonus chance for special drops from mining resources based on pickaxe tier."""
+    if not tool_item or not is_pickaxe_item(tool_item):
+        return 1.0
+    tier = get_tool_tier(tool_item)
+    return SPECIAL_DROP_MULTS.get(tier, 1.0)
+
+def get_special_yield_multiplier(tool_item):
+    """Bonus yield for special mining drops from pickaxe tier."""
+    if not tool_item or not is_pickaxe_item(tool_item):
+        return 1.0
+    tier = get_tool_tier(tool_item)
+    mults = HARVEST_TOOL_MULTS.get(tier, {"special": 1})
+    return mults.get("special", 1)
+
+def get_weapon_tier_from_name(name):
+    tiers = ["dragon", "obsidian", "metal", "gold", "bone", "stone", "wood"]
+    for tier in tiers:
+        if tier in name:
+            return tier
+    return None
+
+def compute_weapon_attack(base_attack, held_item):
+    """Return effective attack after weapon multipliers/flat bonuses."""
+    if not held_item:
+        return base_attack
+
+    name = held_item.get("item_name", "").lower()
+    tier = get_weapon_tier_from_name(name)
+
+    sword_mults = {
+        "wood": (1.1, 5),
+        "stone": (1.3, 9),
+        "metal": (1.4, 13),
+        "bone": (2.1, 2),
+        "obsidian": (1.4, 25),
+        "dragon": (2.2, 20),
+    }
+    spear_flats = {
+        "wood": 9,
+        "stone": 15,
+        "metal": 22,
+        "bone": 19,
+        "obsidian": 40,
+        "dragon": 55,
+    }
+
+    # Clubs
+    if "spiked wooden club" in name:
+        return max(1, int(math.floor(base_attack * 1.5) + 12))
+    if "wooden club" in name:
+        return max(1, int(math.floor(base_attack * 1.3) + 4))
+
+    # Swords
+    if "sword" in name and tier in sword_mults:
+        mult, flat = sword_mults[tier]
+        return max(1, int(math.floor(base_attack * mult) + flat))
+
+    # Axes (not pickaxes): same as sword multipliers, but lower base damage
+    if "axe" in name and "pickaxe" not in name and tier in sword_mults:
+        mult, flat = sword_mults[tier]
+        reduced_base = base_attack // 1.5
+        return max(1, int(math.floor(reduced_base * mult) + flat))
+
+    # Spears: flat bonuses only
+    if "spear" in name and tier in spear_flats:
+        return max(1, int(base_attack + spear_flats[tier]))
+
+    return base_attack
+
 def get_tool_tier(item):
     """Return a normalized tier name for resource multipliers."""
     if not item:
@@ -829,15 +929,8 @@ def get_tool_tier(item):
         return "bone"
     return None
 
-tool_multipliers = {
-    "wood": {"normal": 1, "special": 1},
-    "stone": {"normal": 2, "special": 2},
-    "metal": {"normal": 3, "special": 3},
-    "gold": {"normal": 1, "special": 6},
-    "bone": {"normal": 6, "special": 1},
-    "obsidian": {"normal": 4, "special": 4},
-    "dragon": {"normal": 8, "special": 8},
-}
+# Use the shared tool multiplier table from inventory/tooltips
+tool_multipliers = HARVEST_TOOL_MULTS
 
 special_resources = {"Flint", "Raw Metal", "Raw Gold"}
 mining_resources = {"Stone", "Flint", "Raw Metal", "Raw Gold"}
@@ -1241,13 +1334,10 @@ while running:
             
             inventory.inventory_list = [None] * inventory.capacity
             inventory.hotbar_slots = [None] * inventory.hotbar_size
-            
+
             globals()['crafting_bench'] = CraftingBench(inventory)
             globals()['smelter'] = Smelter(inventory)
             globals()['campfire'] = Campfire(inventory)
-            
-            populate_test_inventory()
-            set_starting_hotbar()
 
             inventory_resources = []
             collection_messages = []
@@ -1636,7 +1726,8 @@ while running:
                     elif event.button == 5:
                         inventory.selected_hotbar_slot = (inventory.selected_hotbar_slot + 1) % inventory.hotbar_size
                     inventory.selection_mode = "hotbar"
-            
+                    inventory.show_selected_hotbar_name()
+
             if event.type == pygame.MOUSEBUTTONDOWN and event.button in (1, 3):
                 if crafting_bench_in_use:
                     mouse_pos = pygame.mouse.get_pos()
@@ -1876,10 +1967,12 @@ while running:
         if not paused and not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and naming_cat is None and pygame.mouse.get_pressed()[0] and not player.exhausted:
             if current_time - harvest_cooldown > harvest_delay:
                 held_item = get_selected_hotbar_item()
+                base_attack_val = int(round(player.damage + (player.strength_leveler - 1) * player.strength_level_gain))
+                player.attack = compute_weapon_attack(base_attack_val, held_item)
                 has_pickaxe_equipped = is_pickaxe_item(held_item)
                 for obj in visible_objects:
                     if hasattr(obj, 'harvest') and hasattr(obj, 'destroyed') and not obj.destroyed:
-                        
+
                         obj_collision = obj.get_collision_rect(0)
                         
                         horizontal_dist = abs(obj_collision.centerx - player_world_x)
@@ -1898,12 +1991,16 @@ while running:
                             facing_object = True
                         elif player.last_direction == "down" and obj_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
                             facing_object = True
-                            
+
                         if facing_object:
                             if getattr(obj, "resource", None) == "Stone" and not has_pickaxe_equipped:
+                                need_pickaxe_message_timer = 1.5
                                 continue
-                            resource = obj.harvest(player)
-                            resource = adjust_resources_with_tool(resource, held_item)
+                            current_tool_resource = getattr(obj, "resource", None)
+                            harvest_power = get_harvest_power(held_item, current_tool_resource)
+                            special_chance_mult = get_special_drop_multiplier(held_item)
+                            special_yield_mult = get_special_yield_multiplier(held_item)
+                            resource = obj.harvest(player, harvest_power, special_chance_mult, special_yield_mult)
                             if resource:
                                 if hasattr(obj, 'resource'):
                                     if obj.resource == "Stone":
@@ -1917,6 +2014,8 @@ while running:
                                     resource_counts = group_resources_by_type(resource)
                                     for resource_name, count in resource_counts.items():
                                         add_collection_message(resource_name, count)
+                                # Tool durability loss on successful harvest
+                                inventory.decrement_durability(inventory.selected_hotbar_slot, True, 1)
 
                                 if obj.destroyed:
                                     visible_objects.remove(obj)
@@ -2965,6 +3064,15 @@ while running:
             screen.blit(temp_surface, (x - 5, y - 5))
             screen.blit(tired_text, (x, y))
             stamina_depleted_message_timer -= dt
+        if need_pickaxe_message_timer > 0:
+            pickaxe_text = font.render("Use a pickaxe to harvest this.", True, (255, 220, 80))
+            x = screen.get_width()//2 - pickaxe_text.get_width()//2
+            y = 80
+            temp_surface = pygame.Surface((pickaxe_text.get_width() + 10, pickaxe_text.get_height() + 10), pygame.SRCALPHA)
+            temp_surface.fill((0, 0, 0, 120))
+            screen.blit(temp_surface, (x - 5, y - 5))
+            screen.blit(pickaxe_text, (x, y))
+            need_pickaxe_message_timer -= dt
         if inventory.inventory_full_message_timer > 0:
             full_text = font.render("Inventory Full! Cannot pick up items.", True, (255, 50, 50))
             x = screen.get_width()//2 - full_text.get_width()//2
@@ -2974,6 +3082,11 @@ while running:
             screen.blit(temp_surface, (x - 5, y - 5))
             screen.blit(full_text, (x, y))
             inventory.inventory_full_message_timer -= dt
+
+        if inventory_in_use or campfire_in_use or smelter_in_use or crafting_bench_in_use:
+            inventory.begin_hover_pass()
+        else:
+            inventory.clear_hover_state()
 
         if campfire_in_use:
             campfire.render(screen)
@@ -3036,6 +3149,8 @@ while running:
 
         if crafting_bench_in_use:
             crafting_bench.draw(screen)
+
+        inventory.draw_hover_tooltip(screen)
 
         if not paused and not inventory_in_use and naming_cat is None and not crafting_bench_in_use:
             if keys[pygame.K_o]:

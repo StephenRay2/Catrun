@@ -615,8 +615,9 @@ class Smelter:
     def render(self, screen):
         if not self.active or not self.ui_open:
             return
-        
+
         layout = self._get_layout(screen)
+        mouse_pos = pygame.mouse.get_pos()
         screen_width = screen.get_width()
         screen_height = screen.get_height()
         
@@ -667,7 +668,7 @@ class Smelter:
                     if catalog_item["item_name"] == item["item_name"]:
                         screen.blit(catalog_item["image"], (x, y))
                         break
-                
+
                 if item["quantity"] > 1:
                     qty_text = font.render(str(item["quantity"]), True, (255, 255, 255))
                     if item["quantity"] == 100:
@@ -676,6 +677,14 @@ class Smelter:
                         screen.blit(qty_text, (x + 42, y + 44))
                     else:
                         screen.blit(qty_text, (x + 47, y + 44))
+
+                if pygame.Rect(x, y, self.slot_size, self.slot_size).collidepoint(mouse_pos):
+                    self.inventory.register_hover_candidate(
+                        ("smelter_input", i),
+                        item["item_name"],
+                        (x, y, self.slot_size, self.slot_size),
+                        slot_data=item
+                    )
         
         output_start_x = layout["output_start_x"]
         
@@ -697,7 +706,7 @@ class Smelter:
                     if catalog_item["item_name"] == item["item_name"]:
                         screen.blit(catalog_item["image"], (x, y))
                         break
-                
+
                 if item["quantity"] > 1:
                     qty_text = font.render(str(item["quantity"]), True, (255, 255, 255))
                     if item["quantity"] == 100:
@@ -706,6 +715,14 @@ class Smelter:
                         screen.blit(qty_text, (x + 42, y + 44))
                     else:
                         screen.blit(qty_text, (x + 47, y + 44))
+
+                if pygame.Rect(x, y, self.slot_size, self.slot_size).collidepoint(mouse_pos):
+                    self.inventory.register_hover_candidate(
+                        ("smelter_output", i),
+                        item["item_name"],
+                        (x, y, self.slot_size, self.slot_size),
+                        slot_data=item
+                    )
         
         button_y = layout["button_y"]
         button_x = layout["button_x"]
@@ -754,7 +771,7 @@ class Smelter:
                     if catalog_item["item_name"] == display_item["item_name"]:
                         screen.blit(catalog_item["image"], (x, y))
                         break
-                
+
                 if display_item.get("quantity", 1) > 1:
                     qty_text = font.render(str(display_item["quantity"]), True, (255, 255, 255))
                     if display_item["quantity"] == 100:
@@ -763,6 +780,14 @@ class Smelter:
                         screen.blit(qty_text, (x + 42, y + 44))
                     else:
                         screen.blit(qty_text, (x + 47, y + 44))
+
+                if pygame.Rect(x, y, self.slot_size, self.slot_size).collidepoint(mouse_pos):
+                    self.inventory.register_hover_candidate(
+                        ("smelter_fuel", i),
+                        display_item["item_name"],
+                        (x, y, self.slot_size, self.slot_size),
+                        slot_data=display_item
+                    )
         
         if self.dragging and self.dragged_item:
             mouse_pos = pygame.mouse.get_pos()
@@ -776,19 +801,20 @@ class Smelter:
     def _render_inventory(self, screen, start_x, start_y):
         columns = self.inventory.columns
         font = pygame.font.SysFont(None, 20)
-        
+        mouse_pos = pygame.mouse.get_pos()
+
         for slot_index in range(self.inventory.capacity):
             row = slot_index // columns
             col = slot_index % columns
             x = start_x + col * (self.slot_size + self.gap_size)
             y = start_y + row * (self.slot_size + self.gap_size - 3)
-            
+
             if self.inventory.inventory_list[slot_index] is not None:
                 item = self.inventory.inventory_list[slot_index]
                 for catalog_item in items_list:
                     if catalog_item["item_name"] == item["item_name"]:
                         screen.blit(catalog_item["image"], (x, y))
-                        
+
                         quantity = item["quantity"]
                         if quantity > 1:
                             stack_text = font.render(str(quantity), True, (255, 255, 255))
@@ -798,4 +824,11 @@ class Smelter:
                                 screen.blit(stack_text, (x + 42, y + 44))
                             else:
                                 screen.blit(stack_text, (x + 47, y + 44))
+                        if pygame.Rect(x, y, self.slot_size, self.slot_size).collidepoint(mouse_pos):
+                            self.inventory.register_hover_candidate(
+                                ("smelter_inventory", slot_index),
+                                item["item_name"],
+                                (x, y, self.slot_size, self.slot_size),
+                                slot_data=item
+                            )
                         break

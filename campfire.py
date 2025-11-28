@@ -621,6 +621,7 @@ class Campfire:
             return
 
         layout = self._get_layout(screen)
+        mouse_pos = pygame.mouse.get_pos()
 
         campfire_screen_x = layout["panel_x"]
         campfire_screen_y = layout["panel_draw_y"]
@@ -679,6 +680,14 @@ class Campfire:
                     else:
                         screen.blit(qty_text, (x + 47, y + 44))
 
+                if pygame.Rect(x, y, self.slot_size, self.slot_size).collidepoint(mouse_pos):
+                    self.inventory.register_hover_candidate(
+                        ("campfire_input", i),
+                        item["item_name"],
+                        (x, y, self.slot_size, self.slot_size),
+                        slot_data=item
+                    )
+
         output_start_x = layout["output_start_x"]
 
         output_label = label_font.render("Output", True, (100, 200, 255))
@@ -708,6 +717,14 @@ class Campfire:
                         screen.blit(qty_text, (x + 42, y + 44))
                     else:
                         screen.blit(qty_text, (x + 47, y + 44))
+
+                if pygame.Rect(x, y, self.slot_size, self.slot_size).collidepoint(mouse_pos):
+                    self.inventory.register_hover_candidate(
+                        ("campfire_output", i),
+                        item["item_name"],
+                        (x, y, self.slot_size, self.slot_size),
+                        slot_data=item
+                    )
 
         button_y = layout["button_y"]
         button_x = layout["button_x"]
@@ -764,6 +781,14 @@ class Campfire:
                     else:
                         screen.blit(qty_text, (x + 47, y + 44))
 
+                if pygame.Rect(x, y, self.slot_size, self.slot_size).collidepoint(mouse_pos):
+                    self.inventory.register_hover_candidate(
+                        ("campfire_fuel", i),
+                        display_item["item_name"],
+                        (x, y, self.slot_size, self.slot_size),
+                        slot_data=display_item
+                    )
+
         if self.dragging and self.dragged_item:
             mouse_pos = pygame.mouse.get_pos()
             item = self.dragged_item
@@ -776,6 +801,7 @@ class Campfire:
     def _render_inventory(self, screen, start_x, start_y):
         columns = self.inventory.columns
         font = pygame.font.SysFont(None, 20)
+        mouse_pos = pygame.mouse.get_pos()
 
         for slot_index in range(self.inventory.capacity):
             row = slot_index // columns
@@ -798,4 +824,11 @@ class Campfire:
                                 screen.blit(stack_text, (x + 42, y + 44))
                             else:
                                 screen.blit(stack_text, (x + 47, y + 44))
+                        if pygame.Rect(x, y, self.slot_size, self.slot_size).collidepoint(mouse_pos):
+                            self.inventory.register_hover_candidate(
+                                ("campfire_inventory", slot_index),
+                                item["item_name"],
+                                (x, y, self.slot_size, self.slot_size),
+                                slot_data=item
+                            )
                         break

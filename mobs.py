@@ -362,6 +362,11 @@ class Player(pygame.sprite.Sprite):
                         mob.health -= self.attack
                         if mob.health < 0:
                             mob.health = 0
+                        try:
+                            from inventory import inventory as player_inventory
+                            player_inventory.decrement_durability(player_inventory.selected_hotbar_slot, True, 1)
+                        except Exception:
+                            pass
 
                         if not hasattr(mob, "last_hit_sound_time"):
                             mob.last_hit_sound_time = 0
@@ -1040,10 +1045,10 @@ class Mob(pygame.sprite.Sprite):
         if self.health <= 0:
             self.is_alive = False
 
-    def harvest(self, player=None):
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
         if not self.destroyed and not self.is_alive:
             resources = []
-            
+
             # Get primary resource (hide/meat) - scale modestly with strength level, not raw attack damage
             harvest_rate = 1
             if player and hasattr(player, "strength_leveler"):

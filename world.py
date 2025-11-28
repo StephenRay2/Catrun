@@ -322,11 +322,12 @@ class Solid(pygame.sprite.Sprite):
             self.rect.height - 50
         )
     
-    def harvest(self, player=None):
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
         if not self.destroyed:
-            resource_collected = min(self.resource_amount, (1 * player.attack))
+            power = max(1, int(harvest_power))
+            resource_collected = min(self.resource_amount, power)
             self.resource_amount -= resource_collected
-            
+
             if self.resource_amount <= 0:
                 self.destroyed = True
             player.experience += harvest_experience * resource_collected
@@ -342,15 +343,16 @@ class Rock(Solid):
         self.resource = "Stone"
         self.resource_amount = random.randint(10, 15)
     
-    def harvest(self, player=None):
-        resources = super().harvest(player)
-        if random.random() < 0.07:
-            resources.append("Flint")
-        if random.random() < 0.05:
-            resources.append("Raw Metal")
-        if random.random() < 0.002:
-            resources.append("Raw Gold")
-        
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
+        resources = super().harvest(player, harvest_power, special_chance_mult, special_yield_mult)
+        special_yield = max(1, int(special_yield_mult))
+        if random.random() < min(1.0, 0.07 * special_chance_mult):
+            resources.extend(["Flint"] * special_yield)
+        if random.random() < min(1.0, 0.05 * special_chance_mult):
+            resources.extend(["Raw Metal"] * special_yield)
+        if random.random() < min(1.0, 0.002 * special_chance_mult):
+            resources.extend(["Raw Gold"] * special_yield)
+
         return resources
 
 
@@ -367,15 +369,16 @@ class Boulder(Solid):
     def draw(self, screen, cam_x):
         screen.blit(self.image, (self.image_rect.x - cam_x, self.image_rect.y))
     
-    def harvest(self, player=None):
-        resources = super().harvest(player)
-        if random.random() < 0.07:
-            resources.append("Flint")
-        if random.random() < 0.05:
-            resources.append("Raw Metal")
-        if random.random() < 0.002:
-            resources.append("Raw Gold")
-        
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
+        resources = super().harvest(player, harvest_power, special_chance_mult, special_yield_mult)
+        special_yield = max(1, int(special_yield_mult))
+        if random.random() < min(1.0, 0.07 * special_chance_mult):
+            resources.extend(["Flint"] * special_yield)
+        if random.random() < min(1.0, 0.05 * special_chance_mult):
+            resources.extend(["Raw Metal"] * special_yield)
+        if random.random() < min(1.0, 0.002 * special_chance_mult):
+            resources.extend(["Raw Gold"] * special_yield)
+
         return resources
 
 
@@ -419,10 +422,10 @@ class BerryBush(pygame.sprite.Sprite):
             return resources
         return []
 
-    def harvest(self, player=None):
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
         if not self.destroyed:
             resources = []
-            
+
             stick_count = random.randint(3, 9)
             resources.extend([self.resource] * stick_count)
             
@@ -483,7 +486,7 @@ class DeadBush(pygame.sprite.Sprite):
             self.rect.height - 40
         )
 
-    def harvest(self, player=None):
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
         if not self.destroyed:
             resource_collected = random.randint(3, 9)
             self.destroyed = True
@@ -525,9 +528,10 @@ class Tree(pygame.sprite.Sprite):
         self.resource = tree_type["wood"]
         self.wood_amount = random.randint(30, 60)
         
-    def harvest(self, player=None):
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
         if not self.destroyed:
-            resource_collected = min(self.wood_amount, random.randint((1 * player.attack), (3 * player.attack)))
+            power = max(1, int(harvest_power))
+            resource_collected = min(self.wood_amount, power)
             self.wood_amount -= resource_collected
             if self.wood_amount <= 0:
                 self.destroyed = True
@@ -584,9 +588,10 @@ class Fern(pygame.sprite.Sprite):
         self.resource = fern_type["resource"]
 
 
-    def harvest(self, player=None):
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
         if not self.destroyed:
-            resource_collected = min(self.amount, random.randint((1 * player.attack), (2 * player.attack)))
+            power = max(1, int(harvest_power))
+            resource_collected = min(self.amount, power)
             self.amount -= resource_collected
             if self.amount <= 0:
                 self.destroyed = True
@@ -636,9 +641,10 @@ class FruitPlant(pygame.sprite.Sprite):
         self.resource = plant_type["resource"]
         self.resource_amount = random.randint(3, 6)
         
-    def harvest(self, player=None):
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
         if not self.destroyed:
-            resource_collected = min(self.resource_amount, random.randint((1 * player.attack), (2 * player.attack)))
+            power = max(1, int(harvest_power))
+            resource_collected = min(self.resource_amount, power)
             self.resource_amount -= resource_collected
             if self.resource_amount <= 0:
                 self.destroyed = True

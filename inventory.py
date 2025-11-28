@@ -1,5 +1,24 @@
 import pygame
+import pygame
 import random
+import re
+
+HARVEST_TOOL_MULTS = {
+    "wood": {"normal": 2, "special": 2},
+    "stone": {"normal": 3, "special": 3},
+    "metal": {"normal": 4, "special": 4},
+    "gold": {"normal": 1, "special": 6},
+    "bone": {"normal": 6, "special": 1},
+    "obsidian": {"normal": 4, "special": 4},
+    "dragon": {"normal": 8, "special": 8},
+}
+SPECIAL_DROP_MULTS = {
+    # Bonus chance for special mining drops (Flint/Raw Metal/Raw Gold)
+    "metal": 1.5,
+    "gold": 3.5,
+    "obsidian": 2.0,
+    "dragon": 3.0,
+}
 from mob_placement import player
 from buttons import inventory_tab, crafting_tab, level_up_tab, cats_tab, inventory_tab_unused, crafting_tab_unused, level_up_tab_unused, cats_tab_unused
 from sounds import sound_manager
@@ -191,6 +210,70 @@ items_list = [
         "weight": 1,
         "type": "raw_material",
         "description": "Strong oak wood. Excellent for construction.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": None,
+        "tags": ["wood", "material", "fuel"],
+        "output_amount": 1
+    },
+    {
+        "item_name": "Orange Wood",
+        "icon": "OrangeWood.png",
+        "stack_size": 100,
+        "weight": 1,
+        "type": "raw_material",
+        "description": "Aromatic wood from orange trees. Subtle citrus scent.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": None,
+        "tags": ["wood", "material", "fuel"],
+        "output_amount": 1
+    },
+    {
+        "item_name": "Willow Wood",
+        "icon": "WillowWood.png",
+        "stack_size": 100,
+        "weight": 1,
+        "type": "raw_material",
+        "description": "Flexible willow wood. Great for light structures.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": None,
+        "tags": ["wood", "material", "fuel"],
+        "output_amount": 1
+    },
+    {
+        "item_name": "Olive Wood",
+        "icon": "OliveWood.png",
+        "stack_size": 100,
+        "weight": 1,
+        "type": "raw_material",
+        "description": "Dense olive wood with a smooth grain and sheen.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": None,
+        "tags": ["wood", "material", "fuel"],
+        "output_amount": 1
+    },
+    {
+        "item_name": "Palm Wood",
+        "icon": "PalmWood.png",
+        "stack_size": 100,
+        "weight": 1,
+        "type": "raw_material",
+        "description": "Sturdy palm wood. Light and salt-kissed.",
         "use_effect": None,
         "placeable": False,
         "consumable": False,
@@ -5800,6 +5883,18 @@ class Inventory():
         self.selected_inventory_slot = None
         self.selection_mode = "hotbar"
         self.inventory_full_message_timer = 0
+        self.hotbar_name_display_until = 0
+        self.hotbar_name_display_text = ""
+        self.hotbar_name_font = pygame.font.SysFont(None, 18)
+        self.tooltip_title_font = pygame.font.SysFont(None, 22)
+        self.tooltip_body_font = pygame.font.SysFont(None, 18)
+        self.tooltip_small_font = pygame.font.SysFont(None, 16)
+        self.tooltip_delay_ms = 1000
+        self.tooltip_mode_active = False
+        self._hover_candidate = None
+        self._hover_active_id = None
+        self._hover_start_time = 0
+        self._hover_display_data = None
         self.dragging = False
         self.dragged_item = None
         self.dragged_from_slot = None
@@ -5996,6 +6091,269 @@ class Inventory():
                     self.last_level_up_click_time = now
                 break
 
+    def begin_hover_pass(self):
+        self.tooltip_mode_active = True
+        self._hover_candidate = None
+
+    def clear_hover_state(self):
+        self.tooltip_mode_active = False
+        self._hover_candidate = None
+        self._hover_active_id = None
+        self._hover_display_data = None
+        self._hover_start_time = 0
+
+    def _get_item_def(self, item_name):
+        for item in items_list:
+            if item["item_name"] == item_name:
+                return item
+        return None
+
+    def _is_pickaxe_item(self, item_def):
+        if not item_def:
+            return False
+        name = item_def.get("item_name", "").lower()
+        tags = item_def.get("tags", [])
+        return "pickaxe" in name or ("mining" in tags)
+
+    def _is_axe_item(self, item_def):
+        if not item_def:
+            return False
+        name = item_def.get("item_name", "").lower()
+        return "axe" in name and "pickaxe" not in name
+
+    def _get_tool_tier(self, item_def):
+        if not item_def:
+            return None
+        name = item_def.get("item_name", "").lower()
+        tags = item_def.get("tags", [])
+        if "dragon scale" in name:
+            return "dragon"
+        if "obsidian" in name:
+            return "obsidian"
+        if "gold" in name:
+            return "gold"
+        if "metal" in name:
+            return "metal"
+        if "stone" in name:
+            return "stone"
+        if "bone" in name:
+            return "bone"
+        if "wood" in name:
+            return "wood"
+        if "mining" in tags:
+            return "metal"
+        return None
+
+    def register_hover_candidate(self, candidate_id, item_name, rect, recipe=None, slot_data=None):
+        if not self.tooltip_mode_active:
+            return
+
+        item_def = self._get_item_def(item_name)
+        if not item_def:
+            return
+
+        durability = item_def.get("durability")
+        if slot_data is not None and slot_data.get("durability") is not None:
+            durability = slot_data.get("durability")
+
+        status_effects = None
+        if slot_data is not None:
+            status_effects = slot_data.get("status_effects")
+        if status_effects is None:
+            status_effects = item_def.get("status_effects")
+        if status_effects is None:
+            status_effects = item_def.get("use_effect")
+
+        self._hover_candidate = {
+            "id": candidate_id,
+            "item_def": item_def,
+            "rect": rect,
+            "durability": durability,
+            "status": status_effects,
+            "recipe": recipe,
+        }
+
+    def _finalize_hover_candidate(self):
+        now = pygame.time.get_ticks()
+
+        if not self.tooltip_mode_active or self._hover_candidate is None:
+            self._hover_active_id = None
+            self._hover_display_data = None
+            self._hover_start_time = 0
+            return
+
+        if self._hover_candidate["id"] != self._hover_active_id:
+            self._hover_active_id = self._hover_candidate["id"]
+            self._hover_start_time = now
+
+        self._hover_display_data = self._hover_candidate
+
+    def _wrap_text(self, text, font, max_width):
+        words = text.split()
+        lines = []
+        current = ""
+        for word in words:
+            test_line = word if current == "" else current + " " + word
+            if font.size(test_line)[0] <= max_width:
+                current = test_line
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        if not lines:
+            lines = [""]
+        return lines
+
+    def create_item_instance(self, item_def, quantity=1):
+        new_item = item_def.copy()
+        new_item["quantity"] = quantity
+        if item_def.get("durability") is not None:
+            new_item["durability"] = item_def["durability"]
+        return new_item
+
+    def decrement_durability(self, slot_index, is_hotbar=True, amount=1):
+        slot_list = self.hotbar_slots if is_hotbar else self.inventory_list
+        if slot_index is None or slot_index < 0 or slot_index >= len(slot_list):
+            return
+        slot = slot_list[slot_index]
+        if slot is None:
+            return
+        if slot.get("durability") is None:
+            return
+        slot["durability"] -= amount
+        if slot["durability"] <= 0:
+            slot_list[slot_index] = None
+
+    def _format_status_effects(self, status):
+        effects = []
+        if isinstance(status, list):
+            raw_effects = status
+        else:
+            raw_effects = [status]
+
+        for raw in raw_effects:
+            if raw is None:
+                continue
+            parts = [p.strip() for p in str(raw).split(";") if p.strip()]
+            for part in parts:
+                match = re.match(r"player\.(\w+)\s*([+-]=)\s*([+-]?\d*\.?\d+)", part)
+                if match:
+                    stat_name, op, val = match.groups()
+                    label = stat_name.replace("_", " ").title()
+                    sign = "+" if op == "+=" and not val.startswith("-") else ""
+                    effects.append(f"{label} {sign}{val}")
+                    continue
+                effects.append(part)
+        return effects
+
+    def draw_hover_tooltip(self, screen):
+        self._finalize_hover_candidate()
+
+        if not self.tooltip_mode_active or self._hover_display_data is None:
+            return
+
+        now = pygame.time.get_ticks()
+        if now - self._hover_start_time < self.tooltip_delay_ms:
+            return
+
+        data = self._hover_display_data
+        item_def = data["item_def"]
+        rect_x, rect_y, rect_w, rect_h = data["rect"]
+        max_text_width = 280
+
+        lines = []
+        lines.append((self.tooltip_title_font, item_def.get("item_name", "Unknown"), (255, 255, 255)))
+
+        description = item_def.get("description", "")
+        for line in self._wrap_text(description, self.tooltip_body_font, max_text_width):
+            lines.append((self.tooltip_body_font, line, (230, 230, 230)))
+
+        durability_label = "Durability" if data.get("recipe") is None else "Max Durability"
+        durability_value = data.get("durability")
+        dur_text = f"{durability_label}: {durability_value}" if durability_value is not None else f"{durability_label}: N/A"
+        lines.append((self.tooltip_small_font, dur_text, (210, 210, 210)))
+
+        is_pickaxe = self._is_pickaxe_item(item_def)
+        is_axe = self._is_axe_item(item_def)
+        tier = self._get_tool_tier(item_def)
+        if tier and (is_pickaxe or is_axe):
+            mults = HARVEST_TOOL_MULTS.get(tier, {"normal": 1, "special": 1})
+            if is_axe:
+                lines.append((self.tooltip_small_font, f"Harvest Yield (wood): x{mults.get('normal',1)}", (200, 230, 255)))
+            if is_pickaxe:
+                lines.append((self.tooltip_small_font, f"Harvest Yield (mining): x{mults.get('special',1)}", (200, 230, 255)))
+
+        status = data.get("status")
+        formatted_status = self._format_status_effects(status) if status else []
+        if formatted_status:
+            lines.append((self.tooltip_small_font, "Status Effects:", (200, 255, 200)))
+            for effect in formatted_status:
+                for line in self._wrap_text(effect, self.tooltip_small_font, max_text_width):
+                    lines.append((self.tooltip_small_font, f"- {line}", (200, 230, 200)))
+        else:
+            lines.append((self.tooltip_small_font, "Status Effects: None", (180, 180, 180)))
+
+        recipe = data.get("recipe")
+        if recipe:
+            lines.append((self.tooltip_small_font, "Recipe:", (255, 220, 160)))
+            for req in recipe:
+                if "item" in req:
+                    label = f"{req['item']} x{req.get('amount', 1)}"
+                elif "item_tag" in req:
+                    pretty = req["item_tag"].replace("_", " ").title()
+                    label = f"{pretty} x{req.get('amount', 1)}"
+                else:
+                    label = "Unknown ingredient"
+                for line in self._wrap_text(label, self.tooltip_small_font, max_text_width):
+                    lines.append((self.tooltip_small_font, f"- {line}", (230, 230, 200)))
+
+        line_height = 4
+        rendered = []
+        max_width = 0
+        for font, text, color in lines:
+            surface = font.render(text, True, color)
+            rendered.append(surface)
+            max_width = max(max_width, surface.get_width())
+            line_height += surface.get_height() + 4
+
+        padding = 10
+        box_width = max_width + padding * 2
+        box_height = line_height + padding
+
+        tooltip_x = rect_x + rect_w + 12
+        tooltip_y = rect_y
+
+        if tooltip_x + box_width > screen.get_width() - 10:
+            tooltip_x = rect_x - box_width - 12
+        if tooltip_y + box_height > screen.get_height() - 10:
+            tooltip_y = max(10, screen.get_height() - box_height - 10)
+
+        bg_surface = pygame.Surface((box_width, box_height), pygame.SRCALPHA)
+        bg_surface.fill((0, 0, 0, 170))
+        pygame.draw.rect(bg_surface, (255, 255, 255, 200), (0, 0, box_width, box_height), 1, border_radius=6)
+
+        current_y = padding // 2
+        for surf in rendered:
+            bg_surface.blit(surf, (padding, current_y))
+            current_y += surf.get_height() + 4
+
+        screen.blit(bg_surface, (tooltip_x, tooltip_y))
+
+    def show_selected_hotbar_name(self, duration_ms=1200):
+        slot = None
+        if 0 <= self.selected_hotbar_slot < len(self.hotbar_slots):
+            slot = self.hotbar_slots[self.selected_hotbar_slot]
+
+        if slot is None or "item_name" not in slot:
+            self.hotbar_name_display_text = ""
+            self.hotbar_name_display_until = 0
+            return
+
+        self.hotbar_name_display_text = slot["item_name"]
+        self.hotbar_name_display_until = pygame.time.get_ticks() + duration_ms
+
     def draw_hotbar(self, screen):
         hotbar_x = screen.get_width() // 2 - hotbar_image.get_width() // 2
         hotbar_y = screen.get_height() - 70
@@ -6005,11 +6363,12 @@ class Inventory():
         first_slot_x = hotbar_x + 4.5
         slot_y = hotbar_y + 4.5
         slot_spacing = 51
-        
+        mouse_pos = pygame.mouse.get_pos()
+
         for i in range(self.hotbar_size):
             x = first_slot_x + i * slot_spacing
             y = slot_y
-            
+
             if i == self.selected_hotbar_slot and self.selection_mode == "hotbar":
                 highlight_surface = pygame.Surface((slot_size + 6, slot_size + 6), pygame.SRCALPHA)
                 pygame.draw.rect(highlight_surface, (255, 255, 255, 200), (0, 0, slot_size + 6, slot_size + 6), 3)
@@ -6040,14 +6399,36 @@ class Inventory():
                                 screen.blit(stack_text, (x + 29, y + 33))
                             else:
                                 screen.blit(stack_text, (x + 30, y + 33))
-                        
+
+                        if pygame.Rect(x, y, slot_size, slot_size).collidepoint(mouse_pos):
+                            self.register_hover_candidate(
+                                ("hotbar", i),
+                                item_name,
+                                (x, y, slot_size, slot_size),
+                                slot_data=slot
+                            )
+
                         break
-        
+
+        if self.hotbar_name_display_text and pygame.time.get_ticks() < self.hotbar_name_display_until:
+            selected_x = first_slot_x + self.selected_hotbar_slot * slot_spacing
+            selected_y = slot_y
+            name_surface = self.hotbar_name_font.render(self.hotbar_name_display_text, True, (255, 255, 255))
+            bg_width = name_surface.get_width() + 8
+            bg_height = name_surface.get_height() + 4
+            bg_surface = pygame.Surface((bg_width, bg_height), pygame.SRCALPHA)
+            bg_surface.fill((0, 0, 0, 160))
+            bg_x = int(selected_x + (slot_size - bg_width) / 2)
+            bg_y = int(selected_y + slot_size + 2)
+            screen.blit(bg_surface, (bg_x, bg_y))
+            screen.blit(name_surface, (bg_x + 4, bg_y + 2))
+
     def draw_items(self, screen):
         start_x = (screen.get_width() / 2 - self.inventory_image.get_width() / 2) + 18
         start_y = (screen.get_height() / 2 - self.inventory_image.get_height() / 2) + 44
         font = pygame.font.SysFont(None, 20)
         self.total_inventory_weight = 0
+        mouse_pos = pygame.mouse.get_pos()
 
         for hotbar_slot in self.hotbar_slots:
             if hotbar_slot is not None:
@@ -6080,10 +6461,17 @@ class Inventory():
                 for item in items_list:
                     if item["item_name"] == item_name:
                         screen.blit(item["image"], (x, y))  # Use inventory version (already 60x60)
-                        
+                        if pygame.Rect(x, y, self.slot_size, self.slot_size).collidepoint(mouse_pos):
+                            self.register_hover_candidate(
+                                ("inventory", slot_index),
+                                item_name,
+                                (x, y, self.slot_size, self.slot_size),
+                                slot_data=slot
+                            )
+
                         stack_weight = round(quantity * item["weight"], 1)
                         self.total_inventory_weight += stack_weight
-                        
+
                         weight_text = font.render(str(stack_weight), True, (250, 250, 20))
                         weight_x_pos = x + 39
                         if stack_weight == int(stack_weight) and stack_weight < 10:
@@ -6248,13 +6636,14 @@ class Inventory():
     def draw_crafting(self, screen):
         start_x = (screen.get_width() / 2 - self.inventory_image.get_width() / 2) + 18
         start_y = (screen.get_height() / 2 - self.inventory_image.get_height() / 2) + 44
-        
+
         font_small = pygame.font.SysFont(None, 30)
         font_medium = pygame.font.SysFont(None, 40)
         font_large = pygame.font.SysFont(None, 50)
+        mouse_pos = pygame.mouse.get_pos()
 
         self.crafting_slot_positions = {}
-        
+
         craftable_items = self.get_craftable_items()
         
         for idx, item in enumerate(craftable_items):
@@ -6278,8 +6667,16 @@ class Inventory():
                 screen.blit(highlight_surface, (x, y))
             
             screen.blit(item["image"], (x, y))
-            
+
             self.crafting_slot_positions[idx] = (x, y, item)
+
+            if pygame.Rect(x, y, self.slot_size, self.slot_size).collidepoint(mouse_pos):
+                self.register_hover_candidate(
+                    ("crafting_recipe", idx),
+                    item["item_name"],
+                    (x, y, self.slot_size, self.slot_size),
+                    recipe=item.get("recipe")
+                )
 
         # Draw crafting completion flash
         if self.crafting_completion_flash and self.crafting_completion_slot:
@@ -6395,20 +6792,14 @@ class Inventory():
                     if not stacked:
                         for i in range(self.hotbar_size):
                             if self.hotbar_slots[i] is None:
-                                self.hotbar_slots[i] = {
-                                    "item_name": item_name,
-                                    "quantity": 1
-                                }
+                                self.hotbar_slots[i] = self.create_item_instance(item_data, 1)
                                 stacked = True
                                 break
                     
                     if not stacked:
                         for i in range(self.capacity):
                             if self.inventory_list[i] is None:
-                                self.inventory_list[i] = {
-                                    "item_name": item_name,
-                                    "quantity": 1
-                                }
+                                self.inventory_list[i] = self.create_item_instance(item_data, 1)
                                 stacked = True
                                 break
                     

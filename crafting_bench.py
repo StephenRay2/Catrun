@@ -453,10 +453,11 @@ class CraftingBench:
         gap_size = 4
         columns = 8
         font = pygame.font.SysFont(None, 20)
-        
+        mouse_pos = pygame.mouse.get_pos()
+
         for slot_index in range(self.inventory.capacity):
             slot = self.inventory.inventory_list[slot_index]
-            
+
             row = slot_index // columns
             col = slot_index % columns
             x = start_x + col * (slot_size + gap_size)
@@ -471,11 +472,18 @@ class CraftingBench:
             if slot is not None:
                 item_name = slot["item_name"]
                 quantity = slot["quantity"]
-                
+
                 for item in items_list:
                     if item["item_name"] == item_name:
                         screen.blit(item["image"], (x, y))
-                        
+                        if pygame.Rect(x, y, slot_size, slot_size).collidepoint(mouse_pos):
+                            self.inventory.register_hover_candidate(
+                                ("workbench_inventory", slot_index),
+                                item_name,
+                                (x, y, slot_size, slot_size),
+                                slot_data=slot
+                            )
+
                         if quantity > 1:
                             stack_text = font.render(str(quantity), True, (255, 255, 255))
                             if quantity == 100:
@@ -499,22 +507,30 @@ class CraftingBench:
         slot_y = hotbar_y + 4.5
         slot_spacing = 51
         font = pygame.font.SysFont(None, 18)
-        
+        mouse_pos = pygame.mouse.get_pos()
+
         for slot_index in range(self.inventory.hotbar_size):
             slot = self.inventory.hotbar_slots[slot_index]
-            
+
             x = first_slot_x + slot_index * slot_spacing
             y = slot_y
             
             if slot is not None:
                 item_name = slot["item_name"]
                 quantity = slot["quantity"]
-                
+
                 for item in items_list:
                     if item["item_name"] == item_name:
                         scaled_img = pygame.transform.scale(item["image"], (slot_size, slot_size))
                         screen.blit(scaled_img, (x, y))
-                        
+                        if pygame.Rect(x, y, slot_size, slot_size).collidepoint(mouse_pos):
+                            self.inventory.register_hover_candidate(
+                                ("workbench_hotbar", slot_index),
+                                item_name,
+                                (x, y, slot_size, slot_size),
+                                slot_data=slot
+                            )
+
                         if quantity > 1:
                             stack_text = font.render(str(quantity), True, (255, 255, 255))
                             if quantity == 100:
@@ -551,11 +567,12 @@ class CraftingBench:
         slot_size = 64
         gap_size = 4
         columns = 6
-        
+        mouse_pos = pygame.mouse.get_pos()
+
         for i, recipe in enumerate(self.recipes[self.scroll_offset * columns:]):
             if i >= self.recipe_rows_visible * columns:
                 break
-            
+
             col = i % columns
             row = i // columns
             
@@ -573,10 +590,18 @@ class CraftingBench:
             
             if recipe_idx == self.selected_recipe:
                 pygame.draw.rect(screen, (255, 255, 0), (x, y, slot_size, slot_size), 3)
-            
+
             if "image" in recipe:
                 scaled_img = pygame.transform.scale(recipe["image"], (60, 60))
                 screen.blit(scaled_img, (x + 2, y + 2))
+
+            if pygame.Rect(x, y, slot_size, slot_size).collidepoint(mouse_pos):
+                self.inventory.register_hover_candidate(
+                    ("workbench_recipe", recipe_idx),
+                    recipe.get("item_name", "Unknown"),
+                    (x, y, slot_size, slot_size),
+                    recipe=recipe.get("recipe")
+                )
     
     def _draw_recipe_description(self, screen, bg_x, bg_y):
         if self.selected_recipe is None or self.selected_recipe >= len(self.recipes):
