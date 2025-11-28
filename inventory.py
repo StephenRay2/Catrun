@@ -5831,6 +5831,57 @@ items_list = [
 
 ]
 
+def _get_tier(name_lower):
+    if "dragon scale" in name_lower:
+        return "dragon"
+    if "obsidian" in name_lower:
+        return "obsidian"
+    if "gold" in name_lower:
+        return "gold"
+    if "metal" in name_lower:
+        return "metal"
+    if "bone" in name_lower:
+        return "bone"
+    if "stone" in name_lower:
+        return "stone"
+    if "wood" in name_lower:
+        return "wood"
+    return None
+
+_tier_durabilities = {
+    "wood": 300,
+    "stone": 600,
+    "metal": 1600,
+    "bone": 1000,
+    "gold": 1200,
+    "obsidian": 2200,
+    "dragon": 5000,
+}
+
+_weaponish_keywords = ("axe", "sword", "spear", "mace", "pickaxe", "shovel", "hoe", "club", "bow", "crossbow")
+_explicit_dur_overrides = {
+    "Torch": 800,
+    "Oil Lamp": 1500,
+    "Leather Boots": 500,
+    "Leather Chestplate": 500,
+    "Leather Gloves": 500,
+    "Leather Helmet": 500,
+    "Leather Leggings": 500,
+    "Wooden Crossbow": 1200,
+}
+
+for item in items_list:
+    name = item.get("item_name", "")
+    if name in _explicit_dur_overrides:
+        item["durability"] = _explicit_dur_overrides[name]
+        continue
+    name_lower = name.lower()
+    if not any(k in name_lower for k in _weaponish_keywords):
+        continue
+    tier = _get_tier(name_lower)
+    if tier:
+        item["durability"] = _tier_durabilities.get(tier, item.get("durability"))
+
 for item in items_list:
     # Handle tamed cat icons from mobs folder
     if "cat_type" in item:
@@ -6383,14 +6434,14 @@ class Inventory():
                 for item in items_list:
                     if item["item_name"] == item_name:
                         screen.blit(item["image_hotbar"], (x, y))  # Use hotbar version
-                        
+
                         stack_weight = round(quantity * item["weight"], 1)
                         weight_text = hotbar_font.render(str(stack_weight), True, (250, 250, 20))
                         weight_x_pos = x + 29
                         if stack_weight == int(stack_weight) and stack_weight < 10:
                             weight_x_pos += 4
                         screen.blit(weight_text, (weight_x_pos, y + 3))
-                        
+
                         if quantity > 1:
                             stack_text = hotbar_font.render(str(quantity), True, (255, 255, 255))
                             if quantity >= 100:
@@ -6399,6 +6450,17 @@ class Inventory():
                                 screen.blit(stack_text, (x + 29, y + 33))
                             else:
                                 screen.blit(stack_text, (x + 30, y + 33))
+
+                        if slot.get("durability") is not None and slot.get("durability") < item.get("durability", slot.get("durability")):
+                            max_dur = item.get("durability", slot["durability"])
+                            cur_dur = max(0, min(slot["durability"], max_dur))
+                            ratio = cur_dur / max_dur if max_dur else 0
+                            bar_width = int(slot_size * ratio)
+                            bar_height = 3
+                            bar_x = x
+                            bar_y = y + slot_size - bar_height - 1
+                            pygame.draw.rect(screen, (60, 60, 60), (bar_x, bar_y, slot_size, bar_height))
+                            pygame.draw.rect(screen, (50, 200, 50), (bar_x, bar_y, bar_width, bar_height))
 
                         if pygame.Rect(x, y, slot_size, slot_size).collidepoint(mouse_pos):
                             self.register_hover_candidate(
@@ -6486,7 +6548,18 @@ class Inventory():
                                 screen.blit(stack_text, (x + 42, y + 44))
                             else:
                                 screen.blit(stack_text, (x + 47, y + 44))
-                        
+
+                        if slot.get("durability") is not None and slot.get("durability") < item.get("durability", slot.get("durability")):
+                            max_dur = item.get("durability", slot["durability"])
+                            cur_dur = max(0, min(slot["durability"], max_dur))
+                            ratio = cur_dur / max_dur if max_dur else 0
+                            bar_width = int(self.slot_size * ratio)
+                            bar_height = 4
+                            bar_x = x
+                            bar_y = y + self.slot_size - bar_height - 2
+                            pygame.draw.rect(screen, (60, 60, 60), (bar_x, bar_y, self.slot_size, bar_height))
+                            pygame.draw.rect(screen, (50, 200, 50), (bar_x, bar_y, bar_width, bar_height))
+
                         break
         
         player.weight = self.total_inventory_weight
