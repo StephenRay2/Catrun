@@ -6,6 +6,7 @@ from mob_placement import *
 from sounds import *
 from crafting_bench import CraftingBench
 from smelter import Smelter
+from campfire import Campfire
 
 clock = pygame.time.Clock()
 from inventory import *
@@ -70,6 +71,8 @@ crafting_bench = None
 crafting_bench_in_use = False
 smelter = None
 smelter_in_use = False
+campfire = None
+campfire_in_use = False
 
 default_placeable_sprite_size = (64, 64)
 
@@ -1033,6 +1036,8 @@ while running:
             inventory.update_flash(dt)
             if smelter:
                 smelter.update(dt)
+            if campfire:
+                campfire.update(dt)
             # Update placement position if in placement mode
             update_placement_position()
         else:
@@ -1239,6 +1244,7 @@ while running:
             
             globals()['crafting_bench'] = CraftingBench(inventory)
             globals()['smelter'] = Smelter(inventory)
+            globals()['campfire'] = Campfire(inventory)
             
             populate_test_inventory()
             set_starting_hotbar()
@@ -1283,6 +1289,9 @@ while running:
                     if crafting_bench_in_use:
                         crafting_bench.close()
                         crafting_bench_in_use = False
+                    elif campfire_in_use:
+                        campfire.close()
+                        campfire_in_use = False
                     elif smelter_in_use:
                         smelter.close()
                         smelter_in_use = False
@@ -1300,8 +1309,8 @@ while running:
                 
                 if crafting_bench_in_use:
                     crafting_bench.handle_key_event(event)
-                # Allow exiting smelter with E or ESC even while UI is open
-                if smelter_in_use and event.key not in (pygame.K_e, pygame.K_ESCAPE):
+                # Allow exiting smelter/campfire with E or ESC even while UI is open
+                if (smelter_in_use or campfire_in_use) and event.key not in (pygame.K_e, pygame.K_ESCAPE):
                     continue
 
                 if event.key == pygame.K_f and not inventory_in_use and not crafting_bench_in_use and player.is_alive:
@@ -1312,7 +1321,7 @@ while running:
                         elif any(tag in tags for tag in ["liquid", "consumable"]):
                             sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
 
-                if event.key == pygame.K_q and not crafting_bench_in_use and not smelter_in_use:
+                if event.key == pygame.K_q and not crafting_bench_in_use and not smelter_in_use and not campfire_in_use:
                     inventory_in_use = not inventory_in_use
                     if not inventory_in_use:
                         inventory.selection_mode = "hotbar"
@@ -1325,7 +1334,7 @@ while running:
                         inventory.selected_inventory_slot = None
 
             # Placement system - toggle placement mode with right-click
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3 and player.is_alive and not crafting_bench_in_use and not smelter_in_use:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3 and player.is_alive and not crafting_bench_in_use and not smelter_in_use and not campfire_in_use:
                 if placement_mode:
                     # Cancel placement mode
                     cancel_placement()
@@ -1529,6 +1538,30 @@ while running:
                 
                 throw_charge_start = None
 
+            # Campfire UI drag handling
+            if campfire_in_use:
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    mouse_pos = pygame.mouse.get_pos()
+                    slot_info = campfire.get_slot_at_mouse(mouse_pos, screen)
+                    slot_index, slot_type = slot_info
+                    
+                    if hasattr(campfire, 'button_rect') and campfire.button_rect.collidepoint(mouse_pos):
+                        campfire.toggle_fire()
+                    elif slot_index is not None:
+                        if campfire.dragging:
+                            campfire.end_drag(slot_info)
+                        else:
+                            campfire.start_drag(slot_info)
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    if campfire.dragging:
+                        mouse_pos = pygame.mouse.get_pos()
+                        slot_info = campfire.get_slot_at_mouse(mouse_pos, screen)
+                        slot_index, slot_type = slot_info
+                        if slot_index is not None:
+                            campfire.end_drag(slot_info)
+                        else:
+                            campfire.cancel_drag()
+
             # Smelter UI drag handling
             if smelter_in_use:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -1553,7 +1586,7 @@ while running:
                         else:
                             smelter.cancel_drag()
 
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not smelter_in_use:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not smelter_in_use and not campfire_in_use:
                 mouse_pos = pygame.mouse.get_pos()
 
                 slot_index, is_hotbar = inventory.get_slot_at_mouse(mouse_pos, screen)
@@ -1571,7 +1604,7 @@ while running:
                         if slot_index is not None:
                             inventory.start_drag(slot_index, is_hotbar)
 
-            if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and not smelter_in_use:
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and not smelter_in_use and not campfire_in_use:
                 if placement_mode:
                     # Try to place the item
                     x, y = placement_position
@@ -1613,6 +1646,9 @@ while running:
                 if crafting_bench_in_use:
                     crafting_bench.close()
                     crafting_bench_in_use = False
+                elif campfire_in_use:
+                    campfire.close()
+                    campfire_in_use = False
                 elif smelter_in_use:
                     smelter.close()
                     smelter_in_use = False
@@ -1664,6 +1700,31 @@ while running:
                                 if facing_object:
                                     smelter.open((structure['x'], structure['y']))
                                     smelter_in_use = True
+                                    break
+                    
+                    if not crafting_bench_in_use and not smelter_in_use:
+                        for structure in nearby_structures:
+                            if structure['item_name'] == 'Campfire':
+                                struct_collision = structure['rect']
+                                horizontal_dist = abs(struct_collision.centerx - player_world_x)
+                                vertical_dist = abs(struct_collision.centery - player_world_y)
+                                campfire_reach = 40
+                                horizontal_range = (struct_collision.width / 2) + campfire_reach
+                                vertical_range = (struct_collision.height / 2) + campfire_reach
+                                
+                                facing_object = False
+                                if player.last_direction == "right" and struct_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                    facing_object = True
+                                elif player.last_direction == "left" and struct_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                    facing_object = True
+                                elif player.last_direction == "up" and struct_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                    facing_object = True
+                                elif player.last_direction == "down" and struct_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                    facing_object = True
+                                
+                                if facing_object:
+                                    campfire.open((structure['x'], structure['y']))
+                                    campfire_in_use = True
                                     break
                 
                 if not crafting_bench_in_use:
@@ -1812,7 +1873,7 @@ while running:
                     state = "menu"
                     paused = False
     
-        if not paused and not inventory_in_use and not smelter_in_use and not crafting_bench_in_use and naming_cat is None and pygame.mouse.get_pressed()[0] and not player.exhausted:
+        if not paused and not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and naming_cat is None and pygame.mouse.get_pressed()[0] and not player.exhausted:
             if current_time - harvest_cooldown > harvest_delay:
                 held_item = get_selected_hotbar_item()
                 has_pickaxe_equipped = is_pickaxe_item(held_item)
@@ -2025,7 +2086,7 @@ while running:
                 for item in items_list:
                     if item["item_name"] == current_hotbar_slot["item_name"] and "held_item_images" in item:
                         # disable attacking while smelter UI is open
-                        is_attacking = pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use
+                        is_attacking = pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use and not campfire_in_use
                         held_image = item["held_item_images"].get(player.last_direction)
                         
                         if held_image and is_attacking:
@@ -2176,6 +2237,10 @@ while running:
                     lit_sprite = smelter.get_world_sprite((sprite_width, sprite_height))
                     if lit_sprite:
                         struct_sprite = lit_sprite
+                if obj.get('item_name') == 'Campfire' and campfire is not None:
+                    cf_sprite = campfire.get_world_sprite((sprite_width, sprite_height))
+                    if cf_sprite:
+                        struct_sprite = cf_sprite
                 try:
                     if struct_sprite is None:
                         icon_path = f"assets/sprites/items/{obj['icon']}"
@@ -2621,7 +2686,7 @@ while running:
             if not in_liquid:
                 player.exit_liquid()
 
-            if not inventory_in_use and not smelter_in_use and not crafting_bench_in_use and naming_cat is None:
+            if not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and naming_cat is None:
 
                 if (((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]) and (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT])) or pygame.mouse.get_pressed()[0]) and not player.exhausted:
                     if player.lose_stamina(screen, dt):
@@ -2651,7 +2716,7 @@ while running:
 
                 if not is_moving:
                     if player.last_direction == "down":
-                        if pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use:
+                        if pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use and not campfire_in_use:
                             player_animation_timer += dt
                             if player_animation_timer > .07:
                                 player_frame_index = (player_frame_index + 1) % len(player_stand_attack_down_images)
@@ -2664,7 +2729,7 @@ while running:
                                 player_current_image = player_idle_down_images[player_frame_index]
                                 player_animation_timer = 0
                     elif player.last_direction == "up":
-                        if pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use:
+                        if pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use and not campfire_in_use:
                             player_animation_timer += dt
                             if player_animation_timer > .07:
                                 player_frame_index = (player_frame_index + 1) % len(player_stand_attack_up_images)
@@ -2677,7 +2742,7 @@ while running:
                                 player_current_image = player_idle_up_images[player_frame_index]
                                 player_animation_timer = 0
                     elif player.last_direction == "left":
-                        if pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use:
+                        if pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use and not campfire_in_use:
                             player_animation_timer += dt
                             if player_animation_timer > .07:
                                 player_frame_index = (player_frame_index + 1) % len(player_stand_attack_left_images)
@@ -2690,7 +2755,7 @@ while running:
                                 player_current_image = player_idle_left_images[player_frame_index]
                                 player_animation_timer = 0
                     elif player.last_direction == "right":
-                        if pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use:
+                        if pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use and not campfire_in_use:
                             player_animation_timer += dt
                             if player_animation_timer > .07:
                                 player_frame_index = (player_frame_index + 1) % len(player_stand_attack_right_images)
@@ -2909,6 +2974,9 @@ while running:
             screen.blit(temp_surface, (x - 5, y - 5))
             screen.blit(full_text, (x, y))
             inventory.inventory_full_message_timer -= dt
+
+        if campfire_in_use:
+            campfire.render(screen)
 
         if smelter_in_use:
             smelter.render(screen)

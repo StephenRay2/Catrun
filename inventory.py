@@ -393,7 +393,7 @@ items_list = [
         "output_amount": 1
     },
     {
-        "item_name": "Small Meat",
+        "item_name": "Raw Small Meat",
         "icon": "SmallMeat.png",
         "stack_size": 100,
         "weight": .2,
@@ -1369,7 +1369,7 @@ items_list = [
         "durability": None,
         "recipe": [{"item_tag": "wood", "amount": 2}],
         "crafting_medium": "hand",
-        "tags": ["wooden", "material"],
+        "tags": ["wooden", "material", "container"],
         "output_amount": 1
     },
     {
@@ -2056,7 +2056,7 @@ items_list = [
         "durability": 2000,
         "recipe": [{"item": "Twine", "amount": 15}, {"item": "Metal Rod", "amount": 5}, {"item": "Metal Ingot", "amount": 1}],
         "crafting_medium": "workbench",
-        "tags": ["food", "meat"],
+        "tags": ["tool"],
         "output_amount": 1
     },
     {
@@ -6800,14 +6800,18 @@ class Inventory():
             else:
                 self.inventory_list[slot_index] = None
         
-        # Return the empty container to inventory if this item used one
+        # Return an empty container only if the recipe actually uses a container item
         recipe = item_data.get("recipe")
         if recipe and isinstance(recipe, list):
             for recipe_item in recipe:
-                if isinstance(recipe_item, dict) and "item" in recipe_item:
-                    container_name = recipe_item["item"]
-                    # Add the empty container back to inventory (must pass as list)
+                if not (isinstance(recipe_item, dict) and "item" in recipe_item):
+                    continue
+                container_name = recipe_item["item"]
+                # Check whether this recipe item is a container (by tag or type)
+                container_data = next((itm for itm in items_list if itm["item_name"] == container_name), None)
+                if container_data and ("container" in container_data.get("tags", []) or container_data.get("type") == "container"):
                     self.add([container_name])
+                    break  # only add one container back
         
         return (True, item_data.get("tags", []))  # Return success and tags
         

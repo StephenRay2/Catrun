@@ -1149,7 +1149,7 @@ class Cat(Mob):
         self.death_experience = 200  * (1 + (self.level * self.death_experience * .0001))
         self.level = 1
         self.tamed_boost = 1.1
-        self.meat_resource = "Small Meat"
+        self.meat_resource = "Raw Small Meat"
         self.special_drops = [{'item': 'Fur', 'chance': 0.1, 'min': 1, 'max': 2}]
 
         self.full_health = 100 + (random.randint(5, 7) * self.level) * self.tamed_boost
@@ -1257,11 +1257,11 @@ class Cat(Mob):
         health_increase = 0
         
         # Raw meats - +20 tame, +15 health
-        if item_name in ["Fish", "Raw Venison", "Gila Meat", "Raw Beef", "Raw Chicken", "Small Meat", "Bear Meat"]:
+        if item_name in ["Fish", "Raw Venison", "Raw Lizard Meat", "Raw Beef", "Raw Chicken", "Raw Small Meat", "Raw Bear Meat"]:
             tame_increase = 20
             health_increase = 15
         # Cooked meats - +10 tame, +20 health
-        elif item_name in ["Cooked Fish", "Cooked Venison", "Cooked Gila Meat", "Cooked Beef", "Cooked Chicken", "Cooked Small Meat", "Cooked Bear Meat"]:
+        elif item_name in ["Cooked Fish", "Cooked Venison", "Cooked Lizard Meat", "Cooked Beef", "Cooked Chicken", "Cooked Small Meat", "Cooked Bear Meat"]:
             tame_increase = 5
             health_increase = 20
         # Milk - +30 tame, +25 health
@@ -1391,7 +1391,7 @@ class Squirrel(Mob):
         self.level = 1
         self.death_experience = 75 * (1 + (self.level * self.death_experience * .0001))
         self.resource = "Hide"
-        self.meat_resource = "Small Meat"
+        self.meat_resource = "Raw Small Meat"
         self.special_drops = [{'item': 'Fur', 'chance': 0.1, 'min': 1, 'max': 2}]
         
 
@@ -2706,7 +2706,7 @@ class Crow(Mob):
         self.full_health = 30 + (random.randint(5, 10) * self.level)
         self.health = self.full_health
         self.resource = "Feathers"
-        self.special_drops = [{'item': 'Small Meat', 'chance': 0.6, 'min': 2, 'max': 4}]
+        self.special_drops = [{'item': 'Raw Small Meat', 'chance': 0.6, 'min': 2, 'max': 4}]
         self.resource_amount = 4
         self.death_experience = 400 * (1 + (self.level * self.death_experience * .0001))
         self.level = 1
