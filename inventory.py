@@ -149,7 +149,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["wood", "material"],
+        "tags": ["wood", "material", "fuel"],
         "output_amount": 1
     },
     {
@@ -165,7 +165,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["wood", "material"],
+        "tags": ["wood", "material", "fuel"],
         "output_amount": 1
     },
     {
@@ -181,7 +181,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["wood", "material"],
+        "tags": ["wood", "material", "fuel"],
         "output_amount": 1
     },
     {
@@ -197,7 +197,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["wood", "material"],
+        "tags": ["wood", "material", "fuel"],
         "output_amount": 1
     },
     {
@@ -489,6 +489,22 @@ items_list = [
         "output_amount": 1
     },
     {
+        "item_name": "Clay",
+        "icon": "Clay.png",
+        "stack_size": 100,
+        "weight": 1,
+        "type": "raw_material",
+        "description": "Soft clay soil. Can be smelted into ceramic shards.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": None,
+        "recipe": [{"item": "Clay", "amount": 1}],
+        "crafting_medium": "smelter",
+        "tags": ["material"],
+        "output_amount": 2
+    },
+    {
         "item_name": "Raw Metal",
         "icon": "RawMetal.png",
         "stack_size": 100,
@@ -517,7 +533,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["material", "stick"],
+        "tags": ["material", "stick", "fuel"],
         "output_amount": 1
     },
     {
@@ -1448,7 +1464,7 @@ items_list = [
         "durability": None,
         "recipe": [{"item": "Olives", "amount": 5}, {"item": "Wooden Cup", "amount": 1}],
         "crafting_medium": "mortar_and_pestle",
-        "tags": ["crafted", "material"],
+        "tags": ["crafted", "material", "fuel"],
         "output_amount": 1
     },
     {
@@ -4274,7 +4290,7 @@ items_list = [
         "durability": None,
         "recipe": [{"item": "Olives", "amount": 15}, {"item": "Glass Bottle", "amount": 1}],
         "crafting_medium": "alchemy_bench",
-        "tags": ["crafted", "material"],
+        "tags": ["crafted", "material", "fuel"],
         "output_amount": 1
     },
     {
@@ -4290,7 +4306,7 @@ items_list = [
         "durability": None,
         "recipe": [{"item": "Olives", "amount": 20}, {"item": "Large Metal Canteen", "amount": 1}],
         "crafting_medium": "alchemy_bench",
-        "tags": ["material", "ore"],
+        "tags": ["material", "ore", "fuel"],
         "output_amount": 1
     },
     {
@@ -4858,6 +4874,22 @@ items_list = [
         "output_amount": 1
     },
     {
+        "item_name": "Ceramic Shard",
+        "icon": "CeramicShard.png",
+        "stack_size": 100,
+        "weight": 0.1,
+        "type": "raw_material",
+        "description": "A piece of fired ceramic. Used in pottery crafting.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": None,
+        "tags": ["material", "ceramic"],
+        "output_amount": 1
+    },
+    {
         "item_name": "Ceramic Pot",
         "icon": "CeramicPot.png",
         "stack_size": 100,
@@ -4868,8 +4900,8 @@ items_list = [
         "placeable": True,
         "consumable": False,
         "durability": None,
-        "recipe": [{"item": "Clay", "amount": 4}],
-        "crafting_medium": "smelter",
+        "recipe": [{"item": "Ceramic Shard", "amount": 8}],
+        "crafting_medium": "workbench",
         "tags": ["decoration", "clay"],
         "output_amount": 1
     },
