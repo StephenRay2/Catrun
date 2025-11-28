@@ -459,6 +459,74 @@ def get_footstep_sounds(background):
     else:
         return [f"footstep_grass{i}" for i in range(1, 7)]
 
+def calculate_temperature(current_background, time_of_day, player_swimming=False, player_in_lava=False):
+    if player_in_lava:
+        return 120
+    
+    biome_temperatures = {
+        bg_grass: {"5am": 50, "5pm": 70},
+        bg_dirt: {"5am": 45, "5pm": 65},
+        bg_compact: {"5am": 55, "5pm": 75},
+        bg_sand: {"5am": 50, "5pm": 100},
+        bg_savannah: {"5am": 55, "5pm": 80},
+        bg_riverrock: {"5am": 40, "5pm": 60},
+        bg_bigrock: {"5am": 40, "5pm": 60},
+        bg_duskstone: {"5am": 30, "5pm": 60},
+        bg_lavastone: {"5am": 100, "5pm": 120},
+        bg_blackstone: {"5am": 35, "5pm": 65},
+        bg_redrock: {"5am": 50, "5pm": 70},
+        bg_snow: {"5am": 0, "5pm": 20},
+    }
+    
+    if current_background == bg_lavastone:
+        return 110 + (5 * math.sin(time_of_day * math.pi / 12))
+    
+    if current_background == bg_wasteland:
+        wasteland_base_seed = int(total_elapsed_time / 100.0)
+        random.seed(wasteland_base_seed)
+        base_wasteland_temp = random.randint(10, 110)
+        wasteland_fluctuation = 40 * math.sin((total_elapsed_time / 200.0) * math.pi)
+        temp = base_wasteland_temp + wasteland_fluctuation
+        temp = max(10, min(110, temp))
+        if player_swimming:
+            temp -= 30
+        return max(10, min(110, temp))
+    
+    if current_background in biome_temperatures:
+        temp_data = biome_temperatures[current_background]
+        am_temp = temp_data["5am"]
+        pm_temp = temp_data["5pm"]
+    else:
+        am_temp = 55
+        pm_temp = 65
+    
+    hour_normalized = (time_of_day % 24)
+    
+    if 5 <= hour_normalized < 17:
+        progress = (hour_normalized - 5) / 12
+        temp = am_temp + (pm_temp - am_temp) * progress
+    else:
+        if hour_normalized >= 17:
+            hours_into_cooling = hour_normalized - 17
+        else:
+            hours_into_cooling = (24 - 17) + hour_normalized
+        progress = hours_into_cooling / 12
+        temp = pm_temp + (am_temp - pm_temp) * progress
+    
+    if player_swimming:
+        temp -= 30
+    
+    return max(0, min(120, temp))
+
+def get_temperature_gauge_index(temperature):
+    gauge_index = int((temperature / 120) * 7)
+    return max(0, min(6, gauge_index))
+
+def draw_temperature_gauge(screen, current_temperature, gauge_index):
+    from buttons import temperature_gauges
+    gauge_image = temperature_gauges[gauge_index]
+    screen.blit(gauge_image, (20, height - 84))
+
 # Placement system functions
 def start_placement(item_data):
     """Start placement mode for a placeable item"""
@@ -2798,6 +2866,11 @@ while running:
         time_surface.fill((0, 0, 0, 100))
         screen.blit(time_surface, (time_rect.x + 8, time_rect.y + 22))
         screen.blit(time_text, (time_rect.x + 13, time_rect.y + 27))
+
+        current_bg = get_current_background(player_world_x, tiles)
+        current_temperature = calculate_temperature(current_bg, time_of_day, player.swimming, player.in_lava)
+        gauge_idx = get_temperature_gauge_index(current_temperature)
+        draw_temperature_gauge(screen, current_temperature, gauge_idx)
 
         if crafting_bench_in_use:
             crafting_bench.draw(screen)

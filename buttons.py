@@ -82,4 +82,9 @@ crafting_tab_unused = Button(width // 2 - 397, height // 2 - 303, crafting_tab_u
 level_up_tab_unused = Button(width // 2 - 261, height // 2 - 303, level_up_tab_unused)
 cats_tab_unused = Button(width // 2 - 125, height // 2 - 303, cats_tab_unused)
 
+temperature_gauges = []
+for i in range(1, 8):
+    gauge_image = pygame.image.load(f"assets/sprites/buttons/TemperatureGuage{i}.png").convert_alpha()
+    gauge_image = pygame.transform.scale(gauge_image, (64, 64))
+    temperature_gauges.append(gauge_image)
 

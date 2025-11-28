@@ -5898,7 +5898,7 @@ class Inventory():
             },
             {
                 "key": "weather",
-                "label": "Weather Res",
+                "label": "Temp Resist",
                 "base": int(player.heat_resistance),
                 "preview": int(round((player.weather_resistance_leveler + 0.1) * 100))
             },
