@@ -500,7 +500,7 @@ items_list = [
         "consumable": False,
         "durability": None,
         "recipe": [{"item": "Clay", "amount": 1}],
-        "crafting_medium": "smelter",
+        "crafting_medium": None,
         "tags": ["material"],
         "output_amount": 2
     },
@@ -4884,10 +4884,10 @@ items_list = [
         "placeable": False,
         "consumable": False,
         "durability": None,
-        "recipe": None,
-        "crafting_medium": None,
+        "recipe": [{"item": "Clay", "amount": 1}],
+        "crafting_medium": "smelter",
         "tags": ["material", "ceramic"],
-        "output_amount": 1
+        "output_amount": 4
     },
     {
         "item_name": "Ceramic Pot",

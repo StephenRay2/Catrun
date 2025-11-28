@@ -52,14 +52,14 @@ class Smelter:
         self.fuel_burn_remaining = 0.0
         self.current_fuel_name = None
         self.fuel_burn_times = {
-            "Sticks": 5.0,
-            "Fir Wood": 10.0,
-            "Apple Wood": 12.0,
-            "Dusk Wood": 14.0,
-            "Oak Wood": 16.0,
-            "Small Olive Oil": 18.0,
-            "Medium Glass Olive Oil": 28.0,
-            "Large Metal Olive Oil": 36.0
+            "Sticks": 10.0,
+            "Fir Wood": 20.0,
+            "Apple Wood": 20.0,
+            "Dusk Wood": 20.0,
+            "Oak Wood": 20.0,
+            "Small Olive Oil": 15.0,
+            "Medium Glass Olive Oil": 30.0,
+            "Large Metal Olive Oil": 45.0
         }
         self.default_fuel_time = 12.0
         

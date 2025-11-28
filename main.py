@@ -1300,7 +1300,8 @@ while running:
                 
                 if crafting_bench_in_use:
                     crafting_bench.handle_key_event(event)
-                if smelter_in_use:
+                # Allow exiting smelter with E or ESC even while UI is open
+                if smelter_in_use and event.key not in (pygame.K_e, pygame.K_ESCAPE):
                     continue
 
                 if event.key == pygame.K_f and not inventory_in_use and not crafting_bench_in_use and player.is_alive:
@@ -1525,8 +1526,32 @@ while running:
                                         sound_manager.play_sound(random.choice([f"consume_item{i}" for i in range(1, 7)]))
                                     elif any(tag in tags for tag in ["liquid", "consumable"]):
                                         sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
+                
+                throw_charge_start = None
+
+            # Smelter UI drag handling
+            if smelter_in_use:
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    mouse_pos = pygame.mouse.get_pos()
+                    slot_info = smelter.get_slot_at_mouse(mouse_pos, screen)
+                    slot_index, slot_type = slot_info
                     
-                    throw_charge_start = None
+                    if hasattr(smelter, 'button_rect') and smelter.button_rect.collidepoint(mouse_pos):
+                        smelter.toggle_fire()
+                    elif slot_index is not None:
+                        if smelter.dragging:
+                            smelter.end_drag(slot_info)
+                        else:
+                            smelter.start_drag(slot_info)
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    if smelter.dragging:
+                        mouse_pos = pygame.mouse.get_pos()
+                        slot_info = smelter.get_slot_at_mouse(mouse_pos, screen)
+                        slot_index, slot_type = slot_info
+                        if slot_index is not None:
+                            smelter.end_drag(slot_info)
+                        else:
+                            smelter.cancel_drag()
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not smelter_in_use:
                 mouse_pos = pygame.mouse.get_pos()
@@ -2885,31 +2910,8 @@ while running:
             screen.blit(full_text, (x, y))
             inventory.inventory_full_message_timer -= dt
 
-
-
-            if smelter_in_use:
-                smelter.render(screen)
-                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    mouse_pos = pygame.mouse.get_pos()
-                    slot_info = smelter.get_slot_at_mouse(mouse_pos, screen)
-                    slot_index, slot_type = slot_info
-                    
-                    if hasattr(smelter, 'button_rect') and smelter.button_rect.collidepoint(mouse_pos):
-                        smelter.toggle_fire()
-                    elif slot_index is not None:
-                        if smelter.dragging:
-                            smelter.end_drag(slot_info)
-                        else:
-                            smelter.start_drag(slot_info)
-                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                    if smelter.dragging:
-                        mouse_pos = pygame.mouse.get_pos()
-                        slot_info = smelter.get_slot_at_mouse(mouse_pos, screen)
-                        slot_index, slot_type = slot_info
-                        if slot_index is not None:
-                            smelter.end_drag(slot_info)
-                        else:
-                            smelter.cancel_drag()
+        if smelter_in_use:
+            smelter.render(screen)
 
         if inventory_in_use:
 
