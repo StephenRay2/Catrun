@@ -641,6 +641,95 @@ def add_collection_message(resource_name, count):
     
     collection_messages.insert(0, [text_surface, bg_surface, rect, 3.0, 3.0])
 
+def get_selected_hotbar_item():
+    """Return the item currently selected in the hotbar, if any."""
+    selected_slot = inventory.selected_hotbar_slot
+    if 0 <= selected_slot < len(inventory.hotbar_slots):
+        return inventory.hotbar_slots[selected_slot]
+    return None
+
+def is_pickaxe_item(item):
+    """Check if the given inventory item is any type of pickaxe."""
+    if not item:
+        return False
+    item_name = item.get("item_name", "").lower()
+    tags = item.get("tags", [])
+    return "pickaxe" in item_name or ("mining" in tags)
+
+def is_axe_item(item):
+    """Check if the given inventory item is any type of axe (not pickaxe)."""
+    if not item:
+        return False
+    item_name = item.get("item_name", "").lower()
+    return "axe" in item_name and "pickaxe" not in item_name
+
+def get_tool_tier(item):
+    """Return a normalized tier name for resource multipliers."""
+    if not item:
+        return None
+    name = item.get("item_name", "").lower()
+    if "dragon" in name:
+        return "dragon"
+    if "obsidian" in name:
+        return "obsidian"
+    if "metal" in name:
+        return "metal"
+    if "gold" in name:
+        return "gold"
+    if "stone" in name:
+        return "stone"
+    if "wood" in name:
+        return "wood"
+    if "bone" in name:
+        return "bone"
+    return None
+
+tool_multipliers = {
+    "wood": {"normal": 1, "special": 1},
+    "stone": {"normal": 2, "special": 2},
+    "metal": {"normal": 3, "special": 3},
+    "gold": {"normal": 1, "special": 6},
+    "bone": {"normal": 6, "special": 1},
+    "obsidian": {"normal": 4, "special": 4},
+    "dragon": {"normal": 8, "special": 8},
+}
+
+special_resources = {"Flint", "Raw Metal", "Raw Gold"}
+mining_resources = {"Stone", "Flint", "Raw Metal", "Raw Gold"}
+
+def is_wood_resource(resource_name):
+    lower_name = resource_name.lower()
+    return "wood" in lower_name or resource_name == "Sticks"
+
+def adjust_resources_with_tool(resources, tool_item):
+    """Apply resource multipliers based on the equipped pickaxe/axe."""
+    if not resources or not tool_item:
+        return resources
+    tier = get_tool_tier(tool_item)
+    if not tier or tier not in tool_multipliers:
+        return resources
+    is_pickaxe = is_pickaxe_item(tool_item)
+    is_axe = is_axe_item(tool_item)
+    if not (is_pickaxe or is_axe):
+        return resources
+
+    adjusted = []
+    for res in resources:
+        res_name = res if isinstance(res, str) else str(res)
+        # Enforce tool applicability by resource family.
+        if is_pickaxe and res_name not in mining_resources:
+            adjusted.append(res_name)
+            continue
+        if is_axe and not is_wood_resource(res_name):
+            adjusted.append(res_name)
+            continue
+
+        is_special = res_name in special_resources
+        mult = tool_multipliers.get(tier, {"normal": 1, "special": 1})
+        factor = mult["special"] if is_special else mult["normal"]
+        adjusted.extend([res_name] * max(1, factor))
+    return adjusted
+
 def calculate_held_item_offset(base_offset, frame_index, num_frames, direction, is_attacking, is_moving):
     if is_attacking:
         return calculate_attack_arc_offset(base_offset, frame_index, num_frames, direction)
@@ -1539,6 +1628,8 @@ while running:
     
         if not paused and not inventory_in_use and not smelter_in_use and not crafting_bench_in_use and naming_cat is None and pygame.mouse.get_pressed()[0] and not player.exhausted:
             if current_time - harvest_cooldown > harvest_delay:
+                held_item = get_selected_hotbar_item()
+                has_pickaxe_equipped = is_pickaxe_item(held_item)
                 for obj in visible_objects:
                     if hasattr(obj, 'harvest') and hasattr(obj, 'destroyed') and not obj.destroyed:
                         
@@ -1562,7 +1653,10 @@ while running:
                             facing_object = True
                             
                         if facing_object:
+                            if getattr(obj, "resource", None) == "Stone" and not has_pickaxe_equipped:
+                                continue
                             resource = obj.harvest(player)
+                            resource = adjust_resources_with_tool(resource, held_item)
                             if resource:
                                 if hasattr(obj, 'resource'):
                                     if obj.resource == "Stone":

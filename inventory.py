@@ -1418,7 +1418,20 @@ items_list = [
         "recipe": [{"item": "Empty Oil Lamp", "amount": 1}, {"item_tag": "oil", "amount": 1}],
         "crafting_medium": "hand",
         "tags": ["tool"],
-        "output_amount": 1
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "OilLamp1.png",
+            "right": "OilLamp1.png",
+            "up": "OilLamp1.png",
+            "down": "OilLamp1.png"
+        },
+        "held_item_offset": {
+            "left": (5, 18),
+            "right": (15, 18),
+            "up": (13, 10),
+            "down": (0, 18)
+        },
+        **get_weapon_animation_data()
     },
 
     # Crafted Items at Mortar and Pestle
@@ -1935,7 +1948,20 @@ items_list = [
         "recipe": [{"item": "Metal Ingot", "amount": 4}, {"item": "Glass", "amount": 4}, {"item": "Torch", "amount": 1}],
         "crafting_medium": "workbench",
         "tags": ["tool"],
-        "output_amount": 1
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "Lantern1.png",
+            "right": "Lantern1.png",
+            "up": "Lantern1.png",
+            "down": "Lantern1.png"
+        },
+        "held_item_offset": {
+            "left": (5, 18),
+            "right": (15, 18),
+            "up": (13, 10),
+            "down": (0, 18)
+        },
+        **get_weapon_animation_data()
     },
     {
         "item_name": "Mortar And Pestle",
@@ -5101,7 +5127,20 @@ items_list = [
         "recipe": [{"item": "Metal Ingot", "amount": 5}, {"item": "Sticks", "amount": 4}],
         "crafting_medium": "workbench",
         "tags": ["tool", "farming"],
-        "output_amount": 1
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "MetalHoeRightHeld.png",
+            "right": "MetalHoeRightHeld.png",
+            "up": "MetalHoeUpHeld.png",
+            "down": "MetalHoeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
     },
     {
         "item_name": "Metal Ladder",
@@ -5133,7 +5172,20 @@ items_list = [
         "recipe": [{"item": "Metal Ingot", "amount": 8}, {"item": "Sticks", "amount": 4}],
         "crafting_medium": "workbench",
         "tags": ["weapon", "melee"],
-        "output_amount": 1
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "MetalMaceRightHeld.png",
+            "right": "MetalMaceRightHeld.png",
+            "up": "MetalMaceUpHeld.png",
+            "down": "MetalMaceDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
     },
     {
         "item_name": "Metal Pickaxe",
@@ -5149,7 +5201,20 @@ items_list = [
         "recipe": [{"item": "Metal Ingot", "amount": 8}, {"item": "Sticks", "amount": 4}],
         "crafting_medium": "workbench",
         "tags": ["tool", "mining"],
-        "output_amount": 1
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "MetalPickaxeRightHeld.png",
+            "right": "MetalPickaxeRightHeld.png",
+            "up": "MetalPickaxeUpHeld.png",
+            "down": "MetalPickaxeDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
     },
     {
         "item_name": "Metal Shovel",
@@ -5165,7 +5230,20 @@ items_list = [
         "recipe": [{"item": "Metal Ingot", "amount": 6}, {"item": "Sticks", "amount": 4}],
         "crafting_medium": "workbench",
         "tags": ["tool", "digging"],
-        "output_amount": 1
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "MetalShovelRightHeld.png",
+            "right": "MetalShovelRightHeld.png",
+            "up": "MetalShovelUpHeld.png",
+            "down": "MetalShovelDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
     },
     {
         "item_name": "Metal Spear",
@@ -5181,7 +5259,20 @@ items_list = [
         "recipe": [{"item": "Metal Ingot", "amount": 4}, {"item": "Sticks", "amount": 10}, {"item": "Twine", "amount": 2}],
         "crafting_medium": "workbench",
         "tags": ["weapon", "melee"],
-        "output_amount": 1
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "MetalSpearRightHeld.png",
+            "right": "MetalSpearRightHeld.png",
+            "up": "MetalSpearUpHeld.png",
+            "down": "MetalSpearDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 20),
+            "right": (15, 20),
+            "up": (13, 19),
+            "down": (0, 19)
+        },
+        **get_weapon_animation_data()
     },
     {
         "item_name": "Metal Stairs",
@@ -5213,7 +5304,20 @@ items_list = [
         "recipe": [{"item": "Metal Ingot", "amount": 12}, {"item": "Sticks", "amount": 2}, {"item": "Hide", "amount": 2}],
         "crafting_medium": "workbench",
         "tags": ["weapon", "melee"],
-        "output_amount": 1
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "MetalSwordRightHeld.png",
+            "right": "MetalSwordRightHeld.png",
+            "up": "MetalSwordUpHeld.png",
+            "down": "MetalSwordDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (3, 22),
+            "right": (17, 22),
+            "up": (12, 21),
+            "down": (1, 21)
+        },
+        **get_weapon_animation_data()
     },
     {
         "item_name": "Milk Bucket",
@@ -5389,7 +5493,20 @@ items_list = [
         "recipe": [{"item": "Wooden Club", "amount": 1}, {"item": "Metal Nail", "amount": 10}],
         "crafting_medium": "workbench",
         "tags": ["weapon", "melee"],
-        "output_amount": 1
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "SpikedWoodenClubRightHeld.png",
+            "right": "SpikedWoodenClubRightHeld.png",
+            "up": "SpikedWoodenClubUpHeld.png",
+            "down": "SpikedWoodenClubDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
     },
     {
         "item_name": "Stone Floor",
@@ -5565,7 +5682,20 @@ items_list = [
         "recipe": [{"item_tag": "wood", "amount": 12}],
         "crafting_medium": "hand",
         "tags": ["weapon", "melee"],
-        "output_amount": 1
+        "output_amount": 1,
+        "held_item_frames": {
+            "left": "WoodenClubRightHeld.png",
+            "right": "WoodenClubRightHeld.png",
+            "up": "WoodenClubUpHeld.png",
+            "down": "WoodenClubDownHeld.png"
+        },
+        "held_item_offset": {
+            "left": (5, 21),
+            "right": (15, 21),
+            "up": (13, 20),
+            "down": (0, 20)
+        },
+        **get_weapon_animation_data()
     },
     {
         "item_name": "Wooden Crossbow",
