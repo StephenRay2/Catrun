@@ -726,6 +726,7 @@ class Collectible(pygame.sprite.Sprite):
 
 class DroppedItem(Collectible):
     ICON_SIZE = 16
+    DESPAWN_TIME = 180.0
     drop_font = pygame.font.SysFont(None, 18)
 
     def __init__(self, x, y, resource, icon_path, amount=1):
@@ -742,6 +743,7 @@ class DroppedItem(Collectible):
         super().__init__(int(x), int(y), icon_path or "", resource, size=size, image_surface=image_surface)
         self.amount = max(1, int(amount))
         self._float_phase = random.random() * math.tau
+        self.age = 0.0
 
     def draw(self, screen, cam_x):
         if self.destroyed:
@@ -767,6 +769,13 @@ class DroppedItem(Collectible):
             text_y = self.rect.y + self.rect.height - qty_text.get_height() - 4 + offset_y
             screen.blit(shadow, (text_x + 1, text_y + 1))
             screen.blit(qty_text, (text_x, text_y))
+
+    def update_lifetime(self, dt):
+        if self.destroyed:
+            return
+        self.age += dt
+        if self.age >= self.DESPAWN_TIME:
+            self.destroyed = True
 
 class Stick(Collectible):
     def __init__(self, x, y):
