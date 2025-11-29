@@ -1193,6 +1193,8 @@ while running:
             time_of_day = (12 + (total_elapsed_time / 60)) % 24
             # Update crafting flash
             inventory.update_flash(dt)
+            for dropped in list(dropped_items):
+                dropped.update_lifetime(dt)
             if smelter:
                 smelter.update(dt)
             if campfire:
