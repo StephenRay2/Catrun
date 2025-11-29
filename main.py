@@ -1,5 +1,6 @@
 import pygame
 import math
+import random
 pygame.init()
 from buttons import *
 from mob_placement import *
@@ -406,6 +407,7 @@ def spawn_thrown_item(x, y, vel_x, vel_y, item_data, is_cat=False, throw_power=1
     sprite = None
     sprite_size = 64 if is_cat else 32  # Cats are 64x64, regular items are 32x32
     cache_key = f"{item_data.get('icon', 'unknown')}_{sprite_size}" if item_data else None
+    cat_payload = dict(item_data) if is_cat and item_data else None
     
     if item_data and "icon" in item_data:
         icon_name = item_data["icon"]
@@ -447,10 +449,38 @@ def spawn_thrown_item(x, y, vel_x, vel_y, item_data, is_cat=False, throw_power=1
         "sprite": sprite,
         "sprite_size": sprite_size,
         "is_cat": is_cat,
-        "cat_data": item_data if is_cat else None,
+        "cat_data": cat_payload if is_cat else None,
         "landed": False  # Track if item has landed
     }
     thrown_items.append(thrown_item)
+
+def build_cat_from_item(cat_data, x, y):
+    """Recreate a cat mob from inventory item data when the cat object is missing."""
+    cat_type_key = cat_data.get("cat_type")
+    cat_type_data = next((ct for ct in cat_types if ct.get("type") == cat_type_key), random.choice(cat_types))
+    
+    cat = Cat(x, y, "Cat")
+    
+    if cat_type_data and cat.cat_type != cat_type_data:
+        cat.cat_type = cat_type_data
+        cat.walk_right_images = [pygame.image.load(cat.cat_type[f"walk_right_image{i}"]).convert_alpha() for i in range(1, 6)]
+        cat.stand_right_image = pygame.image.load(cat.cat_type["stand_right_image"]).convert_alpha()
+        cat.walk_left_images = [pygame.transform.flip(img, True, False) for img in cat.walk_right_images]
+        cat.stand_left_image = pygame.transform.flip(cat.stand_right_image, True, False)
+        cat.dead_cat_right_image = pygame.image.load(cat.cat_type["dead_image"]).convert_alpha()
+        cat.dead_cat_left_image = pygame.transform.flip(cat.dead_cat_right_image, True, False)
+        cat.image = cat.stand_right_image
+        cat.rect = cat.image.get_rect(center=(x, y))
+    else:
+        cat.rect.center = (x, y)
+    
+    cat.cat_name = cat_data.get("cat_name")
+    cat.tame = cat_data.get("cat_tame", cat.tame)
+    cat.tamed = True
+    cat.just_tamed = False
+    cat.level = cat_data.get("cat_level", cat.level)
+    cat.health = min(cat_data.get("cat_health", cat.health), cat.max_health)
+    return cat
 
 def resolve_item_icon_path(item_data):
     if not item_data:
@@ -2129,12 +2159,17 @@ while running:
                     # If it's a cat, add it back to the world
                     if thrown["is_cat"]:
                         cat_data = thrown["cat_data"]
-                        if cat_data and "cat_object" in cat_data:
-                            cat_obj = cat_data["cat_object"]
-                            cat_obj.rect.centerx = int(thrown["x"])
-                            cat_obj.rect.centery = int(thrown["y"])
-                            cat_obj.destroyed = False
-                            cats.append(cat_obj)
+                        if cat_data:
+                            cat_obj = cat_data.get("cat_object")
+                            if cat_obj is None:
+                                cat_obj = build_cat_from_item(cat_data, int(thrown["x"]), int(thrown["y"]))
+                                cat_data["cat_object"] = cat_obj
+                            if cat_obj:
+                                cat_obj.rect.centerx = int(thrown["x"])
+                                cat_obj.rect.centery = int(thrown["y"])
+                                cat_obj.destroyed = False
+                                cat_obj.placement_time = pygame.time.get_ticks()
+                                cats.append(cat_obj)
                         thrown_items.remove(thrown)
                     # For regular items, convert to world item
                     else:
