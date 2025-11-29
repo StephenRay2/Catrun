@@ -331,8 +331,8 @@ class Player(pygame.sprite.Sprite):
         self.lava_damage_timer = 0
         self.current_liquid = None
 
-    def attacking(self, nearby_mobs, player_world_x, player_world_y):
-        if pygame.mouse.get_pressed()[0] and not self.exhausted:
+    def attacking(self, nearby_mobs, player_world_x, player_world_y, mouse_over_hotbar=False):
+        if pygame.mouse.get_pressed()[0] and not self.exhausted and not mouse_over_hotbar:
             current_time = pygame.time.get_ticks()
             if current_time - self.attack_cooldown > self.attack_delay:
                 self.attack_cooldown = current_time
@@ -850,6 +850,8 @@ class Mob(pygame.sprite.Sprite):
         self.speed = 1
         self.level = 1
         self.death_experience = 50
+        self.death_time = None
+        self.harvest_grace_ms = 200
         
         self.swimming = False
         self.in_lava = False
@@ -1053,10 +1055,21 @@ class Mob(pygame.sprite.Sprite):
         self.last_health = self.health
 
         if self.health <= 0:
+            if self.is_alive:
+                self.death_time = pygame.time.get_ticks()
+            elif self.death_time is None:
+                self.death_time = pygame.time.get_ticks()
             self.is_alive = False
 
     def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
         if not self.destroyed and not self.is_alive:
+            # Small buffer after death before harvesting is allowed
+            if self.death_time is None:
+                self.death_time = pygame.time.get_ticks()
+            elapsed = pygame.time.get_ticks() - self.death_time
+            if elapsed < self.harvest_grace_ms:
+                return []
+
             resources = []
 
             # Get primary resource (hide/meat) - scale modestly with strength level, not raw attack damage
@@ -2228,7 +2241,7 @@ class BlackBear(AggressiveMob):
         self.speed = 1
         self.full_health = 220 + (random.randint(7, 13) * self.level)
         self.health = self.full_health
-        self.meat_resource = "Bear Meat"
+        self.meat_resource = "Raw Bear Meat"
         self.special_drops = [{'item': 'Fur', 'chance': 0.6, 'min': 2, 'max': 4}]
         self.resource_amount = 8
         self.death_experience = 600  * (1 + (self.level * self.death_experience * .0001))
@@ -2433,7 +2446,7 @@ class BrownBear(AggressiveMob):
         self.speed = 1
         self.full_health = 300 + (random.randint(8, 20) * self.level)
         self.health = self.full_health
-        self.meat_resource = "Bear Meat"
+        self.meat_resource = "Raw Bear Meat"
         self.special_drops = [{'item': 'Fur', 'chance': 0.6, 'min': 2, 'max': 4}]
         self.resource_amount = 8
         

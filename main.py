@@ -39,6 +39,8 @@ cat_name_input = ""
 
 paused = False
 inventory_in_use = False
+mouse_attack_blocked = False
+mouse_attack_block_expires = 0
 debug_step_mode = False
 debug_should_step_frame = False
 
@@ -59,7 +61,7 @@ throw_charge_start = None
 max_throw_charge = 1.0
 min_throw_power = 2
 max_throw_power = 8
-min_throw_hold_time = 0.15  # Minimum hold time (in seconds) to trigger throw instead of pickup
+min_throw_hold_time = 0.2  # Minimum hold time (in seconds) to trigger throw instead of pickup
 thrown_items = []
 loaded_item_sprites = {}  # Cache for loaded item sprites
 
@@ -1207,6 +1209,12 @@ while running:
         
         if game_just_started:
             generate_world()
+            total_elapsed_time = 0
+            time_of_day = 12.0
+            stamina_depleted_message_timer = 0
+            need_pickaxe_message_timer = 0
+            player.full_timer = 60
+            player.thirst_full_timer = 60
             cats.clear()
             squirrels.clear()
             cows.clear()
@@ -1412,11 +1420,21 @@ while running:
             thrown_items = []
 
             inventory.state = "inventory"
+            starter_items = [
+                "Smelter",
+                "Waterskin",
+                "Workbench",
+                "Campfire",
+                "Fire Dragon Scale Sword",
+                "Fire Dragon Scale Axe"
+            ]
+            inventory.add(starter_items)
 
             game_just_started = False 
         
         player_world_x = player_pos.x + cam_x
         player_world_y = player_pos.y
+        inventory.ui_open = inventory_in_use or campfire_in_use or smelter_in_use or crafting_bench_in_use or inventory.drop_menu_active
         
         player_speed = player.get_speed()
         if player.swimming:
@@ -1466,6 +1484,7 @@ while running:
                             paused = not paused
                     elif inventory_in_use:
                         inventory_in_use = False
+                        inventory.ui_open = False
                         inventory.selection_mode = "hotbar"
                         inventory.selected_inventory_slot = None
                         inventory.close_drop_menu()
@@ -1479,29 +1498,93 @@ while running:
                     continue
 
                 if event.key == pygame.K_f and not inventory_in_use and not crafting_bench_in_use and player.is_alive:
-                    success, tags = inventory.consume_item()
-                    if success:
-                        if "food" in tags:
-                            sound_manager.play_sound(random.choice([f"consume_item{i}" for i in range(1, 7)]))
-                        elif any(tag in tags for tag in ["liquid", "consumable"]):
+                    drank_water = False
+                    if player.swimming and player.current_liquid and not player.in_lava:
+                        if getattr(player.current_liquid, "liquid_type", "") == "water":
+                            player.thirst = player.max_thirst
+                            player.thirst_full_timer = getattr(player, "thirst_full_timer", 60)
                             sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
+                            drank_water = True
+                    if not drank_water:
+                        success, tags = inventory.consume_item()
+                        if success:
+                            if "food" in tags:
+                                sound_manager.play_sound(random.choice([f"consume_item{i}" for i in range(1, 7)]))
+                            elif any(tag in tags for tag in ["liquid", "consumable"]):
+                                sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
 
                 if event.key == pygame.K_q and not crafting_bench_in_use and not smelter_in_use and not campfire_in_use:
                     inventory_in_use = not inventory_in_use
+                    inventory.ui_open = inventory_in_use
                     if not inventory_in_use:
                         inventory.selection_mode = "hotbar"
                         inventory.selected_inventory_slot = None
                         inventory.close_drop_menu()
                 
                 if event.key == pygame.K_r and player.is_alive:
-                    drop_result = inventory.remove_selected_quantity(1)
-                    if drop_result:
-                        process_drop_result(drop_result)
+                    selected_slot = None
+                    selected_index = None
+                    slot_is_hotbar = False
+                    if inventory.selection_mode == "hotbar":
+                        selected_index = inventory.selected_hotbar_slot
+                        selected_slot = inventory.hotbar_slots[selected_index]
+                        slot_is_hotbar = True
+                    elif inventory.selection_mode == "inventory" and inventory.selected_inventory_slot is not None:
+                        selected_index = inventory.selected_inventory_slot
+                        selected_slot = inventory.inventory_list[selected_index]
+                    
+                    is_cat_slot = selected_slot is not None and ("cat_object" in selected_slot or "cat_type" in selected_slot)
+                    if is_cat_slot and selected_index is not None:
+                        cat_obj = selected_slot.get("cat_object")
+                        if cat_obj is None and "cat_type" in selected_slot:
+                            cat_obj = build_cat_from_item(selected_slot, player_world_x, player_world_y)
+                            selected_slot["cat_object"] = cat_obj
+                        if cat_obj:
+                            placement_distance = 50
+                            if player.last_direction == "right":
+                                place_x = player_world_x + placement_distance
+                                place_y = player_world_y
+                            elif player.last_direction == "left":
+                                place_x = player_world_x - placement_distance
+                                place_y = player_world_y
+                            elif player.last_direction == "up":
+                                place_x = player_world_x
+                                place_y = player_world_y - placement_distance
+                            else:
+                                place_x = player_world_x
+                                place_y = player_world_y + placement_distance
+
+                            cat_obj.rect.centerx = place_x
+                            cat_obj.rect.centery = place_y
+                            cat_obj.placement_time = pygame.time.get_ticks()
+                            cat_obj.destroyed = False
+                            if cat_obj not in cats:
+                                cats.append(cat_obj)
+
+                            if "quantity" in selected_slot:
+                                selected_slot["quantity"] -= 1
+                                if selected_slot["quantity"] <= 0:
+                                    if slot_is_hotbar:
+                                        inventory.hotbar_slots[selected_index] = None
+                                    else:
+                                        inventory.inventory_list[selected_index] = None
+                            else:
+                                if slot_is_hotbar:
+                                    inventory.hotbar_slots[selected_index] = None
+                                else:
+                                    inventory.inventory_list[selected_index] = None
+                            inventory.recalc_weight()
+                            sound_manager.play_sound(random.choice(["cat_meow1", "cat_meow2", "cat_meow3"]))
+                    else:
+                        drop_result = inventory.remove_selected_quantity(1)
+                        if drop_result:
+                            process_drop_result(drop_result)
                     inventory.close_drop_menu()
                 
                 if inventory_in_use and player.is_alive:
                     if event.key == pygame.K_ESCAPE:
                         inventory_in_use = False
+                        inventory.ui_open = False
                         inventory.selection_mode = "hotbar"
                         inventory.selected_inventory_slot = None
                         inventory.close_drop_menu()
@@ -1514,12 +1597,43 @@ while running:
                 if inventory.drop_menu_active:
                     continue
 
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3 and inventory_in_use and inventory.state == "inventory":
-                mouse_pos = pygame.mouse.get_pos()
-                if inventory.handle_drop_right_click(mouse_pos, screen):
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+                ui_context_open = inventory_in_use or campfire_in_use or smelter_in_use or crafting_bench_in_use
+                if ui_context_open:
+                    mouse_pos = pygame.mouse.get_pos()
+                    
+                    if inventory_in_use:
+                        slot_index, is_hotbar = inventory.get_slot_at_mouse(mouse_pos, screen)
+                        if slot_index is not None and inventory.handle_drop_right_click(mouse_pos, screen):
+                            continue
+                    elif smelter_in_use:
+                        slot_info = smelter.get_slot_at_mouse(mouse_pos, screen)
+                        slot_index, slot_type = slot_info
+                        if slot_index is not None:
+                            if slot_type in ["inventory", "hotbar"]:
+                                is_hotbar = (slot_type == "hotbar")
+                                if inventory.open_drop_menu(slot_index, is_hotbar, mouse_pos):
+                                    continue
+                            elif smelter.open_drop_menu(slot_index, slot_type, mouse_pos):
+                                continue
+                    elif campfire_in_use:
+                        slot_info = campfire.get_slot_at_mouse(mouse_pos, screen)
+                        slot_index, slot_type = slot_info
+                        if slot_index is not None:
+                            if slot_type in ["inventory", "hotbar"]:
+                                is_hotbar = (slot_type == "hotbar")
+                                if inventory.open_drop_menu(slot_index, is_hotbar, mouse_pos):
+                                    continue
+                            elif campfire.open_drop_menu(slot_index, slot_type, mouse_pos):
+                                continue
+                    elif crafting_bench_in_use:
+                        slot_index, is_hotbar = crafting_bench.get_slot_at_mouse(mouse_pos, screen)
+                        if slot_index is not None:
+                            if crafting_bench.open_drop_menu(slot_index, is_hotbar, mouse_pos):
+                                continue
+                    
+                    inventory.close_drop_menu()
                     continue
-                inventory.close_drop_menu()
-                continue
 
             # Placement system - toggle placement mode with right-click
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3 and player.is_alive and not crafting_bench_in_use and not smelter_in_use and not campfire_in_use and not inventory_in_use:
@@ -1774,11 +1888,32 @@ while running:
                         else:
                             smelter.cancel_drag()
 
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not smelter_in_use and not campfire_in_use:
+            # Crafting bench drag handling
+            if crafting_bench_in_use:
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    mouse_pos = pygame.mouse.get_pos()
+                    slot_index, is_hotbar = crafting_bench.get_slot_at_mouse(mouse_pos, screen)
+                    if slot_index is not None:
+                        if crafting_bench.dragging:
+                            crafting_bench.end_drag(slot_index, is_hotbar)
+                        else:
+                            crafting_bench.start_drag(slot_index, is_hotbar)
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    if crafting_bench.dragging:
+                        mouse_pos = pygame.mouse.get_pos()
+                        slot_index, is_hotbar = crafting_bench.get_slot_at_mouse(mouse_pos, screen)
+                        if slot_index is not None:
+                            crafting_bench.end_drag(slot_index, is_hotbar)
+                        else:
+                            crafting_bench.cancel_drag()
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use:
                 mouse_pos = pygame.mouse.get_pos()
 
                 slot_index, is_hotbar = inventory.get_slot_at_mouse(mouse_pos, screen)
                 if is_hotbar:
+                    mouse_attack_blocked = True
+                    mouse_attack_block_expires = pygame.time.get_ticks() + 200
                     inventory.handle_selection_click(mouse_pos, screen)
                     inventory.start_drag(slot_index, is_hotbar)
 
@@ -1788,11 +1923,15 @@ while running:
                         crafting_time = time.time()
                         inventory.handle_crafting_click(mouse_pos, crafting_time)
                     else:
+                        if slot_index is not None:
+                            mouse_attack_blocked = True
+                            mouse_attack_block_expires = pygame.time.get_ticks() + 200
                         inventory.handle_selection_click(mouse_pos, screen)
                         if slot_index is not None:
                             inventory.start_drag(slot_index, is_hotbar)
 
-            if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and not smelter_in_use and not campfire_in_use:
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use:
+                mouse_attack_blocked = False
                 if placement_mode:
                     # Try to place the item
                     x, y = placement_position
@@ -1991,6 +2130,8 @@ while running:
                             facing_object = True
                         elif player.last_direction == "down" and obj_collision.centery > player_world_y - 10 and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
                             facing_object = True
+                        if player.swimming and player.current_liquid == obj:
+                            facing_object = True
                         
                         if facing_object:
                             held_item = None
@@ -2062,7 +2203,11 @@ while running:
                     state = "menu"
                     paused = False
     
-        if not paused and not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and naming_cat is None and pygame.mouse.get_pressed()[0] and not player.exhausted:
+        mouse_pos = pygame.mouse.get_pos()
+        hotbar_rect = pygame.Rect(width/2 - 257, height - 70, 514, 55)
+        mouse_over_hotbar = hotbar_rect.collidepoint(mouse_pos) if hotbar_rect else False
+        
+        if not paused and not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and naming_cat is None and pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not mouse_over_hotbar:
             if current_time - harvest_cooldown > harvest_delay:
                 held_item = get_selected_hotbar_item()
                 base_attack_val = int(round(player.damage + (player.strength_leveler - 1) * player.strength_level_gain))
@@ -2289,7 +2434,7 @@ while running:
                 for item in items_list:
                     if item["item_name"] == current_hotbar_slot["item_name"] and "held_item_images" in item:
                         # disable attacking while smelter UI is open
-                        is_attacking = pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use and not campfire_in_use
+                        is_attacking = pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not smelter_in_use and not campfire_in_use and not mouse_over_hotbar
                         held_image = item["held_item_images"].get(player.last_direction)
                         
                         if held_image and is_attacking:
@@ -2387,6 +2532,55 @@ while running:
                             screen.blit(held_image, (held_x, held_y))
                         break
 
+        def draw_shadow_for_obj(obj):
+            rect = None
+            if isinstance(obj, dict) and 'rect' in obj:
+                rect = obj['rect']
+            elif hasattr(obj, 'rect'):
+                rect = obj.rect
+            if rect is None:
+                return
+            is_player_obj = obj is player
+            name = getattr(obj, "__class__", type("x", (), {})).__name__ if not isinstance(obj, dict) else obj.get("item_name", "")
+            alpha = 60
+            width_mult = 0.8
+            height_mult = 0.25
+            y_offset = 0
+            # Tweak by type
+            if name == "SavannahGrass":
+                width_mult = 0.55
+                height_mult = 0.25
+                alpha = 40
+            elif name in ("Grass", "Stick", "DroppedItem", "Mushroom"):
+                width_mult = 0.4
+                height_mult = 0.2
+                alpha = 40
+            if name == "Rock":
+                y_offset = 0
+            if name == "Boulder":
+                y_offset = -25
+            if name in ("Squirrel",):
+                width_mult = 0.45
+                height_mult = 0.18
+                alpha = 50
+            if hasattr(obj, "resource") and getattr(obj, "resource", "") == "Willow Wood":
+                y_offset = -rect.height * 0.08
+            if name in ("Crow", "Bird", "Duck"):
+                width_mult = 0.35
+                height_mult = 0.18
+                alpha = 45
+            if is_player_obj:
+                y_offset += rect.height * 0.16
+            shadow_width = max(8, int(rect.width * width_mult))
+            shadow_height = max(4, int(rect.height * height_mult))
+            shadow_surface = pygame.Surface((shadow_width, shadow_height), pygame.SRCALPHA)
+            pygame.draw.ellipse(shadow_surface, (0, 0, 0, alpha), shadow_surface.get_rect())
+            # Player rect is in screen space; other objects need camera offset applied.
+            shadow_x = rect.centerx - shadow_width // 2
+            if not is_player_obj:
+                shadow_x -= cam_x
+            screen.blit(shadow_surface, (shadow_x, rect.bottom - shadow_height // 2 + y_offset))
+
         for obj in visible_objects:
             # Handle both regular objects with rect and placed structures (dictionaries)
             if isinstance(obj, dict) and 'y' in obj:
@@ -2399,7 +2593,8 @@ while running:
                 if player.last_direction in ["left", "up"]:
                     draw_held_item()
                 
-                # Draw player
+                # Draw player (with shadow)
+                draw_shadow_for_obj(player)
                 if player.swimming and player.current_liquid:
                     liquid_center_x = player.current_liquid.rect.centerx
                     liquid_center_y = player.current_liquid.rect.centery
@@ -2423,13 +2618,15 @@ while running:
                     y_offset = sinking_ratio * 4
                     screen.blit(clipped_image, (player_pos.x - size/2, player_pos.y - size/2 + y_offset))
                 else:
-                    screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size/2))
+                    screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size + 20))
                 
                 # Draw axe after for right/down directions (in front of the player)
                 if player.last_direction in ["right", "down"]:
                     draw_held_item()
                 
                 player_drawn = True
+
+            draw_shadow_for_obj(obj)
 
             # Handle drawing of placed structures (dictionaries)
             if isinstance(obj, dict) and 'item_name' in obj:
@@ -2467,6 +2664,7 @@ while running:
             if player.last_direction in ["left", "up"]:
                 draw_held_item()
             
+            draw_shadow_for_obj(player)
             if player.swimming and player.current_liquid:
                 liquid_center_x = player.current_liquid.rect.centerx
                 liquid_center_y = player.current_liquid.rect.centery
@@ -2781,7 +2979,7 @@ while running:
                 mob.keep_in_screen(height)
             player_world_x = player_pos.x + cam_x
             player_world_y = player_pos.y
-            player.attacking(nearby_mobs, player_world_x, player_world_y)
+            player.attacking(nearby_mobs, player_world_x, player_world_y, mouse_over_hotbar)
             for mob in nearby_mobs:
                 mob.handle_health(screen, cam_x, dt)
                 mob.handle_lava_damage(dt)
@@ -2891,7 +3089,7 @@ while running:
 
             if not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and naming_cat is None:
 
-                if (((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]) and (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT])) or pygame.mouse.get_pressed()[0]) and not player.exhausted:
+                if (((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]) and (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT])) or (pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not mouse_over_hotbar)) and not player.exhausted:
                     if player.lose_stamina(screen, dt):
                         stamina_depleted_message_timer = 2.0
                     player.stamina_speed()
@@ -2922,7 +3120,7 @@ while running:
 
                 if not is_moving:
                     if player.last_direction == "down":
-                        if pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use and not campfire_in_use:
+                        if pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not smelter_in_use and not campfire_in_use and not mouse_over_hotbar:
                             player_animation_timer += dt
                             if player_animation_timer > .07:
                                 player_frame_index = (player_frame_index + 1) % len(player_stand_attack_down_images)
@@ -2935,7 +3133,7 @@ while running:
                                 player_current_image = player_idle_down_images[player_frame_index]
                                 player_animation_timer = 0
                     elif player.last_direction == "up":
-                        if pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use and not campfire_in_use:
+                        if pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not smelter_in_use and not campfire_in_use and not mouse_over_hotbar:
                             player_animation_timer += dt
                             if player_animation_timer > .07:
                                 player_frame_index = (player_frame_index + 1) % len(player_stand_attack_up_images)
@@ -2948,7 +3146,7 @@ while running:
                                 player_current_image = player_idle_up_images[player_frame_index]
                                 player_animation_timer = 0
                     elif player.last_direction == "left":
-                        if pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use and not campfire_in_use:
+                        if pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not smelter_in_use and not campfire_in_use and not mouse_over_hotbar:
                             player_animation_timer += dt
                             if player_animation_timer > .07:
                                 player_frame_index = (player_frame_index + 1) % len(player_stand_attack_left_images)
@@ -2961,7 +3159,7 @@ while running:
                                 player_current_image = player_idle_left_images[player_frame_index]
                                 player_animation_timer = 0
                     elif player.last_direction == "right":
-                        if pygame.mouse.get_pressed()[0] and not player.exhausted and not smelter_in_use and not campfire_in_use:
+                        if pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not smelter_in_use and not campfire_in_use and not mouse_over_hotbar:
                             player_animation_timer += dt
                             if player_animation_timer > .07:
                                 player_frame_index = (player_frame_index + 1) % len(player_stand_attack_right_images)
@@ -2998,7 +3196,7 @@ while running:
 
                 cam_x = int(absolute_cam_x)
 
-                if not crafting_bench_in_use and (keys[pygame.K_d] and pygame.mouse.get_pressed()[0] and not player.exhausted):
+                if not crafting_bench_in_use and (keys[pygame.K_d] and pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not mouse_over_hotbar):
                     player.last_direction = "right"
                     player_animation_timer += dt
                     if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
@@ -3028,7 +3226,7 @@ while running:
                             player_animation_timer = 0
                 
 
-                elif not crafting_bench_in_use and (keys[pygame.K_a] and pygame.mouse.get_pressed()[0] and not player.exhausted):
+                elif not crafting_bench_in_use and (keys[pygame.K_a] and pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not mouse_over_hotbar):
                     player.last_direction = "left"
                     player_animation_timer += dt
                     if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
@@ -3059,7 +3257,7 @@ while running:
                             player_animation_timer = 0
 
 
-                elif not crafting_bench_in_use and (keys[pygame.K_w] and pygame.mouse.get_pressed()[0] and not player.exhausted):
+                elif not crafting_bench_in_use and (keys[pygame.K_w] and pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not mouse_over_hotbar):
                     player.last_direction = "up"
                     player_animation_timer += dt
                     if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
@@ -3090,7 +3288,7 @@ while running:
                 
                 
 
-                elif not crafting_bench_in_use and (keys[pygame.K_s] and pygame.mouse.get_pressed()[0] and not player.exhausted):
+                elif not crafting_bench_in_use and (keys[pygame.K_s] and pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not mouse_over_hotbar):
                     player.last_direction = "down"
                     player_animation_timer += dt
                     if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
@@ -3157,7 +3355,7 @@ while running:
         player.print_score(screen, dungeon_depth_high)
         player.is_dead(screen, dungeon_depth_high)
 
-        if (not ((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]) and (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT])) and not pygame.mouse.get_pressed()[0]) or player.exhausted:
+        if (not ((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]) and (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT])) and ((not pygame.mouse.get_pressed()[0]) or mouse_attack_blocked or pygame.time.get_ticks() < mouse_attack_block_expires)) or player.exhausted:
             player.regain_stamina(dt, screen)
             player.stamina_speed()
             player.lose_thirst(dt)
@@ -3209,6 +3407,8 @@ while running:
                 inventory.draw_items(screen)
                 inventory.draw_hotbar(screen)
                 inventory.draw_drop_menu(screen)
+        elif (campfire_in_use or smelter_in_use) and inventory.drop_menu_active:
+            inventory.draw_drop_menu(screen)
             inventory.draw_dragged_item(screen)
             if inventory_tab_unused.is_clicked(event):
                 inventory.state = "inventory"
@@ -3258,6 +3458,9 @@ while running:
 
         if crafting_bench_in_use:
             crafting_bench.draw(screen)
+            if inventory.drop_menu_active:
+                inventory.draw_drop_menu(screen)
+                inventory.draw_dragged_item(screen)
 
         inventory.draw_hover_tooltip(screen)
 

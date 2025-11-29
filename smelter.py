@@ -492,6 +492,22 @@ class Smelter:
         else:
             self.light_fire()
     
+    def open_drop_menu(self, slot_index, slot_type, mouse_pos):
+        if slot_type == "input":
+            slot = self.input_slots[slot_index] if slot_index < len(self.input_slots) else None
+        elif slot_type == "output":
+            slot = self.output_slots[slot_index] if slot_index < len(self.output_slots) else None
+        elif slot_type == "fuel":
+            slot = self.fuel_slots[slot_index] if slot_index < len(self.fuel_slots) else None
+        else:
+            return False
+        
+        if slot is None or slot.get("quantity", 0) <= 0:
+            return False
+        
+        self.inventory.open_special_menu_drop(slot, "smelter", mouse_pos)
+        return True
+    
     def _get_layout(self, screen):
         screen_width = screen.get_width()
         screen_height = screen.get_height()

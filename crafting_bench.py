@@ -54,6 +54,18 @@ class CraftingBench:
                     recipes.append(item)
                     seen.add(item_name)
         return recipes
+
+    def _select_slot(self, slot_index, is_hotbar):
+        """Keep inventory selection in sync while using the workbench UI."""
+        if slot_index is None:
+            return
+        if is_hotbar:
+            self.inventory.selection_mode = "hotbar"
+            self.inventory.selected_hotbar_slot = slot_index
+            self.inventory.selected_inventory_slot = None
+        else:
+            self.inventory.selection_mode = "inventory"
+            self.inventory.selected_inventory_slot = slot_index
     
     def _can_craft(self, recipe):
         required = recipe.get("recipe", [])
@@ -102,6 +114,10 @@ class CraftingBench:
         return True
     
     def start_drag(self, slot_index, is_hotbar):
+        if slot_index is None:
+            return
+        self.inventory.close_drop_menu()
+        self._select_slot(slot_index, is_hotbar)
         if is_hotbar:
             slot = self.inventory.hotbar_slots[slot_index]
         else:
@@ -117,6 +133,7 @@ class CraftingBench:
                 self.inventory.hotbar_slots[slot_index] = None
             else:
                 self.inventory.inventory_list[slot_index] = None
+            self.inventory.recalc_weight()
     
     def end_drag(self, slot_index, is_hotbar):
         if not self.dragging:
@@ -167,6 +184,7 @@ class CraftingBench:
         self.dragged_item = None
         self.dragged_from_slot = None
         self.dragged_from_hotbar = False
+        self.inventory.recalc_weight()
     
     def cancel_drag(self):
         if not self.dragging:
@@ -181,6 +199,7 @@ class CraftingBench:
         self.dragged_item = None
         self.dragged_from_slot = None
         self.dragged_from_hotbar = False
+        self.inventory.recalc_weight()
     
     def get_slot_at_mouse(self, mouse_pos, screen):
         mouse_x, mouse_y = mouse_pos
@@ -202,9 +221,12 @@ class CraftingBench:
             if x <= mouse_x <= x + slot_size and y <= mouse_y <= y + slot_size:
                 return (i, True)
         
+        # Inventory grid (match draw positions)
         start_x = bg_x + 18
         start_y = bg_y + 44
         columns = 8
+        slot_size = 64
+        gap_size = 4
         
         for slot_index in range(self.inventory.capacity):
             row = slot_index // columns
@@ -229,7 +251,12 @@ class CraftingBench:
         self.workbench_pos = None
         self.selected_recipe = None
         self.crafting_amount_menu = None
+        self.inventory.close_drop_menu()
         self.cancel_drag()
+    
+    def open_drop_menu(self, slot_index, is_hotbar, mouse_pos):
+        self._select_slot(slot_index, is_hotbar)
+        return self.inventory.open_drop_menu(slot_index, is_hotbar, mouse_pos)
     
     def handle_mouse_click(self, mouse_pos, button, screen):
         if not self.active:
@@ -261,11 +288,8 @@ class CraftingBench:
             return
         
         slot_index, is_hotbar = self.get_slot_at_mouse(mouse_pos, screen)
+        # Left-clicking a slot is handled by the main loop drag logic to mirror smelter/campfire.
         if slot_index is not None and button == 1:
-            if self.dragging:
-                self.end_drag(slot_index, is_hotbar)
-            else:
-                self.start_drag(slot_index, is_hotbar)
             return
         
         recipe_idx = self._get_recipe_at_mouse(mouse_pos, screen)
@@ -464,10 +488,11 @@ class CraftingBench:
             y = start_y + row * (slot_size + gap_size - 3)
             
             pygame.draw.rect(screen, (100, 100, 100), (x, y, slot_size, slot_size))
+            is_selected = (self.inventory.selection_mode == "inventory" and self.inventory.selected_inventory_slot == slot_index)
+            border_color = (255, 255, 120) if is_selected else (200, 200, 200)
             if self.dragging and slot_index == self.dragged_from_slot and not self.dragged_from_hotbar:
-                pygame.draw.rect(screen, (150, 150, 150), (x, y, slot_size, slot_size), 2)
-            else:
-                pygame.draw.rect(screen, (200, 200, 200), (x, y, slot_size, slot_size), 2)
+                border_color = (150, 150, 150)
+            pygame.draw.rect(screen, border_color, (x, y, slot_size, slot_size), 2)
             
             if slot is not None:
                 item_name = slot["item_name"]
@@ -514,6 +539,10 @@ class CraftingBench:
 
             x = first_slot_x + slot_index * slot_spacing
             y = slot_y
+
+            is_selected = (self.inventory.selection_mode == "hotbar" and self.inventory.selected_hotbar_slot == slot_index)
+            if is_selected:
+                pygame.draw.rect(screen, (255, 255, 120), (x - 2, y - 2, slot_size + 4, slot_size + 4), 2)
             
             if slot is not None:
                 item_name = slot["item_name"]

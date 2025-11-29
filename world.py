@@ -268,6 +268,8 @@ class Pond(Liquid):
                     return ["Waterbucket"] * resource_collected
                 elif container_name == "Large Metal Canteen":
                     return ["Large Metal Water"] * resource_collected
+                elif container_name == "Waterskin":
+                    return ["Filled Waterskin"] * resource_collected
         return []
 
 class Lavapond(Liquid):

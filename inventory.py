@@ -614,10 +614,10 @@ items_list = [
         "placeable": False,
         "consumable": False,
         "durability": None,
-        "recipe": None,
-        "crafting_medium": None,
+        "recipe": [{"item_tag": "wood", "amount": 1}],
+        "crafting_medium": "hand",
         "tags": ["material", "stick", "fuel"],
-        "output_amount": 1
+        "output_amount": 4
     },
     {
         "item_name": "Raw Gold",
@@ -5717,6 +5717,7 @@ items_list = [
         "recipe": None,
         "crafting_medium": "gameplay",
         "tags": ["food", "container"],
+        "return_item": "Waterskin",
         "output_amount": 1
     },
     {
@@ -5940,6 +5941,7 @@ class Inventory():
         self.selected_hotbar_slot = 0
         self.selected_inventory_slot = None
         self.selection_mode = "hotbar"
+        self.ui_open = False
         self.inventory_full_message_timer = 0
         self.hotbar_name_display_until = 0
         self.hotbar_name_display_text = ""
@@ -5962,9 +5964,11 @@ class Inventory():
         self.drop_menu_is_hotbar = False
         self.drop_menu_position = (0, 0)
         self.drop_menu_rect = None
+        self.drop_menu_context = None
         self.drop_option_rects = {}
         self.drop_amount_input = ""
         self.awaiting_drop_amount = False
+        self.amount_action = None
         self.inventory_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/inventory_screen.png").convert_alpha(), (1100, 600))
         self.crafting_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/crafting_screen.png").convert_alpha(), (1100, 600))
         self.level_up_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/level_up_screen.png").convert_alpha(), (1100, 600))
@@ -6516,12 +6520,21 @@ class Inventory():
         if not self.drop_menu_active:
             return
 
-        slot = self._get_slot_from_context(self.drop_menu_slot, self.drop_menu_is_hotbar)
+        is_special_menu = hasattr(self, 'drop_menu_context') and self.drop_menu_context is not None
+        
+        if is_special_menu:
+            slot = self.drop_menu_slot if isinstance(self.drop_menu_slot, dict) else None
+        else:
+            slot = self._get_slot_from_context(self.drop_menu_slot, self.drop_menu_is_hotbar)
+        
         if slot is None:
-            self.close_drop_menu()
+            if is_special_menu:
+                self.close_special_menu_drop()
+            else:
+                self.close_drop_menu()
             return
 
-        menu_width = 210
+        menu_width = 240
         option_height = 26
         title_height = 18
         padding = 10
@@ -6529,6 +6542,10 @@ class Inventory():
             ("drop_one", "Drop one (R)"),
             ("drop_amount", "Drop amount..."),
             ("drop_all", "Drop all"),
+            ("split_one", "Split one to new stack"),
+            ("split_half", "Split half"),
+            ("split_amount", "Split amount..."),
+            ("split_singles", "Split into singles"),
         ]
         menu_height = padding * 2 + title_height + (option_height + 4) * len(options)
         if self.awaiting_drop_amount:
@@ -6567,7 +6584,8 @@ class Inventory():
             input_rect = pygame.Rect(menu_x + padding, start_y + len(options) * (option_height + 4), menu_width - padding * 2, option_height)
             pygame.draw.rect(screen, (30, 30, 30, 200), input_rect)
             pygame.draw.rect(screen, (180, 180, 180), input_rect, 1, border_radius=4)
-            prompt = f"Amount: {self.drop_amount_input or '_'}"
+            prompt_label = "Split amount" if self.amount_action == "split" else "Drop amount"
+            prompt = f"{prompt_label}: {self.drop_amount_input or '_'}"
             prompt_surface = option_font.render(prompt, True, (255, 255, 255))
             screen.blit(prompt_surface, (input_rect.x + 8, input_rect.y + 5))
 
@@ -6989,7 +7007,7 @@ class Inventory():
             if x <= mouse_x <= x + slot_size and y <= mouse_y <= y + slot_size:  # Changed from /2 to use slot_size variable
                 return (i, True)
         
-        if self.state == "inventory":
+        if self.ui_open:
             start_x = (screen.get_width() / 2 - self.inventory_image.get_width() / 2) + 17
             start_y = (screen.get_height() / 2 - self.inventory_image.get_height() / 2) + 44
             
@@ -7231,10 +7249,12 @@ class Inventory():
         self.drop_menu_active = False
         self.drop_menu_slot = None
         self.drop_menu_is_hotbar = False
+        self.drop_menu_context = None
         self.drop_option_rects = {}
         self.drop_menu_rect = None
         self.drop_amount_input = ""
         self.awaiting_drop_amount = False
+        self.amount_action = None
 
     def open_drop_menu(self, slot_index, is_hotbar, mouse_pos):
         if slot_index is None:
@@ -7254,6 +7274,7 @@ class Inventory():
         self.drop_menu_position = mouse_pos
         self.awaiting_drop_amount = False
         self.drop_amount_input = ""
+        self.amount_action = None
         return True
 
     def handle_drop_right_click(self, mouse_pos, screen):
@@ -7314,12 +7335,133 @@ class Inventory():
 
         return self.remove_quantity_from_slot(slot_index, is_hotbar, amount)
 
+    def _first_empty_inventory_slot(self):
+        for idx, slot in enumerate(self.inventory_list):
+            if slot is None:
+                return ("inventory", idx)
+        for idx, slot in enumerate(self.hotbar_slots):
+            if slot is None:
+                return ("hotbar", idx)
+        return (None, None)
+
+    def _count_empty_slots(self, exclude_hotbar_index=None, exclude_inventory_index=None):
+        count = 0
+        for idx, slot in enumerate(self.inventory_list):
+            if idx == exclude_inventory_index:
+                continue
+            if slot is None:
+                count += 1
+        for idx, slot in enumerate(self.hotbar_slots):
+            if idx == exclude_hotbar_index:
+                continue
+            if slot is None:
+                count += 1
+        return count
+
+    def _place_new_stack(self, item_data, quantity, exclude_hotbar_index=None, exclude_inventory_index=None):
+        if quantity is None or quantity <= 0 or not item_data:
+            return False
+        new_stack = self.create_item_instance(item_data, quantity)
+        for idx, slot in enumerate(self.inventory_list):
+            if idx == exclude_inventory_index:
+                continue
+            if slot is None:
+                self.inventory_list[idx] = new_stack
+                return True
+        for idx, slot in enumerate(self.hotbar_slots):
+            if idx == exclude_hotbar_index:
+                continue
+            if slot is None:
+                self.hotbar_slots[idx] = new_stack
+                return True
+        return False
+
     def _perform_drop_from_menu(self, amount):
         if self.drop_menu_slot is None:
             return None
         result = self.remove_quantity_from_slot(self.drop_menu_slot, self.drop_menu_is_hotbar, amount)
         self.close_drop_menu()
         return result
+
+    def _split_stack(self, amount=None, mode=None):
+        """Split items from the drop menu slot into a new stack."""
+        if self.drop_menu_slot is None:
+            return False
+
+        slot = self._get_slot_from_context(self.drop_menu_slot, self.drop_menu_is_hotbar)
+        if slot is None:
+            return False
+
+        item_name = slot.get("item_name")
+        item_data = next((item for item in items_list if item["item_name"] == item_name), None)
+        if not item_data:
+            return False
+
+        current_qty = slot.get("quantity", 0)
+        if current_qty <= 1:
+            return False
+
+        # Determine split amount
+        split_amount = None
+        if mode == "half":
+            split_amount = max(1, current_qty // 2)
+        elif mode == "all_singles":
+            # Attempt to peel items off into single stacks where space allows
+            movable = min(current_qty - 1, self._count_empty_slots(
+                exclude_hotbar_index=self.drop_menu_slot if self.drop_menu_is_hotbar else None,
+                exclude_inventory_index=self.drop_menu_slot if not self.drop_menu_is_hotbar else None
+            ))
+            if movable <= 0:
+                return False
+            moved = 0
+            for _ in range(movable):
+                if self._place_new_stack(
+                    item_data,
+                    1,
+                    exclude_hotbar_index=self.drop_menu_slot if self.drop_menu_is_hotbar else None,
+                    exclude_inventory_index=self.drop_menu_slot if not self.drop_menu_is_hotbar else None
+                ):
+                    moved += 1
+                else:
+                    break
+            if moved <= 0:
+                return False
+            slot["quantity"] -= moved
+            if slot["quantity"] <= 0:
+                if self.drop_menu_is_hotbar:
+                    self.hotbar_slots[self.drop_menu_slot] = None
+                else:
+                    self.inventory_list[self.drop_menu_slot] = None
+            self.recalc_weight()
+            return True
+        else:
+            # Explicit amount (one or custom)
+            split_amount = amount if amount is not None else 1
+
+        if split_amount is None or split_amount <= 0:
+            return False
+        if split_amount >= current_qty:
+            split_amount = current_qty - 1
+        if split_amount <= 0:
+            return False
+
+        placed = self._place_new_stack(
+            item_data,
+            split_amount,
+            exclude_hotbar_index=self.drop_menu_slot if self.drop_menu_is_hotbar else None,
+            exclude_inventory_index=self.drop_menu_slot if not self.drop_menu_is_hotbar else None
+        )
+        if not placed:
+            return False
+
+        slot["quantity"] -= split_amount
+        if slot["quantity"] <= 0:
+            if self.drop_menu_is_hotbar:
+                self.hotbar_slots[self.drop_menu_slot] = None
+            else:
+                self.inventory_list[self.drop_menu_slot] = None
+        self.recalc_weight()
+        return True
 
     def handle_drop_menu_click(self, mouse_pos):
         if not self.drop_menu_active:
@@ -7331,15 +7473,51 @@ class Inventory():
 
         for key, rect in self.drop_option_rects.items():
             if rect.collidepoint(mouse_pos):
+                is_special_menu = hasattr(self, 'drop_menu_context') and self.drop_menu_context is not None
+                
                 if key == "drop_one":
-                    return self._perform_drop_from_menu(1)
+                    if is_special_menu:
+                        return self.handle_special_menu_drop(1)
+                    else:
+                        return self._perform_drop_from_menu(1)
                 if key == "drop_all":
-                    slot = self._get_slot_from_context(self.drop_menu_slot, self.drop_menu_is_hotbar)
-                    amount = slot.get("quantity", 0) if slot else 0
-                    return self._perform_drop_from_menu(amount)
+                    if is_special_menu:
+                        slot = self.drop_menu_slot
+                        amount = slot.get("quantity", 0) if slot else 0
+                        return self.handle_special_menu_drop(amount)
+                    else:
+                        slot = self._get_slot_from_context(self.drop_menu_slot, self.drop_menu_is_hotbar)
+                        amount = slot.get("quantity", 0) if slot else 0
+                        return self._perform_drop_from_menu(amount)
                 if key == "drop_amount":
                     self.awaiting_drop_amount = True
                     self.drop_amount_input = ""
+                    self.amount_action = "drop"
+                if key == "split_one":
+                    if is_special_menu:
+                        if self.handle_special_menu_split(amount=1):
+                            self.close_special_menu_drop()
+                    else:
+                        if self._split_stack(amount=1):
+                            self.close_drop_menu()
+                if key == "split_half":
+                    if is_special_menu:
+                        if self.handle_special_menu_split(mode="half"):
+                            self.close_special_menu_drop()
+                    else:
+                        if self._split_stack(mode="half"):
+                            self.close_drop_menu()
+                if key == "split_amount":
+                    self.awaiting_drop_amount = True
+                    self.drop_amount_input = ""
+                    self.amount_action = "split"
+                if key == "split_singles":
+                    if is_special_menu:
+                        if self.handle_special_menu_split(mode="all_singles"):
+                            self.close_special_menu_drop()
+                    else:
+                        if self._split_stack(mode="all_singles"):
+                            self.close_drop_menu()
                 return None
 
         return None
@@ -7348,6 +7526,8 @@ class Inventory():
         if not (self.drop_menu_active and self.awaiting_drop_amount):
             return None
 
+        is_special_menu = hasattr(self, 'drop_menu_context') and self.drop_menu_context is not None
+
         if event.key == pygame.K_RETURN:
             self.awaiting_drop_amount = False
             try:
@@ -7355,13 +7535,31 @@ class Inventory():
             except ValueError:
                 amount = 0
             if amount <= 0:
-                self.close_drop_menu()
+                if is_special_menu:
+                    self.close_special_menu_drop()
+                else:
+                    self.close_drop_menu()
                 return None
-            return self._perform_drop_from_menu(amount)
+            if self.amount_action == "split":
+                if is_special_menu:
+                    self.handle_special_menu_split(amount=amount)
+                    self.close_special_menu_drop()
+                else:
+                    self._split_stack(amount=amount)
+                    self.close_drop_menu()
+                return None
+            else:
+                if is_special_menu:
+                    return self.handle_special_menu_drop(amount)
+                else:
+                    return self._perform_drop_from_menu(amount)
         elif event.key == pygame.K_BACKSPACE:
             self.drop_amount_input = self.drop_amount_input[:-1]
         elif event.key == pygame.K_ESCAPE:
-            self.close_drop_menu()
+            if is_special_menu:
+                self.close_special_menu_drop()
+            else:
+                self.close_drop_menu()
         else:
             if hasattr(event, "unicode") and event.unicode.isdigit():
                 if len(self.drop_amount_input) < 3:
@@ -7442,6 +7640,10 @@ class Inventory():
             else:
                 self.inventory_list[slot_index] = None
 
+        # Return empty container if defined
+        if item_data.get("return_item"):
+            self.add([item_data["return_item"]])
+
         self.recalc_weight()
         return (True, item_data.get("tags", []))
 
@@ -7499,18 +7701,22 @@ class Inventory():
             else:
                 self.inventory_list[slot_index] = None
         
-        # Return an empty container only if the recipe actually uses a container item
-        recipe = item_data.get("recipe")
-        if recipe and isinstance(recipe, list):
-            for recipe_item in recipe:
-                if not (isinstance(recipe_item, dict) and "item" in recipe_item):
-                    continue
-                container_name = recipe_item["item"]
-                # Check whether this recipe item is a container (by tag or type)
-                container_data = next((itm for itm in items_list if itm["item_name"] == container_name), None)
-                if container_data and ("container" in container_data.get("tags", []) or container_data.get("type") == "container"):
-                    self.add([container_name])
-                    break  # only add one container back
+        # Return an empty container if defined via return_item field
+        if item_data.get("return_item"):
+            self.add([item_data["return_item"]])
+        else:
+            # Return an empty container only if the recipe actually uses a container item
+            recipe = item_data.get("recipe")
+            if recipe and isinstance(recipe, list):
+                for recipe_item in recipe:
+                    if not (isinstance(recipe_item, dict) and "item" in recipe_item):
+                        continue
+                    container_name = recipe_item["item"]
+                    # Check whether this recipe item is a container (by tag or type)
+                    container_data = next((itm for itm in items_list if itm["item_name"] == container_name), None)
+                    if container_data and ("container" in container_data.get("tags", []) or container_data.get("type") == "container"):
+                        self.add([container_name])
+                        break  # only add one container back
         
         return (True, item_data.get("tags", []))  # Return success and tags
         
@@ -7603,5 +7809,101 @@ class Inventory():
                 self.inventory_list[slot_index] = None
         
         return cat
+
+    def open_special_menu_drop(self, slot_data, menu_context, mouse_pos=(0, 0)):
+        self.drop_menu_active = True
+        self.drop_menu_slot = slot_data
+        self.drop_menu_is_hotbar = False
+        self.drop_menu_position = mouse_pos
+        self.drop_menu_context = menu_context
+        self.awaiting_drop_amount = False
+        self.drop_amount_input = ""
+        self.amount_action = None
+        return True
+
+    def handle_special_menu_drop(self, amount):
+        if not self.drop_menu_active:
+            return None
+        
+        slot_data = self.drop_menu_slot
+        if not isinstance(slot_data, dict) or "item_name" not in slot_data:
+            return None
+        
+        drop_amount = min(amount, slot_data.get("quantity", 0))
+        if drop_amount <= 0:
+            return None
+        
+        item_name = slot_data.get("item_name")
+        item_data = next((item for item in items_list if item["item_name"] == item_name), None)
+        
+        slot_data["quantity"] -= drop_amount
+        if slot_data["quantity"] <= 0:
+            slot_data["quantity"] = 0
+        
+        self.recalc_weight()
+        return {"item_data": item_data, "item_name": item_name, "amount": drop_amount}
+
+    def handle_special_menu_split(self, amount=None, mode=None):
+        if not self.drop_menu_active:
+            return False
+        
+        slot_data = self.drop_menu_slot
+        if not isinstance(slot_data, dict) or "item_name" not in slot_data:
+            return False
+        
+        item_name = slot_data.get("item_name")
+        item_data = next((item for item in items_list if item["item_name"] == item_name), None)
+        if not item_data:
+            return False
+        
+        current_qty = slot_data.get("quantity", 0)
+        if current_qty <= 1:
+            return False
+        
+        split_amount = None
+        if mode == "half":
+            split_amount = max(1, current_qty // 2)
+        elif mode == "all_singles":
+            movable = min(current_qty - 1, self._count_empty_slots())
+            if movable <= 0:
+                return False
+            moved = 0
+            for _ in range(movable):
+                if self._place_new_stack(item_data, 1):
+                    moved += 1
+                else:
+                    break
+            if moved <= 0:
+                return False
+            slot_data["quantity"] -= moved
+            if slot_data["quantity"] <= 0:
+                slot_data["quantity"] = 0
+            self.recalc_weight()
+            return True
+        else:
+            split_amount = amount if amount is not None else 1
+        
+        if split_amount is None or split_amount <= 0:
+            return False
+        if split_amount >= current_qty:
+            split_amount = current_qty - 1
+        if split_amount <= 0:
+            return False
+        
+        placed = self._place_new_stack(item_data, split_amount)
+        if not placed:
+            return False
+        
+        slot_data["quantity"] -= split_amount
+        if slot_data["quantity"] <= 0:
+            slot_data["quantity"] = 0
+        self.recalc_weight()
+        return True
+
+    def close_special_menu_drop(self):
+        self.drop_menu_active = False
+        self.drop_menu_slot = None
+        self.drop_menu_context = None
+        self.drop_menu_rect = None
 
 inventory = Inventory(64)
