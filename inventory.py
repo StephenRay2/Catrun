@@ -13,9 +13,8 @@ HARVEST_TOOL_MULTS = {
     "dragon": {"normal": 8, "special": 8},
 }
 SPECIAL_DROP_MULTS = {
-    # Bonus chance for special mining drops (Flint/Raw Metal/Raw Gold)
     "metal": 1.5,
-    "gold": 3.5,
+    "gold": 4.0,
     "obsidian": 2.0,
     "dragon": 3.0,
 }
@@ -1405,15 +1404,15 @@ items_list = [
         "placeable": True,
         "consumable": False,
         "durability": 300,
-        "recipe": [{"item": "Sticks", "amount": 5}, {"item": "Flint", "amount": 1}, {"item": "Stone", "amount": 1}],
+        "recipe": [{"item": "Sticks", "amount": 3}, {"item": "Flint", "amount": 1}, {"item": "Stone", "amount": 1}],
         "crafting_medium": "hand",
         "tags": ["tool"],
         "output_amount": 1,
         "held_item_frames": {
-            "left": "Torch1.png",
-            "right": "Torch1.png",
-            "up": "Torch1.png",
-            "down": "Torch1.png"
+            "left": ["TorchRightHeld1.png", "TorchRightHeld2.png", "TorchRightHeld3.png", "TorchRightHeld4.png"],
+            "right": ["TorchRightHeld1.png", "TorchRightHeld2.png", "TorchRightHeld3.png", "TorchRightHeld4.png"],
+            "up": ["TorchUpHeld1.png", "TorchUpHeld2.png", "TorchUpHeld3.png", "TorchUpHeld4.png"],
+            "down": ["TorchDownHeld1.png", "TorchDownHeld2.png", "TorchDownHeld3.png", "TorchDownHeld4.png"]
         },
         "held_item_offset": {
             "left": (5, 18),
@@ -1421,6 +1420,7 @@ items_list = [
             "up": (13, 10),
             "down": (0, 18)
         },
+        "held_item_frame_duration": 0.1,
         **get_weapon_animation_data()
     },
     {
@@ -2007,7 +2007,7 @@ items_list = [
         "stack_size": 1,
         "weight": 15,
         "type": "structure",
-        "description": "A portable tent. Provides shelter anywhere. Except for underwater. Or space. Or in lava.",
+        "description": "A portable tent. Provides shelter anywhere. Except for underwater. Or space. Or in lava. Also enables fast travel to this location.",
         "use_effect": None,
         "placeable": True,
         "consumable": False,
@@ -5918,12 +5918,19 @@ for item in items_list:
     if "held_item_frames" in item:
         item["held_item_images"] = {}
         itemframes_path = "assets/sprites/itemFrames"
-        for direction, frame_name in item["held_item_frames"].items():
-            try:
-                img = pygame.image.load(f"{itemframes_path}/{frame_name}").convert_alpha()
-                item["held_item_images"][direction] = img
-            except:
-                item["held_item_images"][direction] = None
+        for direction, frame_names in item["held_item_frames"].items():
+            names = frame_names if isinstance(frame_names, (list, tuple)) else [frame_names]
+            loaded_frames = []
+            for frame_name in names:
+                try:
+                    img = pygame.image.load(f"{itemframes_path}/{frame_name}").convert_alpha()
+                    loaded_frames.append(img)
+                except:
+                    loaded_frames.append(None)
+            if len(loaded_frames) == 1:
+                item["held_item_images"][direction] = loaded_frames[0]
+            else:
+                item["held_item_images"][direction] = loaded_frames
 
 class Inventory():
     def __init__(self, capacity):
@@ -6055,6 +6062,31 @@ class Inventory():
             crafting_tab_unused.draw(screen)
             level_up_tab_unused.draw(screen)
             screen.blit(cats_tab, (width // 2 - 125, height // 2 - 303))
+
+        # Common player info (level / weight / temp)
+        self.draw_player_info(screen)
+
+    def draw_player_info(self, screen):
+        """Render basic player info shared across inventory tabs."""
+        font = pygame.font.SysFont(None, 20)
+        self.recalc_weight()
+        player.weight = self.total_inventory_weight
+        total_weight_pos_x = screen.get_width()/2 + 20
+        info_y = 70
+
+        level_text = font.render(f"Level: {player.level}", True, (200, 220, 255))
+        screen.blit(level_text, (total_weight_pos_x, info_y))
+        info_y += 22
+
+        weight_label = font.render("Weight:", True, (200, 200, 50))
+        weight_value = font.render(f"{round(self.total_inventory_weight, 1)} / {player.max_weight}", True, (200, 200, 50))
+        screen.blit(weight_label, (total_weight_pos_x, info_y))
+        screen.blit(weight_value, (total_weight_pos_x, info_y + 16))
+        info_y += 36
+
+        temp_display = int(player.current_temperature) if hasattr(player, "current_temperature") else "N/A"
+        temp_text = font.render(f"Temp: {temp_display}", True, (255, 200, 120))
+        screen.blit(temp_text, (total_weight_pos_x, info_y + 6))
 
     def draw_level_up(self, screen):
         # Draw the stat list on the left of the level-up screen along with upgrade buttons.
@@ -6663,13 +6695,6 @@ class Inventory():
 
                         break
         
-        player.weight = self.total_inventory_weight
-        weight_text = font.render("Weight: ", True, (200, 200, 50))
-        weight_num_text = font.render(str(f"{round(self.total_inventory_weight, 1)} / {player.max_weight}"), True, (200, 200, 50))
-        total_weight_pos_x = screen.get_width()/2
-        screen.blit(weight_text, (total_weight_pos_x + 20, 110))
-        screen.blit(weight_num_text, (total_weight_pos_x + 20, 125))
-
     def get_craftable_items(self):
         """Get all items that have recipes and crafting_medium is 'hand', sorted alphabetically."""
         craftable = []
@@ -7086,11 +7111,16 @@ class Inventory():
         else:
             target_slot = self.inventory_list[slot_index]
         
+        new_selection_hotbar = None
+        new_selection_inventory = None
+
         if target_slot is None:
             if is_hotbar:
                 self.hotbar_slots[slot_index] = self.dragged_item
+                new_selection_hotbar = slot_index
             else:
                 self.inventory_list[slot_index] = self.dragged_item
+                new_selection_inventory = slot_index
         
         elif target_slot["item_name"] == self.dragged_item["item_name"]:
             max_stack = 100
@@ -7110,12 +7140,19 @@ class Inventory():
                     self.hotbar_slots[self.dragged_from_slot] = self.dragged_item
                 else:
                     self.inventory_list[self.dragged_from_slot] = self.dragged_item
+            # Stacking keeps selection on the target slot
+            if is_hotbar:
+                new_selection_hotbar = slot_index
+            else:
+                new_selection_inventory = slot_index
         
         else:
             if is_hotbar:
                 self.hotbar_slots[slot_index] = self.dragged_item
+                new_selection_hotbar = slot_index
             else:
                 self.inventory_list[slot_index] = self.dragged_item
+                new_selection_inventory = slot_index
             
             if self.dragged_from_hotbar:
                 self.hotbar_slots[self.dragged_from_slot] = target_slot
@@ -7126,6 +7163,15 @@ class Inventory():
         self.dragged_item = None
         self.dragged_from_slot = None
         self.dragged_from_hotbar = False
+        if new_selection_hotbar is not None:
+            self.selected_hotbar_slot = new_selection_hotbar
+            self.selection_mode = "hotbar"
+            self.selected_inventory_slot = None
+        elif new_selection_inventory is not None:
+            self.selected_inventory_slot = new_selection_inventory
+            self.selection_mode = "inventory"
+            self.selected_hotbar_slot = self.selected_hotbar_slot if 0 <= self.selected_hotbar_slot < self.hotbar_size else 0
+        self.recalc_weight()
 
     def cancel_drag(self):
         if not self.dragging:
@@ -7134,8 +7180,19 @@ class Inventory():
         if self.dragged_from_hotbar:
             self.hotbar_slots[self.dragged_from_slot] = self.dragged_item
         else:
-                self.inventory_list[self.dragged_from_slot] = self.dragged_item
+            self.inventory_list[self.dragged_from_slot] = self.dragged_item
         
+        # Restore selection to the slot we canceled from
+        if self.dragged_from_hotbar:
+            self.selected_hotbar_slot = self.dragged_from_slot
+            self.selection_mode = "hotbar"
+            self.selected_inventory_slot = None
+        else:
+            self.selected_inventory_slot = self.dragged_from_slot
+            self.selection_mode = "inventory"
+        # Ensure hotbar index stays in range
+        if self.selected_hotbar_slot >= self.hotbar_size:
+            self.selected_hotbar_slot = 0
         self.dragging = False
         self.dragged_item = None
         self.dragged_from_slot = None

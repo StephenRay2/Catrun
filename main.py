@@ -14,6 +14,7 @@ clock = pygame.time.Clock()
 from inventory import *
 running = True
 dt = 0
+time_speed_multiplier = 1.0
 size = 64
 world_x = 0.0
 absolute_cam_x = 0.0
@@ -24,8 +25,9 @@ dungeon_depth_high = 0
 font = pygame.font.SysFont(None, 24)
 scroll = 0
 dungeon_traversal_speed = .1
-time_of_day = 12.00
+time_of_day = 24.00
 total_elapsed_time = 00.00
+time_of_day_start = time_of_day
 stamina_depleted_message_timer = 0
 need_pickaxe_message_timer = 0
 player_world_x = player_pos.x + cam_x
@@ -64,12 +66,21 @@ max_throw_power = 8
 min_throw_hold_time = 0.2  # Minimum hold time (in seconds) to trigger throw instead of pickup
 thrown_items = []
 loaded_item_sprites = {}  # Cache for loaded item sprites
+placeable_animation_cache = {}  # Cache for animated placeable sprites (keyed by name and size)
+light_mask_cache = {}  # Cache for radial light masks
 
 # Placement system variables
 placement_mode = False
 placement_item = None
 placement_position = (0, 0)
 placed_structures = []
+tent_menu_active = False
+tent_menu_tent = None
+tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
+tent_hold_threshold = 0.6
+fast_travel_menu_active = False
+sleeping_in_tent = False
+tent_hide_active = False
 
 # Crafting bench variables
 crafting_bench = None
@@ -178,7 +189,7 @@ placeable_size_settings = {
             "width_ratio": 0.8,
             "height_ratio": 0.5,
             "offset_x_ratio": -0.5,
-            "offset_y_ratio": -1.0
+            "offset_y_ratio": 0.0
         }
     },
     "Lantern": {
@@ -383,6 +394,15 @@ def set_starting_loadout():
             next_slot += 1
         if next_slot < inventory.capacity:
             inventory.inventory_list[next_slot] = new_item
+            next_slot += 1
+    # Add torches stack
+    torch_data = next((itm for itm in items_list if itm["item_name"] == "Torch"), None)
+    if torch_data:
+        torch_stack = inventory.create_item_instance(torch_data, 50)
+        while next_slot < inventory.capacity and inventory.inventory_list[next_slot] is not None:
+            next_slot += 1
+        if next_slot < inventory.capacity:
+            inventory.inventory_list[next_slot] = torch_stack
             next_slot += 1
 
 def calculate_throw_trajectory(start_x, start_y, target_x, target_y, throw_power):
@@ -1191,8 +1211,13 @@ while running:
         
         if should_process_frame:
             dungeon_depth = absolute_cam_x
-            total_elapsed_time += dt
-            time_of_day = (12 + (total_elapsed_time / 60)) % 24
+            prev_time_of_day = time_of_day
+            time_dt = dt * time_speed_multiplier
+            total_elapsed_time += time_dt
+            time_of_day = (time_of_day_start + (total_elapsed_time / 60)) % 24
+            if sleeping_in_tent and time_of_day >= 6 and time_of_day < 18:
+                sleeping_in_tent = False
+                time_speed_multiplier = 1.0
             # Update crafting flash
             inventory.update_flash(dt)
             for dropped in list(dropped_items):
@@ -1210,7 +1235,10 @@ while running:
         if game_just_started:
             generate_world()
             total_elapsed_time = 0
-            time_of_day = 12.0
+            time_of_day = time_of_day_start
+            sleeping_in_tent = False
+            tent_hide_active = False
+            time_speed_multiplier = 1.0
             stamina_depleted_message_timer = 0
             need_pickaxe_message_timer = 0
             player.full_timer = 60
@@ -1425,16 +1453,19 @@ while running:
                 "Waterskin",
                 "Workbench",
                 "Campfire",
+                "Tent",
                 "Fire Dragon Scale Sword",
                 "Fire Dragon Scale Axe"
             ]
-            inventory.add(starter_items)
+            # Add 50 torches (will stack) plus other starter items
+            torch_stack = ["Torch"] * 50
+            inventory.add(torch_stack + starter_items)
 
             game_just_started = False 
         
         player_world_x = player_pos.x + cam_x
         player_world_y = player_pos.y
-        inventory.ui_open = inventory_in_use or campfire_in_use or smelter_in_use or crafting_bench_in_use or inventory.drop_menu_active
+        inventory.ui_open = inventory_in_use or campfire_in_use or smelter_in_use or crafting_bench_in_use or inventory.drop_menu_active or tent_menu_active or fast_travel_menu_active
         
         player_speed = player.get_speed()
         if player.swimming:
@@ -1449,6 +1480,22 @@ while running:
                 running = False
 
             if event.type == pygame.KEYDOWN:
+                # Exit hide/sleep states with E
+                if tent_hide_active and event.key == pygame.K_e:
+                    tent_hide_active = False
+                    continue
+                if sleeping_in_tent and event.key == pygame.K_e:
+                    sleeping_in_tent = False
+                    time_speed_multiplier = 1.0
+                    continue
+                if tent_menu_active and event.key == pygame.K_e:
+                    tent_menu_active = False
+                    tent_menu_tent = None
+                    continue
+                if fast_travel_menu_active and event.key == pygame.K_e:
+                    fast_travel_menu_active = False
+                    continue
+
                 if naming_cat is not None:
                     if event.key == pygame.K_RETURN:
                         if cat_name_input.strip():
@@ -1497,14 +1544,38 @@ while running:
                 if (smelter_in_use or campfire_in_use) and event.key not in (pygame.K_e, pygame.K_ESCAPE):
                     continue
 
-                if event.key == pygame.K_f and not inventory_in_use and not crafting_bench_in_use and player.is_alive:
-                    drank_water = False
-                    if player.swimming and player.current_liquid and not player.in_lava:
-                        if getattr(player.current_liquid, "liquid_type", "") == "water":
-                            player.thirst = player.max_thirst
-                            player.thirst_full_timer = getattr(player, "thirst_full_timer", 60)
-                            sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
-                            drank_water = True
+            if inventory_in_use:
+                tab_clicked = False
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if inventory_tab_unused.is_clicked(event):
+                        inventory.state = "inventory"
+                        inventory.close_drop_menu()
+                        tab_clicked = True
+                    elif crafting_tab_unused.is_clicked(event):
+                        inventory.state = "crafting"
+                        inventory.close_drop_menu()
+                        tab_clicked = True
+                    elif level_up_tab_unused.is_clicked(event):
+                        inventory.state = "level_up"
+                        inventory.close_drop_menu()
+                        tab_clicked = True
+                    elif cats_tab_unused.is_clicked(event):
+                        inventory.state = "cats"
+                        inventory.close_drop_menu()
+                        tab_clicked = True
+                if tab_clicked:
+                    continue
+                # Handle clicks on level-up buttons while the tab is open
+                inventory.handle_level_up_event(event)
+
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_f and not inventory_in_use and not crafting_bench_in_use and player.is_alive:
+                drank_water = False
+                if player.swimming and player.current_liquid and not player.in_lava:
+                    if getattr(player.current_liquid, "liquid_type", "") == "water":
+                        player.thirst = player.max_thirst
+                        player.thirst_full_timer = getattr(player, "thirst_full_timer", 60)
+                        sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
+                        drank_water = True
                     if not drank_water:
                         success, tags = inventory.consume_item()
                         if success:
@@ -1513,46 +1584,46 @@ while running:
                             elif any(tag in tags for tag in ["liquid", "consumable"]):
                                 sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
 
-                if event.key == pygame.K_q and not crafting_bench_in_use and not smelter_in_use and not campfire_in_use:
-                    inventory_in_use = not inventory_in_use
-                    inventory.ui_open = inventory_in_use
-                    if not inventory_in_use:
-                        inventory.selection_mode = "hotbar"
-                        inventory.selected_inventory_slot = None
-                        inventory.close_drop_menu()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_q and not crafting_bench_in_use and not smelter_in_use and not campfire_in_use:
+                inventory_in_use = not inventory_in_use
+                inventory.ui_open = inventory_in_use
+                if not inventory_in_use:
+                    inventory.selection_mode = "hotbar"
+                    inventory.selected_inventory_slot = None
+                    inventory.close_drop_menu()
+            
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_r and player.is_alive:
+                selected_slot = None
+                selected_index = None
+                slot_is_hotbar = False
+                if inventory.selection_mode == "hotbar":
+                    selected_index = inventory.selected_hotbar_slot
+                    selected_slot = inventory.hotbar_slots[selected_index]
+                    slot_is_hotbar = True
+                elif inventory.selection_mode == "inventory" and inventory.selected_inventory_slot is not None:
+                    selected_index = inventory.selected_inventory_slot
+                    selected_slot = inventory.inventory_list[selected_index]
                 
-                if event.key == pygame.K_r and player.is_alive:
-                    selected_slot = None
-                    selected_index = None
-                    slot_is_hotbar = False
-                    if inventory.selection_mode == "hotbar":
-                        selected_index = inventory.selected_hotbar_slot
-                        selected_slot = inventory.hotbar_slots[selected_index]
-                        slot_is_hotbar = True
-                    elif inventory.selection_mode == "inventory" and inventory.selected_inventory_slot is not None:
-                        selected_index = inventory.selected_inventory_slot
-                        selected_slot = inventory.inventory_list[selected_index]
-                    
-                    is_cat_slot = selected_slot is not None and ("cat_object" in selected_slot or "cat_type" in selected_slot)
-                    if is_cat_slot and selected_index is not None:
-                        cat_obj = selected_slot.get("cat_object")
-                        if cat_obj is None and "cat_type" in selected_slot:
-                            cat_obj = build_cat_from_item(selected_slot, player_world_x, player_world_y)
-                            selected_slot["cat_object"] = cat_obj
-                        if cat_obj:
-                            placement_distance = 50
-                            if player.last_direction == "right":
-                                place_x = player_world_x + placement_distance
-                                place_y = player_world_y
-                            elif player.last_direction == "left":
-                                place_x = player_world_x - placement_distance
-                                place_y = player_world_y
-                            elif player.last_direction == "up":
-                                place_x = player_world_x
-                                place_y = player_world_y - placement_distance
-                            else:
-                                place_x = player_world_x
-                                place_y = player_world_y + placement_distance
+                is_cat_slot = selected_slot is not None and ("cat_object" in selected_slot or "cat_type" in selected_slot)
+                if is_cat_slot and selected_index is not None:
+                    cat_obj = selected_slot.get("cat_object")
+                    if cat_obj is None and "cat_type" in selected_slot:
+                        cat_obj = build_cat_from_item(selected_slot, player_world_x, player_world_y)
+                        selected_slot["cat_object"] = cat_obj
+                    if cat_obj:
+                        placement_distance = 50
+                        if player.last_direction == "right":
+                            place_x = player_world_x + placement_distance
+                            place_y = player_world_y
+                        elif player.last_direction == "left":
+                            place_x = player_world_x - placement_distance
+                            place_y = player_world_y
+                        elif player.last_direction == "up":
+                            place_x = player_world_x
+                            place_y = player_world_y - placement_distance
+                        else:
+                            place_x = player_world_x
+                            place_y = player_world_y + placement_distance
 
                             cat_obj.rect.centerx = place_x
                             cat_obj.rect.centery = place_y
@@ -1965,6 +2036,53 @@ while running:
                     inventory.selection_mode = "hotbar"
                     inventory.show_selected_hotbar_name()
 
+            if tent_menu_active and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                menu_rect = pygame.Rect(width // 2 - 180, height // 2 - 90, 360, 180)
+                option = get_tent_menu_option(event.pos, menu_rect)
+                if option == "sleep":
+                    if time_of_day >= 18 or time_of_day < 6:
+                        sleeping_in_tent = True
+                        tent_hide_active = False
+                        time_speed_multiplier = 20.0
+                        tent_menu_active = False
+                        tent_menu_tent = None
+                        tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
+                elif option == "hide":
+                    tent_hide_active = True
+                    tent_menu_active = False
+                    tent_menu_tent = None
+                    tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
+                elif option == "pickup":
+                    if tent_hover_timers.get("pickup", 0.0) >= tent_hold_threshold:
+                        if tent_menu_tent in placed_structures:
+                            placed_structures.remove(tent_menu_tent)
+                        inventory.add(["Tent"])
+                        tent_menu_active = False
+                        tent_menu_tent = None
+                        tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
+                elif option == "demolish":
+                    if tent_hover_timers.get("demolish", 0.0) >= tent_hold_threshold:
+                        if tent_menu_tent in placed_structures:
+                            placed_structures.remove(tent_menu_tent)
+                        tent_menu_active = False
+                        tent_menu_tent = None
+                        tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
+                elif option == "fast_travel":
+                    fast_travel_menu_active = True
+                    tent_menu_active = False
+                elif option == "cancel":
+                    tent_menu_active = False
+                    tent_menu_tent = None
+                    tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
+                continue
+
+            if fast_travel_menu_active and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                box_rect = pygame.Rect(width // 2 - 210, height // 2 - 110, 420, 220)
+                close_rect = pygame.Rect(box_rect.x + box_rect.width//2 - 60, box_rect.y + box_rect.height - 60, 120, 34)
+                if close_rect.collidepoint(event.pos):
+                    fast_travel_menu_active = False
+                continue
+
             if event.type == pygame.MOUSEBUTTONDOWN and event.button in (1, 3):
                 if crafting_bench_in_use:
                     mouse_pos = pygame.mouse.get_pos()
@@ -1980,6 +2098,11 @@ while running:
                 elif smelter_in_use:
                     smelter.close()
                     smelter_in_use = False
+                elif fast_travel_menu_active:
+                    fast_travel_menu_active = False
+                elif tent_menu_active:
+                    tent_menu_active = False
+                    tent_menu_tent = None
                 else:
                     for structure in nearby_structures:
                         if structure['item_name'] == 'Workbench':
@@ -2054,8 +2177,34 @@ while running:
                                     campfire.open((structure['x'], structure['y']))
                                     campfire_in_use = True
                                     break
-                
-                if not crafting_bench_in_use:
+
+                    if not crafting_bench_in_use and not smelter_in_use and not campfire_in_use:
+                        for structure in nearby_structures:
+                            if structure.get('item_name') == 'Tent':
+                                struct_collision = structure['rect']
+                                horizontal_dist = abs(struct_collision.centerx - player_world_x)
+                                vertical_dist = abs(struct_collision.centery - player_world_y)
+                                tent_reach = 50
+                                horizontal_range = (struct_collision.width / 2) + tent_reach
+                                vertical_range = (struct_collision.height / 2) + tent_reach
+                                
+                                facing_object = False
+                                if player.last_direction == "right" and struct_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                    facing_object = True
+                                elif player.last_direction == "left" and struct_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                    facing_object = True
+                                elif player.last_direction == "up" and struct_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                    facing_object = True
+                                elif player.last_direction == "down" and struct_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                    facing_object = True
+                                
+                                if facing_object:
+                                    tent_menu_active = True
+                                    tent_menu_tent = structure
+                                    tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
+                                    break
+                    
+                if not crafting_bench_in_use and not tent_menu_active and not fast_travel_menu_active and not sleeping_in_tent and not tent_hide_active:
                     for obj in visible_objects:
                         if hasattr(obj, 'collect') and not obj.destroyed:
                             if hasattr(obj, 'is_empty') and obj.is_empty:
@@ -2431,11 +2580,22 @@ while running:
         def draw_held_item():
             current_hotbar_slot = inventory.hotbar_slots[inventory.selected_hotbar_slot]
             if current_hotbar_slot is not None:
+                def get_held_frame(image_entry, item_data):
+                    """Return the current frame for a held item (supports animated lists)."""
+                    if isinstance(image_entry, list):
+                        valid_frames = [frame for frame in image_entry if frame]
+                        if not valid_frames:
+                            return None
+                        frame_duration = max(0.01, item_data.get("held_item_frame_duration", 0.12))
+                        frame_idx = int(pygame.time.get_ticks() / (frame_duration * 1000)) % len(valid_frames)
+                        return valid_frames[frame_idx]
+                    return image_entry
+
                 for item in items_list:
                     if item["item_name"] == current_hotbar_slot["item_name"] and "held_item_images" in item:
                         # disable attacking while smelter UI is open
                         is_attacking = pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not smelter_in_use and not campfire_in_use and not mouse_over_hotbar
-                        held_image = item["held_item_images"].get(player.last_direction)
+                        held_image = get_held_frame(item["held_item_images"].get(player.last_direction), item)
                         
                         if held_image and is_attacking:
                             is_moving = keys[pygame.K_w] or keys[pygame.K_a] or keys[pygame.K_s] or keys[pygame.K_d]
@@ -2476,8 +2636,9 @@ while running:
                             scaled_size = (int(rotated_image.get_width() * scale_factor), int(rotated_image.get_height() * scale_factor))
                             rotated_image = pygame.transform.scale(rotated_image, scaled_size)
                             
+                            base_anchor_y = player_pos.y - size + 20
                             held_x = player_pos.x - size/2 + swing_offset[0]
-                            held_y = player_pos.y - size/2 + swing_offset[1]
+                            held_y = base_anchor_y + swing_offset[1]
                             
                             screen.blit(rotated_image, (held_x, held_y))
                         elif held_image:
@@ -2516,8 +2677,9 @@ while running:
                             else:
                                 offset = base_offset
                             
+                            base_anchor_y = player_pos.y - size + 20
                             held_x = player_pos.x - size/2 + offset[0]
-                            held_y = player_pos.y - size/2 + offset[1]
+                            held_y = base_anchor_y + offset[1]
                             
                             if player.last_direction == "left":
                                 held_image = pygame.transform.flip(held_image, True, False)
@@ -2555,6 +2717,8 @@ while running:
                 width_mult = 0.4
                 height_mult = 0.2
                 alpha = 40
+            elif name == "Torch":
+                y_offset = rect.height * 0.12
             if name == "Rock":
                 y_offset = 0
             if name == "Boulder":
@@ -2580,6 +2744,100 @@ while running:
             if not is_player_obj:
                 shadow_x -= cam_x
             screen.blit(shadow_surface, (shadow_x, rect.bottom - shadow_height // 2 + y_offset))
+
+        def get_tent_menu_option(mouse_pos, rect):
+            if not rect.collidepoint(mouse_pos):
+                return None
+            rel_x = mouse_pos[0] - rect.x
+            rel_y = mouse_pos[1] - rect.y
+            col = int(rel_x / (rect.width / 3))
+            row = int(rel_y / (rect.height / 2))
+            col = max(0, min(2, col))
+            row = max(0, min(1, row))
+            options = [
+                ["sleep", "hide", "pickup"],
+                ["fast_travel", "demolish", "cancel"],
+            ]
+            return options[row][col]
+
+        def draw_tent_menu(screen, dt_local):
+            global tent_hover_timers
+            overlay = pygame.Surface((width, height), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 140))
+            screen.blit(overlay, (0, 0))
+            menu_w, menu_h = 360, 180
+            menu_x = width // 2 - menu_w // 2
+            menu_y = height // 2 - menu_h // 2
+            rect = pygame.Rect(menu_x, menu_y, menu_w, menu_h)
+            pygame.draw.rect(screen, (40, 40, 60), rect, border_radius=8)
+            pygame.draw.rect(screen, (200, 200, 220), rect, 2, border_radius=8)
+            # grid lines
+            pygame.draw.line(screen, (120, 120, 140), (menu_x + menu_w // 3, menu_y), (menu_x + menu_w // 3, menu_y + menu_h), 2)
+            pygame.draw.line(screen, (120, 120, 140), (menu_x + 2 * menu_w // 3, menu_y), (menu_x + 2 * menu_w // 3, menu_y + menu_h), 2)
+            pygame.draw.line(screen, (120, 120, 140), (menu_x, menu_y + menu_h // 2), (menu_x + menu_w, menu_y + menu_h // 2), 2)
+
+            labels = {
+                "sleep": "Sleep",
+                "hide": "Hide",
+                "pickup": "Pick Up",
+                "fast_travel": "Fast Travel",
+                "demolish": "Demolish",
+                "cancel": "Cancel",
+            }
+            mouse_pos = pygame.mouse.get_pos()
+            hovered_option = get_tent_menu_option(mouse_pos, rect)
+
+            for key in tent_hover_timers.keys():
+                if hovered_option != key:
+                    tent_hover_timers[key] = 0.0
+
+            for row in range(2):
+                for col in range(3):
+                    option = [["sleep", "hide", "pickup"], ["fast_travel", "demolish", "cancel"]][row][col]
+                    cell_rect = pygame.Rect(
+                        menu_x + col * (menu_w // 3),
+                        menu_y + row * (menu_h // 2),
+                        menu_w // 3,
+                        menu_h // 2,
+                    )
+                    if hovered_option == option:
+                        pygame.draw.rect(screen, (255, 255, 255, 30), cell_rect)
+                        if option in tent_hover_timers:
+                            tent_hover_timers[option] += dt_local
+                    text_surface = pygame.font.SysFont(None, 24).render(labels[option], True, (255, 255, 255))
+                    text_rect = text_surface.get_rect(center=cell_rect.center)
+                    screen.blit(text_surface, text_rect)
+                    if option in ("pickup", "demolish"):
+                        progress = min(1.0, tent_hover_timers.get(option, 0.0) / tent_hold_threshold)
+                        bar_w = cell_rect.width * 0.6
+                        bar_h = 6
+                        bar_x = cell_rect.centerx - bar_w / 2
+                        bar_y = cell_rect.bottom - 16
+                        pygame.draw.rect(screen, (80, 80, 80), (bar_x, bar_y, bar_w, bar_h))
+                        pygame.draw.rect(screen, (200, 120, 40), (bar_x, bar_y, bar_w * progress, bar_h))
+
+            return rect
+
+        def draw_fast_travel_placeholder(screen):
+            overlay = pygame.Surface((width, height), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 140))
+            screen.blit(overlay, (0, 0))
+            box_w, box_h = 420, 220
+            box_x = width // 2 - box_w // 2
+            box_y = height // 2 - box_h // 2
+            box_rect = pygame.Rect(box_x, box_y, box_w, box_h)
+            pygame.draw.rect(screen, (30, 40, 60), box_rect, border_radius=10)
+            pygame.draw.rect(screen, (200, 200, 220), box_rect, 2, border_radius=10)
+            title = pygame.font.SysFont(None, 28).render("Fast Travel (Coming Soon)", True, (255, 255, 255))
+            body = pygame.font.SysFont(None, 22).render("Fast travel destinations will appear here.", True, (220, 220, 220))
+            button_rect = pygame.Rect(box_x + box_w//2 - 60, box_y + box_h - 60, 120, 34)
+            pygame.draw.rect(screen, (80, 120, 180), button_rect, border_radius=6)
+            pygame.draw.rect(screen, (220, 220, 240), button_rect, 1, border_radius=6)
+            button_text = pygame.font.SysFont(None, 22).render("Close", True, (255, 255, 255))
+            screen.blit(title, title.get_rect(center=(box_rect.centerx, box_y + 50)))
+            screen.blit(body, body.get_rect(center=(box_rect.centerx, box_y + 95)))
+            screen.blit(button_text, button_text.get_rect(center=button_rect.center))
+            return button_rect
 
         for obj in visible_objects:
             # Handle both regular objects with rect and placed structures (dictionaries)
@@ -2641,6 +2899,23 @@ while running:
                     cf_sprite = campfire.get_world_sprite((sprite_width, sprite_height))
                     if cf_sprite:
                         struct_sprite = cf_sprite
+                if obj.get('item_name') == 'Torch':
+                    key = ('Torch', sprite_width, sprite_height)
+                    if key not in placeable_animation_cache:
+                        frames = []
+                        for i in range(1, 5):
+                            try:
+                                frame = pygame.image.load(f"assets/sprites/itemFrames/Torch{i}.png").convert_alpha()
+                                frame = pygame.transform.scale(frame, (sprite_width, sprite_height))
+                                frames.append(frame)
+                            except:
+                                continue
+                        placeable_animation_cache[key] = frames
+                    frames = placeable_animation_cache.get(key, [])
+                    if frames:
+                        elapsed = pygame.time.get_ticks() - obj.get('placed_time', 0)
+                        frame_idx = int(elapsed / 150) % len(frames)
+                        struct_sprite = frames[frame_idx]
                 try:
                     if struct_sprite is None:
                         icon_path = f"assets/sprites/items/{obj['icon']}"
@@ -2774,6 +3049,29 @@ while running:
             """Linear interpolation between a and b for t in [0,1]."""
             return a + (b - a) * max(0, min(1, t))
 
+        def get_light_mask(radius, max_alpha):
+            """Return a cached radial gradient mask used to subtract darkness."""
+            key = (radius, max_alpha)
+            if key in light_mask_cache:
+                return light_mask_cache[key]
+
+            size = radius * 4
+            surf = pygame.Surface((size, size), pygame.SRCALPHA)
+
+            center = (size // 2, size // 2)
+
+            ring_radii = [1.65, 1.6, 1.55, 1.5, 1.45, 1.4, 1.35, 1.3, 1.25, 1.2]
+            ring_alphas = [0.03, 0.07, 0.11, 0.16, 0.22, 0.32, 0.5, 0.7, 0.85, .95]
+
+            for r_scale, a_scale in zip(ring_radii, ring_alphas):
+                r = max(1, int(radius * r_scale))
+                alpha = int(max_alpha * a_scale)
+                pygame.draw.circle(surf, (0, 0, 0, alpha), center, r)
+
+            light_mask_cache[key] = surf
+            return surf
+
+
         # Default color/alpha
         R_value = G_value = B_value = A_value = 0
 
@@ -2818,16 +3116,40 @@ while running:
         B_value = max(0, min(255, B_value))
         A_value = max(0, min(255, A_value))
 
-        # Draw overlay
+        # Draw overlay with local light falloff
         day_night_overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
         day_night_overlay.fill((R_value, G_value, B_value, A_value))
+
+        if A_value > 0:
+            lights = []
+            # Placed torches
+            for struct in placed_structures:
+                if struct.get("item_name") == "Torch":
+                    lights.append((struct["x"] - cam_x, struct["y"], 220))
+                elif struct.get("item_name") == "Campfire" and campfire and getattr(campfire, "fire_lit", False):
+                    lights.append((struct["x"] - cam_x, struct["y"], 260))
+                elif struct.get("item_name") == "Smelter" and smelter and getattr(smelter, "fire_lit", False):
+                    lights.append((struct["x"] - cam_x, struct["y"], 260))
+            # Held torch (player light)
+            player_torch = None
+            sel_slot = inventory.selected_hotbar_slot
+            if 0 <= sel_slot < len(inventory.hotbar_slots):
+                player_torch = inventory.hotbar_slots[sel_slot]
+            if player_torch and player_torch.get("item_name") == "Torch":
+                lights.append((player_pos.x, player_pos.y, 220))
+
+            for lx, ly, radius in lights:
+                mask = get_light_mask(radius, A_value)
+                mask_rect = mask.get_rect(center=(int(lx), int(ly)))
+                day_night_overlay.blit(mask, mask_rect.topleft, special_flags=pygame.BLEND_RGBA_SUB)
+
         screen.blit(day_night_overlay, (0, 0))
 
 
         inventory.draw_hotbar(screen)
 
 
-        if not paused and not inventory_in_use and player.dead == False:
+        if not paused and not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not tent_menu_active and not fast_travel_menu_active and not sleeping_in_tent and not tent_hide_active and player.dead == False:
 
             if keys[pygame.K_e] and current_time - collect_cooldown > collect_delay:
                 for obj in visible_objects:
@@ -3407,19 +3729,10 @@ while running:
                 inventory.draw_items(screen)
                 inventory.draw_hotbar(screen)
                 inventory.draw_drop_menu(screen)
+            inventory.draw_dragged_item(screen)
         elif (campfire_in_use or smelter_in_use) and inventory.drop_menu_active:
             inventory.draw_drop_menu(screen)
             inventory.draw_dragged_item(screen)
-            if inventory_tab_unused.is_clicked(event):
-                inventory.state = "inventory"
-            elif crafting_tab_unused.is_clicked(event):
-                inventory.state = "crafting"
-            elif level_up_tab_unused.is_clicked(event):
-                inventory.state = "level_up"
-            elif cats_tab_unused.is_clicked(event):
-                inventory.state = "cats"
-            if inventory.state == "level_up":
-                inventory.handle_level_up_event(event)
 
         if paused:
             screen.blit(temp_pause_surface, pause_menu_rect.topleft)
@@ -3452,9 +3765,39 @@ while running:
 
         current_bg = get_current_background(player_world_x, tiles)
         current_temperature = calculate_temperature(current_bg, time_of_day, player.swimming, player.in_lava, player.temperature_resistance_leveler)
+        # store on player for UI display
+        player.current_temperature = current_temperature
+        # Warm up near active light sources
+        light_sources = []
+        for struct in placed_structures:
+            if struct.get("item_name") == "Torch":
+                light_sources.append((struct["x"], struct["y"], 220, 6))
+            elif struct.get("item_name") == "Campfire" and campfire and getattr(campfire, "fire_lit", False):
+                light_sources.append((struct["x"], struct["y"], 260, 10))
+            elif struct.get("item_name") == "Smelter" and smelter and getattr(smelter, "fire_lit", False):
+                light_sources.append((struct["x"], struct["y"], 260, 12))
+        # Held torch warmth
+        sel_slot = inventory.selected_hotbar_slot
+        if 0 <= sel_slot < len(inventory.hotbar_slots):
+            held_item = inventory.hotbar_slots[sel_slot]
+            if held_item and held_item.get("item_name") == "Torch":
+                light_sources.append((player_world_x, player_world_y, 220, 6))
+        warm_bonus = 0
+        for lx, ly, radius, bonus in light_sources:
+            dist = math.hypot(lx - player_world_x, ly - player_world_y)
+            if dist < radius:
+                factor = 1 - (dist / radius)
+                warm_bonus += bonus * factor
+        if warm_bonus > 0:
+            current_temperature = min(120, current_temperature + min(warm_bonus, 25))
         gauge_idx = get_temperature_gauge_index(current_temperature)
         draw_temperature_gauge(screen, current_temperature, gauge_idx)
         apply_temperature_effects(player, gauge_idx, dt)
+
+        if tent_menu_active:
+            draw_tent_menu(screen, dt)
+        if fast_travel_menu_active:
+            draw_fast_travel_placeholder(screen)
 
         if crafting_bench_in_use:
             crafting_bench.draw(screen)

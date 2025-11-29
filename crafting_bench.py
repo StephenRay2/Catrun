@@ -144,11 +144,16 @@ class CraftingBench:
         else:
             target_slot = self.inventory.inventory_list[slot_index]
         
+        new_selection_hotbar = None
+        new_selection_inventory = None
+
         if target_slot is None:
             if is_hotbar:
                 self.inventory.hotbar_slots[slot_index] = self.dragged_item
+                new_selection_hotbar = slot_index
             else:
                 self.inventory.inventory_list[slot_index] = self.dragged_item
+                new_selection_inventory = slot_index
         
         elif target_slot["item_name"] == self.dragged_item["item_name"]:
             max_stack = 100
@@ -168,12 +173,19 @@ class CraftingBench:
                     self.inventory.hotbar_slots[self.dragged_from_slot] = self.dragged_item
                 else:
                     self.inventory.inventory_list[self.dragged_from_slot] = self.dragged_item
+            # After stacking, keep selection on the target slot
+            if is_hotbar:
+                new_selection_hotbar = slot_index
+            else:
+                new_selection_inventory = slot_index
         
         else:
             if is_hotbar:
                 self.inventory.hotbar_slots[slot_index] = self.dragged_item
+                new_selection_hotbar = slot_index
             else:
                 self.inventory.inventory_list[slot_index] = self.dragged_item
+                new_selection_inventory = slot_index
             
             if self.dragged_from_hotbar:
                 self.inventory.hotbar_slots[self.dragged_from_slot] = target_slot
@@ -184,6 +196,13 @@ class CraftingBench:
         self.dragged_item = None
         self.dragged_from_slot = None
         self.dragged_from_hotbar = False
+        if new_selection_hotbar is not None:
+            self.inventory.selected_hotbar_slot = new_selection_hotbar
+            self.inventory.selection_mode = "hotbar"
+            self.inventory.selected_inventory_slot = None
+        elif new_selection_inventory is not None:
+            self.inventory.selected_inventory_slot = new_selection_inventory
+            self.inventory.selection_mode = "inventory"
         self.inventory.recalc_weight()
     
     def cancel_drag(self):
@@ -195,6 +214,15 @@ class CraftingBench:
         else:
             self.inventory.inventory_list[self.dragged_from_slot] = self.dragged_item
         
+        # Restore selection to the slot we canceled from
+        if self.dragged_from_hotbar:
+            self.inventory.selected_hotbar_slot = self.dragged_from_slot
+            self.inventory.selection_mode = "hotbar"
+            self.inventory.selected_inventory_slot = None
+        else:
+            self.inventory.selected_inventory_slot = self.dragged_from_slot
+            self.inventory.selection_mode = "inventory"
+
         self.dragging = False
         self.dragged_item = None
         self.dragged_from_slot = None

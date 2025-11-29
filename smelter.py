@@ -71,6 +71,7 @@ class Smelter:
         self.fire_toggle_cooldown = 200  # ms guard to prevent multi-click burn
         self.last_drag_time = 0
         self.drag_cooldown = 120  # debounce between drag starts (ms)
+        self.selected_slot = None
         
         self.dragging = False
         self.dragged_item = None
@@ -363,6 +364,7 @@ class Smelter:
             self.dragged_from_type = slot_type
             self.dragged_source_container = source_container
             source_container[slot_index] = None
+            self.selected_slot = (slot_index, slot_type)
     
     def end_drag(self, slot_info):
         if not self.dragging:
@@ -421,6 +423,7 @@ class Smelter:
                 restore_source(target_slot)
             
             finish()
+            self.selected_slot = (slot_index, slot_type)
             return
         
         elif slot_type in ["input", "output", "fuel"]:
@@ -469,10 +472,12 @@ class Smelter:
                 update_input_state(self.dragged_from_slot)
             
             finish()
+            self.selected_slot = (slot_index, slot_type)
             return
         
         restore_source(self.dragged_item)
         finish()
+        self.selected_slot = (self.dragged_from_slot, self.dragged_from_type)
         
     def cancel_drag(self):
         if not self.dragging:
@@ -480,6 +485,8 @@ class Smelter:
         source_container = getattr(self, "dragged_source_container", None)
         if source_container is not None:
             source_container[self.dragged_from_slot] = self.dragged_item
+        # Preserve selection on the slot we attempted to drag from
+        self.selected_slot = (self.dragged_from_slot, self.dragged_from_type)
         self.dragging = False
         self.dragged_item = None
         self.dragged_from_slot = None
@@ -669,6 +676,8 @@ class Smelter:
             row = i // 3
             x = input_start_x + col * (self.slot_size + self.gap_size)
             y = input_start_y + row * (self.slot_size + self.gap_size)
+            if self.selected_slot == (i, "input"):
+                pygame.draw.rect(screen, (255, 255, 255, 180), (x - 2, y - 2, self.slot_size + 4, self.slot_size + 4), 3)
             
             pygame.draw.rect(screen, (80, 80, 80), (x, y, self.slot_size, self.slot_size))
             pygame.draw.rect(screen, (150, 150, 150), (x, y, self.slot_size, self.slot_size), 2)
@@ -712,6 +721,8 @@ class Smelter:
             row = i // 3
             x = output_start_x + col * (self.slot_size + self.gap_size)
             y = input_start_y + row * (self.slot_size + self.gap_size)
+            if self.selected_slot == (i, "output"):
+                pygame.draw.rect(screen, (255, 255, 255, 180), (x - 2, y - 2, self.slot_size + 4, self.slot_size + 4), 3)
             
             pygame.draw.rect(screen, (80, 80, 80), (x, y, self.slot_size, self.slot_size))
             pygame.draw.rect(screen, (150, 150, 150), (x, y, self.slot_size, self.slot_size), 2)
@@ -767,6 +778,8 @@ class Smelter:
             row = i // 2
             x = fuel_start_x + col * (self.slot_size + self.gap_size)
             y = fuel_start_y + row * (self.slot_size + self.gap_size)
+            if self.selected_slot == (i, "fuel"):
+                pygame.draw.rect(screen, (255, 255, 255, 180), (x - 2, y - 2, self.slot_size + 4, self.slot_size + 4), 3)
             
             pygame.draw.rect(screen, (80, 80, 80), (x, y, self.slot_size, self.slot_size))
             pygame.draw.rect(screen, (150, 150, 150), (x, y, self.slot_size, self.slot_size), 2)
@@ -824,6 +837,8 @@ class Smelter:
             col = slot_index % columns
             x = start_x + col * (self.slot_size + self.gap_size)
             y = start_y + row * (self.slot_size + self.gap_size - 3)
+            if self.selected_slot == (slot_index, "inventory"):
+                pygame.draw.rect(screen, (255, 255, 255, 180), (x - 2, y - 2, self.slot_size + 4, self.slot_size + 4), 3)
 
             if self.inventory.inventory_list[slot_index] is not None:
                 item = self.inventory.inventory_list[slot_index]
