@@ -1,6 +1,7 @@
 import pygame
 import random
 import time
+import math
 
 screen = pygame.display.set_mode((1280, 720), pygame.FULLSCREEN)
 width = screen.get_width()
@@ -57,6 +58,7 @@ fruit_plants = []
 ferns = []
 ponds = []
 lavas = []
+dropped_items = []
 
 
 pond_images = ["assets/sprites/biomes/grassland/pond1.png", "assets/sprites/biomes/grassland/pond2.png", "assets/sprites/biomes/grassland/pond3.png", "assets/sprites/biomes/grassland/pond4.png", "assets/sprites/biomes/grassland/pond5.png", "assets/sprites/biomes/grassland/pond6.png", "assets/sprites/biomes/grassland/pond7.png", "assets/sprites/biomes/grassland/pond8.png", "assets/sprites/biomes/grassland/pond9.png", "assets/sprites/biomes/grassland/pond10.png"]
@@ -686,11 +688,14 @@ class FruitPlant(pygame.sprite.Sprite):
     
 
 class Collectible(pygame.sprite.Sprite):
-    def __init__(self, x, y, image, resource, size=(48, 48)):
+    def __init__(self, x, y, image, resource, size=(48, 48), image_surface=None):
         super().__init__()
         self.x = x
         self.y = y
-        self.image = pygame.transform.scale(pygame.image.load(image).convert_alpha(), size)
+        base_image = image_surface
+        if base_image is None:
+            base_image = pygame.image.load(image).convert_alpha()
+        self.image = pygame.transform.scale(base_image, size)
         self.rect = self.image.get_rect(topleft=(x, y))
         self.resource = resource
         self.amount = 1
@@ -717,6 +722,51 @@ class Collectible(pygame.sprite.Sprite):
     def draw(self, screen, cam_x):
         if not self.destroyed:
             screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
+
+
+class DroppedItem(Collectible):
+    ICON_SIZE = 16
+    drop_font = pygame.font.SysFont(None, 18)
+
+    def __init__(self, x, y, resource, icon_path, amount=1):
+        size = (self.ICON_SIZE, self.ICON_SIZE)
+        image_surface = None
+        if icon_path:
+            try:
+                image_surface = pygame.image.load(icon_path).convert_alpha()
+            except:
+                image_surface = None
+        if image_surface is None:
+            image_surface = pygame.Surface(size, pygame.SRCALPHA)
+            pygame.draw.rect(image_surface, (90, 90, 90, 220), (0, 0, size[0], size[1]), border_radius=6)
+        super().__init__(int(x), int(y), icon_path or "", resource, size=size, image_surface=image_surface)
+        self.amount = max(1, int(amount))
+        self._float_phase = random.random() * math.tau
+
+    def draw(self, screen, cam_x):
+        if self.destroyed:
+            return
+        # Floating animation
+        t = pygame.time.get_ticks() / 1000.0
+        offset_y = int(math.sin(t * 2 + self._float_phase) * 3)
+
+        # Simple shadow ellipse for float effect
+        shadow_width = max(8, self.rect.width - 4)
+        shadow_height = max(4, self.rect.height // 3)
+        shadow_surface = pygame.Surface((shadow_width, shadow_height), pygame.SRCALPHA)
+        pygame.draw.ellipse(shadow_surface, (0, 0, 0, 100), shadow_surface.get_rect())
+        shadow_x = self.rect.x - cam_x + (self.rect.width - shadow_width) // 2
+        shadow_y = self.rect.y + self.rect.height - shadow_height // 2
+        screen.blit(shadow_surface, (shadow_x, shadow_y))
+
+        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y + offset_y))
+        if self.amount > 1:
+            qty_text = self.drop_font.render(str(self.amount), True, (255, 255, 255))
+            shadow = self.drop_font.render(str(self.amount), True, (0, 0, 0))
+            text_x = self.rect.x - cam_x + self.rect.width - qty_text.get_width() - 2
+            text_y = self.rect.y + self.rect.height - qty_text.get_height() - 4 + offset_y
+            screen.blit(shadow, (text_x + 1, text_y + 1))
+            screen.blit(qty_text, (text_x, text_y))
 
 class Stick(Collectible):
     def __init__(self, x, y):
@@ -1197,7 +1247,7 @@ for tile_x, tile_image in tiles:
 
 
 def generate_world():
-    global rocks, dead_bushes, grasses, stones, boulders, berry_bushes, trees, sticks, savannah_grasses, mushrooms, fruit_plants, ferns, ponds, lavas
+    global rocks, dead_bushes, grasses, stones, boulders, berry_bushes, trees, sticks, savannah_grasses, mushrooms, fruit_plants, ferns, ponds, lavas, dropped_items
     
     rocks.clear()
     dead_bushes.clear()
@@ -1213,6 +1263,7 @@ def generate_world():
     ferns.clear()
     ponds.clear()
     lavas.clear()
+    dropped_items.clear()
 
     for _ in range(num_rocks):
         tile_x, tile_image = random.choice(weighted_rock_tiles)

@@ -7,6 +7,7 @@ from sounds import *
 from crafting_bench import CraftingBench
 from smelter import Smelter
 from campfire import Campfire
+from world import DroppedItem, dropped_items
 
 clock = pygame.time.Clock()
 from inventory import *
@@ -451,6 +452,39 @@ def spawn_thrown_item(x, y, vel_x, vel_y, item_data, is_cat=False, throw_power=1
     }
     thrown_items.append(thrown_item)
 
+def resolve_item_icon_path(item_data):
+    if not item_data:
+        return None
+    icon = item_data.get("icon")
+    if not icon:
+        return None
+    if icon.startswith("assets/"):
+        return icon
+    return f"assets/sprites/items/{icon}"
+
+def spawn_dropped_collectible(item_data, quantity=1, drop_x=None, drop_y=None):
+    if not item_data or quantity is None or quantity <= 0:
+        return False
+    icon_path = resolve_item_icon_path(item_data)
+    x = player_world_x if drop_x is None else drop_x
+    y = player_world_y if drop_y is None else drop_y
+    # Offset so the item centers near the player position
+    icon_size = getattr(DroppedItem, "ICON_SIZE", 16)
+    half = icon_size // 2
+    dropped_items.append(
+        DroppedItem(int(x - half), int(y - half), item_data.get("item_name", ""), icon_path, amount=quantity)
+    )
+    return True
+
+def process_drop_result(drop_result, drop_x=None, drop_y=None):
+    if not drop_result:
+        return False
+    item_data = drop_result.get("item_data")
+    amount = drop_result.get("amount", 0)
+    if not item_data or amount <= 0:
+        return False
+    return spawn_dropped_collectible(item_data, amount, drop_x, drop_y)
+
 def create_world_item_from_thrown(thrown_item):
     """Convert a thrown item to a world item and add it to the appropriate list"""
     if not thrown_item["item"]:
@@ -471,7 +505,9 @@ def create_world_item_from_thrown(thrown_item):
         mushrooms.append(Mushroom(x, y))
         return True
     
-    return False
+    # Fallback: spawn a generic dropped collectible that can be picked back up
+    spawn_dropped_collectible(thrown_item["item"], thrown_item.get("quantity", 1), x, y)
+    return True
 
 def get_current_background(player_world_x, tiles):
     for tile_x, tile_image in tiles:
@@ -1065,7 +1101,7 @@ while running:
         menu_screen = pygame.Rect(0, 0, width, height)
         screen.blit(menu_image, (0, 0), menu_screen)
 
-        collectibles = sticks + stones + grasses + savannah_grasses + mushrooms 
+        collectibles = sticks + stones + grasses + savannah_grasses + mushrooms + dropped_items 
         all_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants + ponds + lavas
 
         visible_collectibles = [col for col in collectibles if col.rect.x- cam_x > -1000 and col.rect.y - cam_x < width + 1000]
@@ -1374,6 +1410,12 @@ while running:
                     elif event.unicode.isprintable() and len(cat_name_input) < 20:
                         cat_name_input += event.unicode
                     continue
+
+                if inventory.drop_menu_active and inventory.awaiting_drop_amount:
+                    drop_result = inventory.handle_drop_amount_key(event)
+                    if drop_result:
+                        process_drop_result(drop_result)
+                    continue
                 
                 if event.key == pygame.K_ESCAPE:
                     if crafting_bench_in_use:
@@ -1394,6 +1436,7 @@ while running:
                         inventory_in_use = False
                         inventory.selection_mode = "hotbar"
                         inventory.selected_inventory_slot = None
+                        inventory.close_drop_menu()
                 
                 inventory.handle_keydown_hotbar(event, screen=None, use_on_press=False)
                 
@@ -1416,15 +1459,38 @@ while running:
                     if not inventory_in_use:
                         inventory.selection_mode = "hotbar"
                         inventory.selected_inventory_slot = None
+                        inventory.close_drop_menu()
+                
+                if event.key == pygame.K_r and player.is_alive:
+                    drop_result = inventory.remove_selected_quantity(1)
+                    if drop_result:
+                        process_drop_result(drop_result)
+                    inventory.close_drop_menu()
                 
                 if inventory_in_use and player.is_alive:
                     if event.key == pygame.K_ESCAPE:
                         inventory_in_use = False
                         inventory.selection_mode = "hotbar"
                         inventory.selected_inventory_slot = None
+                        inventory.close_drop_menu()
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and inventory.drop_menu_active:
+                drop_result = inventory.handle_drop_menu_click(pygame.mouse.get_pos())
+                if drop_result:
+                    process_drop_result(drop_result)
+                    continue
+                if inventory.drop_menu_active:
+                    continue
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3 and inventory_in_use and inventory.state == "inventory":
+                mouse_pos = pygame.mouse.get_pos()
+                if inventory.handle_drop_right_click(mouse_pos, screen):
+                    continue
+                inventory.close_drop_menu()
+                continue
 
             # Placement system - toggle placement mode with right-click
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3 and player.is_alive and not crafting_bench_in_use and not smelter_in_use and not campfire_in_use:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3 and player.is_alive and not crafting_bench_in_use and not smelter_in_use and not campfire_in_use and not inventory_in_use:
                 if placement_mode:
                     # Cancel placement mode
                     cancel_placement()
@@ -1440,7 +1506,7 @@ while running:
 
 
             # Throw mechanic - release and throw
-            elif event.type == pygame.MOUSEBUTTONUP and event.button == 3 and player.is_alive and not placement_mode:
+            elif event.type == pygame.MOUSEBUTTONUP and event.button == 3 and player.is_alive and not placement_mode and not inventory_in_use:
                 if throw_charge_start is not None:
                     charge_duration = (pygame.time.get_ticks() - throw_charge_start) / 1000.0
                     throw_power = min(charge_duration / max_throw_charge, 1.0)
@@ -2085,6 +2151,7 @@ while running:
         grasses = [grass for grass in grasses if not grass.destroyed]
         stones = [stone for stone in stones if not stone.destroyed]
         sticks = [s for s in sticks if not s.destroyed]
+        dropped_items = [d for d in dropped_items if not d.destroyed]
         rocks = [r for r in rocks if not r.destroyed]
         trees = [t for t in trees if not t.destroyed]
         boulders = [b for b in boulders if not b.destroyed]
@@ -2119,7 +2186,7 @@ while running:
 
         keys = pygame.key.get_pressed()
 
-        collectibles = sticks + stones + grasses + savannah_grasses + mushrooms
+        collectibles = sticks + stones + grasses + savannah_grasses + mushrooms + dropped_items
         all_objects_no_liquids = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants
         all_objects = all_objects_no_liquids + ponds + lavas
         mobs = cats + squirrels + cows + chickens + crawlers + duskwretches + pocks + deers + black_bears + brown_bears + gilas + crows + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
@@ -2800,15 +2867,18 @@ while running:
                     
                     actual_speed = player_speed * shift_multiplier
                     base_speed = player.base_speed * player.speed
-                    speed_ratio = actual_speed / base_speed if base_speed > 0 else 1.0
+                    speed_ratio = actual_speed / base_speed if base_speed > 0 else 0
                     
-                    current_step_delay = base_delay / speed_ratio
-                    
-                    step_sound_timer += dt
-                    if step_sound_timer >= current_step_delay:
-                        current_bg = get_current_background(player_world_x, tiles)
-                        current_footsteps = get_footstep_sounds(current_bg)
-                        sound_manager.play_sound(random.choice(current_footsteps))
+                    if speed_ratio > 0:
+                        current_step_delay = base_delay / speed_ratio
+                        
+                        step_sound_timer += dt
+                        if step_sound_timer >= current_step_delay:
+                            current_bg = get_current_background(player_world_x, tiles)
+                            current_footsteps = get_footstep_sounds(current_bg)
+                            sound_manager.play_sound(random.choice(current_footsteps))
+                            step_sound_timer = 0
+                    else:
                         step_sound_timer = 0
                 else:
                     step_sound_timer = 0
@@ -3095,11 +3165,13 @@ while running:
             smelter.render(screen)
 
         if inventory_in_use:
-
+            if inventory.state != "inventory":
+                inventory.close_drop_menu()
             inventory.draw_inventory(screen)
             if inventory.state == "inventory":
                 inventory.draw_items(screen)
                 inventory.draw_hotbar(screen)
+                inventory.draw_drop_menu(screen)
             inventory.draw_dragged_item(screen)
             if inventory_tab_unused.is_clicked(event):
                 inventory.state = "inventory"

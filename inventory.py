@@ -5831,6 +5831,13 @@ items_list = [
 
 ]
 
+# Halve all item weights globally
+for item in items_list:
+    if "weight" in item and isinstance(item["weight"], (int, float)):
+        item["weight"] = item["weight"] / 2
+
+_item_weight_lookup = {item["item_name"]: item.get("weight", 0) for item in items_list if "item_name" in item}
+
 def _get_tier(name_lower):
     if "dragon scale" in name_lower:
         return "dragon"
@@ -5850,10 +5857,10 @@ def _get_tier(name_lower):
 
 _tier_durabilities = {
     "wood": 300,
-    "stone": 600,
-    "metal": 1600,
+    "stone": 800,
+    "metal": 1800,
     "bone": 1000,
-    "gold": 1200,
+    "gold": 1400,
     "obsidian": 2200,
     "dragon": 5000,
 }
@@ -5950,6 +5957,14 @@ class Inventory():
         self.dragged_item = None
         self.dragged_from_slot = None
         self.dragged_from_hotbar = False
+        self.drop_menu_active = False
+        self.drop_menu_slot = None
+        self.drop_menu_is_hotbar = False
+        self.drop_menu_position = (0, 0)
+        self.drop_menu_rect = None
+        self.drop_option_rects = {}
+        self.drop_amount_input = ""
+        self.awaiting_drop_amount = False
         self.inventory_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/inventory_screen.png").convert_alpha(), (1100, 600))
         self.crafting_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/crafting_screen.png").convert_alpha(), (1100, 600))
         self.level_up_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/level_up_screen.png").convert_alpha(), (1100, 600))
@@ -5969,6 +5984,18 @@ class Inventory():
         self.crafting_completion_slot = None
         self.crafting_completion_time = 0
         self.crafting_flash_duration = 0.3  # 0.3 second flash
+
+    def recalc_weight(self):
+        """Recompute total carried weight and sync it to the player immediately."""
+        total = 0
+        for slot in (self.hotbar_slots + self.inventory_list):
+            if not slot:
+                continue
+            weight = _item_weight_lookup.get(slot["item_name"], 0)
+            total += round(slot.get("quantity", 0) * weight, 1)
+        self.total_inventory_weight = round(total, 1)
+        player.weight = self.total_inventory_weight
+        return self.total_inventory_weight
 
     def draw_inventory(self, screen):
         
@@ -6485,11 +6512,70 @@ class Inventory():
             screen.blit(bg_surface, (bg_x, bg_y))
             screen.blit(name_surface, (bg_x + 4, bg_y + 2))
 
+    def draw_drop_menu(self, screen):
+        if not self.drop_menu_active:
+            return
+
+        slot = self._get_slot_from_context(self.drop_menu_slot, self.drop_menu_is_hotbar)
+        if slot is None:
+            self.close_drop_menu()
+            return
+
+        menu_width = 210
+        option_height = 26
+        title_height = 18
+        padding = 10
+        options = [
+            ("drop_one", "Drop one (R)"),
+            ("drop_amount", "Drop amount..."),
+            ("drop_all", "Drop all"),
+        ]
+        menu_height = padding * 2 + title_height + (option_height + 4) * len(options)
+        if self.awaiting_drop_amount:
+            menu_height += option_height + 4
+
+        menu_x, menu_y = self.drop_menu_position
+        if menu_x + menu_width > screen.get_width() - 10:
+            menu_x = screen.get_width() - menu_width - 10
+        if menu_y + menu_height > screen.get_height() - 10:
+            menu_y = screen.get_height() - menu_height - 10
+
+        self.drop_menu_rect = pygame.Rect(menu_x, menu_y, menu_width, menu_height)
+
+        bg_surface = pygame.Surface((menu_width, menu_height), pygame.SRCALPHA)
+        bg_surface.fill((0, 0, 0, 190))
+        pygame.draw.rect(bg_surface, (220, 220, 220), bg_surface.get_rect(), 2, border_radius=8)
+        screen.blit(bg_surface, (menu_x, menu_y))
+
+        option_font = pygame.font.SysFont(None, 20)
+        title_font = pygame.font.SysFont(None, 18)
+
+        title_text = title_font.render(slot.get("item_name", "Item"), True, (255, 255, 255))
+        screen.blit(title_text, (menu_x + padding, menu_y + padding))
+
+        self.drop_option_rects = {}
+        start_y = menu_y + padding + title_height + 4
+        for idx, (key, label) in enumerate(options):
+            rect = pygame.Rect(menu_x + padding, start_y + idx * (option_height + 4), menu_width - padding * 2, option_height)
+            self.drop_option_rects[key] = rect
+            pygame.draw.rect(screen, (40, 40, 40, 180), rect)
+            pygame.draw.rect(screen, (200, 200, 200), rect, 1, border_radius=4)
+            text_surface = option_font.render(label, True, (255, 255, 255))
+            screen.blit(text_surface, (rect.x + 8, rect.y + 5))
+
+        if self.awaiting_drop_amount:
+            input_rect = pygame.Rect(menu_x + padding, start_y + len(options) * (option_height + 4), menu_width - padding * 2, option_height)
+            pygame.draw.rect(screen, (30, 30, 30, 200), input_rect)
+            pygame.draw.rect(screen, (180, 180, 180), input_rect, 1, border_radius=4)
+            prompt = f"Amount: {self.drop_amount_input or '_'}"
+            prompt_surface = option_font.render(prompt, True, (255, 255, 255))
+            screen.blit(prompt_surface, (input_rect.x + 8, input_rect.y + 5))
+
     def draw_items(self, screen):
         start_x = (screen.get_width() / 2 - self.inventory_image.get_width() / 2) + 18
         start_y = (screen.get_height() / 2 - self.inventory_image.get_height() / 2) + 44
         font = pygame.font.SysFont(None, 20)
-        self.total_inventory_weight = 0
+        self.recalc_weight()
         mouse_pos = pygame.mouse.get_pos()
 
         for hotbar_slot in self.hotbar_slots:
@@ -6500,7 +6586,6 @@ class Inventory():
                 for item in items_list:
                     if item["item_name"] == item_name:
                         stack_weight = round(quantity * item["weight"], 1)
-                        self.total_inventory_weight += stack_weight
                         break
 
         for slot_index in range(self.capacity):
@@ -6532,8 +6617,6 @@ class Inventory():
                             )
 
                         stack_weight = round(quantity * item["weight"], 1)
-                        self.total_inventory_weight += stack_weight
-
                         weight_text = font.render(str(stack_weight), True, (250, 250, 20))
                         weight_x_pos = x + 39
                         if stack_weight == int(stack_weight) and stack_weight < 10:
@@ -6665,6 +6748,8 @@ class Inventory():
             if self.hotbar_slots[i] and self.hotbar_slots[i]["quantity"] <= 0:
                 self.hotbar_slots[i] = None
 
+        self.recalc_weight()
+
     def remove_items_by_tag(self, tag, amount):
         remaining = amount
         
@@ -6706,6 +6791,8 @@ class Inventory():
         for i in range(len(self.hotbar_slots)):
             if self.hotbar_slots[i] and self.hotbar_slots[i]["quantity"] <= 0:
                 self.hotbar_slots[i] = None
+
+        self.recalc_weight()
     def draw_crafting(self, screen):
         start_x = (screen.get_width() / 2 - self.inventory_image.get_width() / 2) + 18
         start_y = (screen.get_height() / 2 - self.inventory_image.get_height() / 2) + 44
@@ -6883,6 +6970,7 @@ class Inventory():
                 if self.inventory_full_message_timer <= 0:
                     self.inventory_full_message_timer = 2.0
         
+        self.recalc_weight()
         return all_added
     def get_slot_at_mouse(self, mouse_pos, screen):
         mouse_x, mouse_y = mouse_pos
@@ -6950,6 +7038,7 @@ class Inventory():
                 self.crafting_completion_time = 0
 
     def start_drag(self, slot_index, is_hotbar):
+        self.close_drop_menu()
         if is_hotbar:
             slot = self.hotbar_slots[slot_index]
         else:
@@ -6965,6 +7054,7 @@ class Inventory():
                 self.hotbar_slots[slot_index] = None
             else:
                 self.inventory_list[slot_index] = None
+            self.recalc_weight()
 
     def update_drag(self, mouse_pos):
         pass
@@ -7026,12 +7116,13 @@ class Inventory():
         if self.dragged_from_hotbar:
             self.hotbar_slots[self.dragged_from_slot] = self.dragged_item
         else:
-            self.inventory_list[self.dragged_from_slot] = self.dragged_item
+                self.inventory_list[self.dragged_from_slot] = self.dragged_item
         
         self.dragging = False
         self.dragged_item = None
         self.dragged_from_slot = None
         self.dragged_from_hotbar = False
+        self.recalc_weight()
 
     def draw_dragged_item(self, screen):
         if not self.dragging or self.dragged_item is None:
@@ -7130,9 +7221,152 @@ class Inventory():
                 self.selected_inventory_slot = slot_index
                 self.selection_mode = "inventory"
             
+            self.close_drop_menu()
             return (slot_index, is_hotbar)
         
+        self.close_drop_menu()
         return (None, None)
+
+    def close_drop_menu(self):
+        self.drop_menu_active = False
+        self.drop_menu_slot = None
+        self.drop_menu_is_hotbar = False
+        self.drop_option_rects = {}
+        self.drop_menu_rect = None
+        self.drop_amount_input = ""
+        self.awaiting_drop_amount = False
+
+    def open_drop_menu(self, slot_index, is_hotbar, mouse_pos):
+        if slot_index is None:
+            self.close_drop_menu()
+            return False
+        slots = self.hotbar_slots if is_hotbar else self.inventory_list
+        if slot_index < 0 or slot_index >= len(slots):
+            self.close_drop_menu()
+            return False
+        if slots[slot_index] is None:
+            self.close_drop_menu()
+            return False
+
+        self.drop_menu_active = True
+        self.drop_menu_slot = slot_index
+        self.drop_menu_is_hotbar = is_hotbar
+        self.drop_menu_position = mouse_pos
+        self.awaiting_drop_amount = False
+        self.drop_amount_input = ""
+        return True
+
+    def handle_drop_right_click(self, mouse_pos, screen):
+        slot_index, is_hotbar = self.get_slot_at_mouse(mouse_pos, screen)
+        if slot_index is None:
+            self.close_drop_menu()
+            return False
+
+        slots = self.hotbar_slots if is_hotbar else self.inventory_list
+        if slots[slot_index] is None:
+            self.close_drop_menu()
+            return False
+
+        self.handle_selection_click(mouse_pos, screen)
+        return self.open_drop_menu(slot_index, is_hotbar, mouse_pos)
+
+    def _get_slot_from_context(self, slot_index, is_hotbar):
+        slots = self.hotbar_slots if is_hotbar else self.inventory_list
+        if slot_index is None or slot_index < 0 or slot_index >= len(slots):
+            return None
+        return slots[slot_index]
+
+    def remove_quantity_from_slot(self, slot_index, is_hotbar, amount):
+        if amount is None or amount <= 0:
+            return None
+        slot = self._get_slot_from_context(slot_index, is_hotbar)
+        if slot is None:
+            return None
+
+        drop_amount = min(amount, slot.get("quantity", 0))
+        if drop_amount <= 0:
+            return None
+
+        item_name = slot.get("item_name")
+        item_data = next((item for item in items_list if item["item_name"] == item_name), None)
+
+        slot["quantity"] -= drop_amount
+        if slot["quantity"] <= 0:
+            if is_hotbar:
+                self.hotbar_slots[slot_index] = None
+            else:
+                self.inventory_list[slot_index] = None
+
+        self.recalc_weight()
+        return {"item_data": item_data, "item_name": item_name, "amount": drop_amount}
+
+    def remove_selected_quantity(self, amount):
+        if self.selection_mode == "hotbar":
+            slot_index = self.selected_hotbar_slot
+            is_hotbar = True
+        elif self.selection_mode == "inventory":
+            if self.selected_inventory_slot is None:
+                return None
+            slot_index = self.selected_inventory_slot
+            is_hotbar = False
+        else:
+            return None
+
+        return self.remove_quantity_from_slot(slot_index, is_hotbar, amount)
+
+    def _perform_drop_from_menu(self, amount):
+        if self.drop_menu_slot is None:
+            return None
+        result = self.remove_quantity_from_slot(self.drop_menu_slot, self.drop_menu_is_hotbar, amount)
+        self.close_drop_menu()
+        return result
+
+    def handle_drop_menu_click(self, mouse_pos):
+        if not self.drop_menu_active:
+            return None
+
+        if self.drop_menu_rect and not self.drop_menu_rect.collidepoint(mouse_pos):
+            self.close_drop_menu()
+            return None
+
+        for key, rect in self.drop_option_rects.items():
+            if rect.collidepoint(mouse_pos):
+                if key == "drop_one":
+                    return self._perform_drop_from_menu(1)
+                if key == "drop_all":
+                    slot = self._get_slot_from_context(self.drop_menu_slot, self.drop_menu_is_hotbar)
+                    amount = slot.get("quantity", 0) if slot else 0
+                    return self._perform_drop_from_menu(amount)
+                if key == "drop_amount":
+                    self.awaiting_drop_amount = True
+                    self.drop_amount_input = ""
+                return None
+
+        return None
+
+    def handle_drop_amount_key(self, event):
+        if not (self.drop_menu_active and self.awaiting_drop_amount):
+            return None
+
+        if event.key == pygame.K_RETURN:
+            self.awaiting_drop_amount = False
+            try:
+                amount = int(self.drop_amount_input) if self.drop_amount_input else 0
+            except ValueError:
+                amount = 0
+            if amount <= 0:
+                self.close_drop_menu()
+                return None
+            return self._perform_drop_from_menu(amount)
+        elif event.key == pygame.K_BACKSPACE:
+            self.drop_amount_input = self.drop_amount_input[:-1]
+        elif event.key == pygame.K_ESCAPE:
+            self.close_drop_menu()
+        else:
+            if hasattr(event, "unicode") and event.unicode.isdigit():
+                if len(self.drop_amount_input) < 3:
+                    self.drop_amount_input += event.unicode
+        return None
     
     def get_selected_item(self):
         """
@@ -7207,7 +7441,8 @@ class Inventory():
                 self.hotbar_slots[slot_index] = None
             else:
                 self.inventory_list[slot_index] = None
-        
+
+        self.recalc_weight()
         return (True, item_data.get("tags", []))
 
     def consume_item(self):

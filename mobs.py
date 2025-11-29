@@ -525,7 +525,17 @@ class Player(pygame.sprite.Sprite):
         ))
 
     def get_speed(self):
-        return self.base_speed * (self.speed / 100)
+        speed = self.base_speed * (self.speed / 100)
+        weight_ratio = self.weight / self.max_weight if self.max_weight > 0 else 0
+        if weight_ratio >= 1:
+            weight_multiplier = 0
+        elif weight_ratio >= 0.95:
+            weight_multiplier = 0.25
+        elif weight_ratio >= 0.9:
+            weight_multiplier = 0.5
+        else:
+            weight_multiplier = 1
+        return speed * weight_multiplier
 
     def regain_health(self, dt):
         if 1 <= self.health <= self.max_health:
