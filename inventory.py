@@ -2,6 +2,8 @@ import pygame
 import pygame
 import random
 import re
+import math
+import mob_placement
 
 HARVEST_TOOL_MULTS = {
     "wood": {"normal": 2, "special": 2},
@@ -5993,6 +5995,16 @@ class Inventory():
         self.crafting_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/crafting_screen.png").convert_alpha(), (1100, 600))
         self.level_up_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/level_up_screen.png").convert_alpha(), (1100, 600))
         self.cat_screen_image = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/cats_screen.png").convert_alpha(), (1100, 600))
+        self.cat_card_image = pygame.image.load("assets/sprites/buttons/CatCard.png").convert_alpha()
+        self.cat_card_portrait_sources = {}
+        self.cat_card_portrait_cache = {}
+        self.cat_card_scroll = 0
+        self.cat_card_max_scroll = 0
+        self.cat_card_columns = 3
+        self.cat_card_column_padding = 14
+        self.cat_card_row_padding = 30
+        self.cat_card_title_font = pygame.font.SysFont(None, 22)
+        self.cat_card_stat_font = pygame.font.SysFont(None, 16)
         self.level_up_skill_image = pygame.image.load("assets/sprites/buttons/level_up_skill_button.png").convert_alpha()
         self.level_up_skill_flash_image = pygame.image.load("assets/sprites/buttons/level_up_skill_button_flash.png").convert_alpha()
         self.level_up_button_rects = []
@@ -6070,6 +6082,7 @@ class Inventory():
             pygame.draw.rect(inventory_surface, (0, 0, 0, 150), screen.get_rect())
             screen.blit(inventory_surface, (0, 0))
             screen.blit(self.cat_screen_image, (x_pos, y_pos - 20))
+            self.draw_cats_tab(screen, x_pos, y_pos - 20)
 
             inventory_tab_unused.draw(screen)
             crafting_tab_unused.draw(screen)
@@ -6100,6 +6113,243 @@ class Inventory():
         temp_display = int(player.current_temperature) if hasattr(player, "current_temperature") else "N/A"
         temp_text = font.render(f"Temp: {temp_display}", True, (255, 200, 120))
         screen.blit(temp_text, (total_weight_pos_x, info_y + 6))
+
+    def draw_cats_tab(self, screen, x_pos, y_pos):
+        """Draw cat cards for every tamed cat the player owns."""
+        panel_padding_x = 60
+        panel_padding_y = 55
+        tab_left = inventory_tab_unused.rect.left if inventory_tab_unused else screen.get_width() // 2 - 533
+        tab_bottom = inventory_tab_unused.rect.bottom if inventory_tab_unused else (screen.get_height() // 2 - 303) + 44
+        area_left_bound = x_pos + panel_padding_x
+        area_right_bound = x_pos + self.cat_screen_image.get_width() - panel_padding_x
+        shifted_left = 30
+        area_x = max(area_left_bound - shifted_left, tab_left - shifted_left)
+        area_y = max(y_pos + panel_padding_y, tab_bottom + 8)
+        area_width = max(0, area_right_bound - area_x)
+        area_height = self.cat_screen_image.get_height() - ((area_y - (y_pos - 20)) + 25)
+        if area_width <= 0 or area_height <= 0:
+            return
+
+        cat_surface = pygame.Surface((area_width, area_height), pygame.SRCALPHA)
+        entries = self._gather_tamed_cat_entries()
+        card_width = self.cat_card_image.get_width()
+        card_height = self.cat_card_image.get_height()
+        columns = max(1, self.cat_card_columns)
+        horizontal_gap = self.cat_card_column_padding
+        row_offset_x = 0
+        portrait_height = int(card_height)
+        portrait_side = max(10, min(int(card_width * 4.5), portrait_height))
+        portrait_size = (portrait_side, portrait_side)
+
+        if entries:
+            total_rows = math.ceil(len(entries) / columns)
+            total_height = max(0, total_rows * (card_height + self.cat_card_row_padding) - self.cat_card_row_padding)
+            self.cat_card_max_scroll = max(0, total_height - area_height)
+            self.cat_card_scroll = max(0, min(self.cat_card_scroll, self.cat_card_max_scroll))
+        else:
+            self.cat_card_max_scroll = 0
+            self.cat_card_scroll = 0
+
+        y_offset = -self.cat_card_scroll
+
+        if not entries:
+            info_font = pygame.font.SysFont(None, 26)
+            info_text = info_font.render("No tamed cats yet. Feed a cat to tame one!", True, (230, 220, 200))
+            info_rect = info_text.get_rect(center=(area_width // 4, area_height // 3))
+            cat_surface.blit(info_text, info_rect)
+        else:
+            for idx, entry in enumerate(entries):
+                col = idx % columns
+                row = idx // columns
+                draw_x = row_offset_x + col * (card_width + horizontal_gap)
+                draw_y = y_offset + row * (card_height + self.cat_card_row_padding)
+                if draw_y > area_height or draw_y + card_height < -card_height:
+                    continue
+                card_surface = self.cat_card_image.copy()
+
+                portrait = self._load_cat_portrait(entry.get("icon"), portrait_size)
+                portrait_target = pygame.Rect(0, 0, portrait_size[0], portrait_size[1])
+                portrait_target.centerx = card_width // 2
+                portrait_target.centery = portrait_height // 2 - 58
+                if portrait:
+                    card_surface.blit(portrait, portrait_target)
+                else:
+                    fallback_rect = pygame.Rect(0, 0, portrait_size[0], portrait_size[1])
+                    fallback_rect.center = portrait_target.center
+                    pygame.draw.rect(card_surface, (60, 60, 90), fallback_rect, border_radius=6)
+
+                text_color = (0, 0, 0)
+                text_x = 8
+                text_y = 8
+
+                self._draw_text(
+                    card_surface,
+                    self.cat_card_title_font,
+                    entry['name'],
+                    (text_x, text_y),
+                    text_color
+                )
+                stats_lines = [
+                    f"Lvl {entry['level']}  EXP {entry['experience'][0]}/{entry['experience'][1]}",
+                    f"HP {entry['health'][0]}/{entry['health'][1]}  Hunger {entry['hunger'][0]}/{entry['hunger'][1]}",
+                    f"ATK {entry['attack']}  SPD {entry['speed']}  DEF {entry['defense']}",
+                ]
+                stat_line_height = self.cat_card_stat_font.get_height() + 2
+                stats_height = stat_line_height * len(stats_lines)
+                text_y = max(portrait_height + 8, card_height - stats_height - 8)
+                max_bottom_y = card_height - 12 - stats_height
+                if text_y > max_bottom_y:
+                    text_y = max_bottom_y
+                for line in stats_lines:
+                    self._draw_text(
+                        card_surface,
+                        self.cat_card_stat_font,
+                        line,
+                        (text_x, text_y),
+                        text_color
+                    )
+                    text_y += self.cat_card_stat_font.get_height() + 2
+
+                cat_surface.blit(card_surface, (draw_x, draw_y))
+
+        screen.blit(cat_surface, (area_x, area_y))
+
+    def _gather_tamed_cat_entries(self):
+        entries = []
+        seen_ids = set()
+
+        world_cats = getattr(mob_placement, "cats", [])
+        for cat in world_cats:
+            entry = self._build_cat_entry_from_object(cat)
+            if entry and entry["id"] not in seen_ids:
+                entries.append(entry)
+                seen_ids.add(entry["id"])
+
+        for slot in (self.hotbar_slots + self.inventory_list):
+            entry = self._build_cat_entry_from_slot(slot)
+            if entry and entry["id"] not in seen_ids:
+                entries.append(entry)
+                seen_ids.add(entry["id"])
+
+        if self.dragged_item:
+            entry = self._build_cat_entry_from_slot(self.dragged_item)
+            if entry and entry["id"] not in seen_ids:
+                entries.append(entry)
+                seen_ids.add(entry["id"])
+
+        if self.drop_menu_slot:
+            entry = self._build_cat_entry_from_slot(self.drop_menu_slot)
+            if entry and entry["id"] not in seen_ids:
+                entries.append(entry)
+                seen_ids.add(entry["id"])
+
+        return entries
+
+    def _build_cat_entry_from_object(self, cat_obj, icon_override=None):
+        if not cat_obj or not getattr(cat_obj, "tamed", False):
+            return None
+        if not getattr(cat_obj, "is_alive", True):
+            return None
+
+        icon_path = icon_override
+        if not icon_path and getattr(cat_obj, "cat_type", None):
+            icon_path = cat_obj.cat_type.get("stand_right_image")
+
+        level = int(getattr(cat_obj, "level", 1))
+        max_health = int(getattr(cat_obj, "max_health", getattr(cat_obj, "full_health", 100)))
+        health = int(min(max_health, getattr(cat_obj, "health", max_health)))
+        hunger_max = int(getattr(cat_obj, "max_hunger", 100))
+        hunger = int(min(hunger_max, getattr(cat_obj, "hunger", hunger_max)))
+        experience = int(getattr(cat_obj, "experience", getattr(cat_obj, "tame", 0)))
+        experience_max = int(getattr(cat_obj, "next_level_exp", getattr(cat_obj, "tame_max", 100)) or 100)
+        attack_value = int(getattr(cat_obj, "attack", getattr(cat_obj, "attack_damage", max(5, level * 4))))
+        speed_value = int(getattr(cat_obj, "base_speed", 0) * getattr(cat_obj, "speed", 1))
+        defense_value = int(getattr(cat_obj, "defense", max(5, level * 5)))
+
+        entry = {
+            "id": getattr(cat_obj, "unique_id", id(cat_obj)),
+            "name": cat_obj.cat_name or self._format_cat_type(cat_obj.cat_type.get("type") if getattr(cat_obj, "cat_type", None) else "Cat"),
+            "level": level,
+            "health": (health, max_health),
+            "hunger": (hunger, hunger_max),
+            "experience": (experience, max(experience_max, 1)),
+            "attack": attack_value,
+            "speed": max(0, speed_value),
+            "defense": defense_value,
+            "icon": icon_path,
+        }
+        return entry
+
+    def _build_cat_entry_from_slot(self, slot):
+        if not slot or "cat_type" not in slot:
+            return None
+        cat_obj = slot.get("cat_object")
+        if cat_obj:
+            return self._build_cat_entry_from_object(cat_obj, icon_override=slot.get("icon"))
+
+        level = int(slot.get("cat_level", 1))
+        health = int(slot.get("cat_health", 100))
+        max_health = max(health, 100)
+        hunger = int(slot.get("cat_hunger", 100))
+        hunger_max = int(slot.get("cat_hunger_max", 100))
+        experience = int(slot.get("cat_experience", slot.get("cat_tame", 0)))
+        experience_max = int(slot.get("cat_experience_max", slot.get("cat_tame_max", 100)))
+        name = slot.get("cat_name") or self._format_cat_type(slot.get("cat_type"))
+        attack_value = int(slot.get("cat_attack", max(5, level * 4)))
+        speed_value = int(slot.get("cat_speed", 160))
+        defense_value = int(slot.get("cat_defense", max(5, level * 3)))
+
+        return {
+            "id": ("slot", id(slot)),
+            "name": name,
+            "level": level,
+            "health": (health, max_health),
+            "hunger": (hunger, hunger_max),
+            "experience": (experience, max(1, experience_max)),
+            "attack": attack_value,
+            "speed": speed_value,
+            "defense": defense_value,
+            "icon": slot.get("icon"),
+        }
+
+    def _format_cat_type(self, cat_type_key):
+        if not cat_type_key:
+            return "Cat"
+        return cat_type_key.replace("_", " ").title()
+
+    def _load_cat_portrait(self, icon_path, portrait_size):
+        if not icon_path:
+            return None
+        cache_key = (icon_path, portrait_size)
+        if cache_key in self.cat_card_portrait_cache:
+            return self.cat_card_portrait_cache[cache_key]
+
+        base_surface = self.cat_card_portrait_sources.get(icon_path)
+        if base_surface is None:
+            try:
+                base_surface = pygame.image.load(icon_path).convert_alpha()
+                self.cat_card_portrait_sources[icon_path] = base_surface
+            except Exception:
+                return None
+
+        portrait = pygame.transform.scale(base_surface, portrait_size)
+        self.cat_card_portrait_cache[cache_key] = portrait
+        return portrait
+
+    def _draw_text(self, surface, font_obj, text, position, color):
+        if not text:
+            return
+        text_surface = font_obj.render(text, True, color)
+        surface.blit(text_surface, position)
+
+    def handle_cat_scroll(self, direction):
+        """Scroll cat cards vertically. Direction > 0 scrolls down."""
+        if self.state != "cats":
+            return
+        if direction == 0 or self.cat_card_max_scroll <= 0:
+            return
+        scroll_step = 40
+        self.cat_card_scroll = max(0, min(self.cat_card_scroll + direction * scroll_step, self.cat_card_max_scroll))
 
     def draw_level_up(self, screen):
         # Draw the stat list on the left of the level-up screen along with upgrade buttons.
@@ -7094,23 +7344,24 @@ class Inventory():
                 self.crafting_completion_time = 0
 
     def start_drag(self, slot_index, is_hotbar):
+        if slot_index is None:
+            return False
+        if (not is_hotbar) and self.state != "inventory":
+            return False
+
         self.close_drop_menu()
-        if is_hotbar:
-            slot = self.hotbar_slots[slot_index]
-        else:
-            slot = self.inventory_list[slot_index]
-        
-        if slot is not None:
-            self.dragging = True
-            self.dragged_item = slot.copy()
-            self.dragged_from_slot = slot_index
-            self.dragged_from_hotbar = is_hotbar
-            
-            if is_hotbar:
-                self.hotbar_slots[slot_index] = None
-            else:
-                self.inventory_list[slot_index] = None
-            self.recalc_weight()
+        slots = self.hotbar_slots if is_hotbar else self.inventory_list
+        slot = slots[slot_index]
+        if slot is None:
+            return False
+
+        self.dragging = True
+        self.dragged_item = slot.copy()
+        self.dragged_from_slot = slot_index
+        self.dragged_from_hotbar = is_hotbar
+        slots[slot_index] = None
+        self.recalc_weight()
+        return True
 
     def update_drag(self, mouse_pos):
         pass

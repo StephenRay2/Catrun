@@ -25,7 +25,7 @@ dungeon_depth_high = 0
 font = pygame.font.SysFont(None, 24)
 scroll = 0
 dungeon_traversal_speed = .1
-time_of_day = 2.00
+time_of_day = 7.00
 total_elapsed_time = 00.00
 time_of_day_start = time_of_day
 stamina_depleted_message_timer = 0
@@ -1583,7 +1583,8 @@ while running:
             ]
             # Add 20 torches (will stack) plus other starter items
             torch_stack = ["Torch"] * 20
-            inventory.add(torch_stack + starter_items)
+            beef_stack = ["Raw Beef"] * 100
+            inventory.add(torch_stack + starter_items + beef_stack)
             
             from world import gemstone_rocks, GemstoneRock
             gemstone_rocks.append(GemstoneRock(int(player_pos.x + cam_x + 100), int(player_pos.y + 50)))
@@ -1607,6 +1608,16 @@ while running:
         for event in pygame.event.get():
             handle_debug_rotation_input(event)
             handle_debug_step_input(event)
+            
+            if event.type == pygame.MOUSEWHEEL:
+                if inventory_in_use and inventory.state == "cats":
+                    inventory.handle_cat_scroll(-event.y)
+                    continue
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+                if inventory_in_use and inventory.state == "cats":
+                    direction = 1 if event.button == 5 else -1
+                    inventory.handle_cat_scroll(direction)
+                    continue
             
             if event.type == pygame.QUIT:
                 running = False
@@ -2133,7 +2144,9 @@ while running:
                             mouse_attack_block_expires = pygame.time.get_ticks() + 200
                         inventory.handle_selection_click(mouse_pos, screen)
                         if slot_index is not None:
-                            inventory.start_drag(slot_index, is_hotbar)
+                            allow_drag = is_hotbar or inventory.state == "inventory"
+                            if allow_drag:
+                                inventory.start_drag(slot_index, is_hotbar)
 
             if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use:
                 mouse_attack_blocked = False
@@ -2635,40 +2648,40 @@ while running:
                     thrown["x"] = next_x
                     thrown["y"] = next_y
                     
-        dead_bushes = [db for db in dead_bushes if not db.destroyed]
-        mushrooms = [m for m in mushrooms if not m.destroyed]
-        savannah_grasses = [sgrass for sgrass in savannah_grasses if not sgrass.destroyed]
-        grasses = [grass for grass in grasses if not grass.destroyed]
-        stones = [stone for stone in stones if not stone.destroyed]
-        sticks = [s for s in sticks if not s.destroyed]
-        dropped_items = [d for d in dropped_items if not d.destroyed]
-        rocks = [r for r in rocks if not r.destroyed]
-        trees = [t for t in trees if not t.destroyed]
-        boulders = [b for b in boulders if not b.destroyed]
-        berry_bushes = [bush for bush in berry_bushes if not bush.destroyed]
-        ferns = [f for f in ferns if not f.destroyed]
-        fruit_plants = [fp for fp in fruit_plants if not fp.destroyed]
-        ponds = [pond for pond in ponds if not pond.destroyed]
-        lavas = [lava for lava in lavas if not lava.destroyed]
-        banks = [bank for bank in banks if not bank.destroyed]
+        dead_bushes[:] = [db for db in dead_bushes if not db.destroyed]
+        mushrooms[:] = [m for m in mushrooms if not m.destroyed]
+        savannah_grasses[:] = [sgrass for sgrass in savannah_grasses if not sgrass.destroyed]
+        grasses[:] = [grass for grass in grasses if not grass.destroyed]
+        stones[:] = [stone for stone in stones if not stone.destroyed]
+        sticks[:] = [s for s in sticks if not s.destroyed]
+        dropped_items[:] = [d for d in dropped_items if not d.destroyed]
+        rocks[:] = [r for r in rocks if not r.destroyed]
+        trees[:] = [t for t in trees if not t.destroyed]
+        boulders[:] = [b for b in boulders if not b.destroyed]
+        berry_bushes[:] = [bush for bush in berry_bushes if not bush.destroyed]
+        ferns[:] = [f for f in ferns if not f.destroyed]
+        fruit_plants[:] = [fp for fp in fruit_plants if not fp.destroyed]
+        ponds[:] = [pond for pond in ponds if not pond.destroyed]
+        lavas[:] = [lava for lava in lavas if not lava.destroyed]
+        banks[:] = [bank for bank in banks if not bank.destroyed]
 
-        cats = [cat for cat in cats if not cat.destroyed]
-        squirrels = [squirrel for squirrel in squirrels if not squirrel.destroyed]
-        cows = [cow for cow in cows if not cow.destroyed]
-        chickens = [chicken for chicken in chickens if not chicken.destroyed]
-        crawlers = [crawler for crawler in crawlers if not crawler.destroyed]
-        duskwretches = [duskwretch for duskwretch in duskwretches if not duskwretch.destroyed]
-        pocks = [pock for pock in pocks if not pock.destroyed]
-        deers = [deer for deer in deers if not deer.destroyed]
-        black_bears = [black_bear for black_bear in black_bears if not black_bear.destroyed]
-        brown_bears = [brown_bear for brown_bear in brown_bears if not brown_bear.destroyed]
-        gilas = [gila for gila in gilas if not gila.destroyed]
-        crows = [crow for crow in crows if not crow.destroyed]
-        fire_dragons = [dragon for dragon in fire_dragons if not dragon.destroyed]
-        ice_dragons = [dragon for dragon in ice_dragons if not dragon.destroyed]
-        electric_dragons = [dragon for dragon in electric_dragons if not dragon.destroyed]
-        poison_dragons = [dragon for dragon in poison_dragons if not dragon.destroyed]
-        dusk_dragons = [dragon for dragon in dusk_dragons if not dragon.destroyed]
+        cats[:] = [cat for cat in cats if not cat.destroyed]
+        squirrels[:] = [squirrel for squirrel in squirrels if not squirrel.destroyed]
+        cows[:] = [cow for cow in cows if not cow.destroyed]
+        chickens[:] = [chicken for chicken in chickens if not chicken.destroyed]
+        crawlers[:] = [crawler for crawler in crawlers if not crawler.destroyed]
+        duskwretches[:] = [duskwretch for duskwretch in duskwretches if not duskwretch.destroyed]
+        pocks[:] = [pock for pock in pocks if not pock.destroyed]
+        deers[:] = [deer for deer in deers if not deer.destroyed]
+        black_bears[:] = [black_bear for black_bear in black_bears if not black_bear.destroyed]
+        brown_bears[:] = [brown_bear for brown_bear in brown_bears if not brown_bear.destroyed]
+        gilas[:] = [gila for gila in gilas if not gila.destroyed]
+        crows[:] = [crow for crow in crows if not crow.destroyed]
+        fire_dragons[:] = [dragon for dragon in fire_dragons if not dragon.destroyed]
+        ice_dragons[:] = [dragon for dragon in ice_dragons if not dragon.destroyed]
+        electric_dragons[:] = [dragon for dragon in electric_dragons if not dragon.destroyed]
+        poison_dragons[:] = [dragon for dragon in poison_dragons if not dragon.destroyed]
+        dusk_dragons[:] = [dragon for dragon in dusk_dragons if not dragon.destroyed]
 
         for tile_x, tile_image in tiles:
             screen_x = tile_x - cam_x
@@ -2677,18 +2690,18 @@ while running:
 
         keys = pygame.key.get_pressed()
 
-        rocks = [rock for rock in rocks if not rock.destroyed]
-        boulders = [boulder for boulder in boulders if not boulder.destroyed]
-        trees = [tree for tree in trees if not tree.destroyed]
-        berry_bushes = [bush for bush in berry_bushes if not bush.destroyed]
-        dead_bushes = [bush for bush in dead_bushes if not bush.destroyed]
-        ferns = [fern for fern in ferns if not fern.destroyed]
-        fruit_plants = [plant for plant in fruit_plants if not plant.destroyed]
-        gemstone_rocks = [gr for gr in gemstone_rocks if not gr.destroyed]
-        metal_ore_rocks = [ore for ore in metal_ore_rocks if not ore.destroyed]
-        metal_vein_rocks = [vein for vein in metal_vein_rocks if not vein.destroyed]
-        gold_ore_rocks = [ore for ore in gold_ore_rocks if not ore.destroyed]
-        gold_vein_rocks = [vein for vein in gold_vein_rocks if not vein.destroyed]
+        rocks[:] = [rock for rock in rocks if not rock.destroyed]
+        boulders[:] = [boulder for boulder in boulders if not boulder.destroyed]
+        trees[:] = [tree for tree in trees if not tree.destroyed]
+        berry_bushes[:] = [bush for bush in berry_bushes if not bush.destroyed]
+        dead_bushes[:] = [bush for bush in dead_bushes if not bush.destroyed]
+        ferns[:] = [fern for fern in ferns if not fern.destroyed]
+        fruit_plants[:] = [plant for plant in fruit_plants if not plant.destroyed]
+        gemstone_rocks[:] = [gr for gr in gemstone_rocks if not gr.destroyed]
+        metal_ore_rocks[:] = [ore for ore in metal_ore_rocks if not ore.destroyed]
+        metal_vein_rocks[:] = [vein for vein in metal_vein_rocks if not vein.destroyed]
+        gold_ore_rocks[:] = [ore for ore in gold_ore_rocks if not ore.destroyed]
+        gold_vein_rocks[:] = [vein for vein in gold_vein_rocks if not vein.destroyed]
         
         collectibles = sticks + stones + grasses + savannah_grasses + mushrooms + dropped_items + marsh_reeds
         all_objects_no_liquids = rocks + trees + boulders + gemstone_rocks + metal_ore_rocks + metal_vein_rocks + gold_ore_rocks + gold_vein_rocks + berry_bushes + dead_bushes + ferns + fruit_plants + banks
