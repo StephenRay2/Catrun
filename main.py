@@ -25,7 +25,7 @@ dungeon_depth_high = 0
 font = pygame.font.SysFont(None, 24)
 scroll = 0
 dungeon_traversal_speed = .1
-time_of_day = 24.00
+time_of_day = 8.00
 total_elapsed_time = 00.00
 time_of_day_start = time_of_day
 stamina_depleted_message_timer = 0
@@ -750,7 +750,7 @@ def check_placement_collision(x, y, item_data):
     collision_rect = pygame.Rect(x + collision_x_offset, y + collision_y_offset, collision_width, collision_height)
 
     # Check collision with world objects
-    from world import rocks, boulders, trees, berry_bushes, ponds, lavas, dead_bushes, grasses, sticks, stones, savannah_grasses, mushrooms, fruit_plants, ferns
+    from world import rocks, boulders, trees, berry_bushes, ponds, lavas, dead_bushes, grasses, sticks, stones, savannah_grasses, mushrooms, fruit_plants, ferns, gemstone_rocks, metal_ore_rocks, metal_vein_rocks, gold_ore_rocks, gold_vein_rocks
 
     # Check rocks (use their actual collision rect in world space)
     for rock in rocks:
@@ -762,6 +762,30 @@ def check_placement_collision(x, y, item_data):
                 rock.rect.height - 50
             )
             if rock_collision.colliderect(collision_rect):
+                return True
+
+    # Check gemstone rocks
+    for gemstone_rock in gemstone_rocks:
+        if hasattr(gemstone_rock, 'rect'):
+            gemstone_collision = pygame.Rect(
+                gemstone_rock.rect.x + 10,
+                gemstone_rock.rect.y + (gemstone_rock.rect.height * 0.22),
+                gemstone_rock.rect.width - 20,
+                gemstone_rock.rect.height - 50
+            )
+            if gemstone_collision.colliderect(collision_rect):
+                return True
+
+    # Check ore and vein rocks
+    for ore_rock in metal_ore_rocks + metal_vein_rocks + gold_ore_rocks + gold_vein_rocks:
+        if hasattr(ore_rock, 'rect'):
+            ore_collision = pygame.Rect(
+                ore_rock.rect.x + 10,
+                ore_rock.rect.y + (ore_rock.rect.height * 0.22),
+                ore_rock.rect.width - 20,
+                ore_rock.rect.height - 50
+            )
+            if ore_collision.colliderect(collision_rect):
                 return True
 
     # Check boulders (use their actual collision rect in world space)
@@ -1159,11 +1183,24 @@ while running:
         menu_screen = pygame.Rect(0, 0, width, height)
         screen.blit(menu_image, (0, 0), menu_screen)
 
+        rocks = [rock for rock in rocks if not rock.destroyed]
+        boulders = [boulder for boulder in boulders if not boulder.destroyed]
+        trees = [tree for tree in trees if not tree.destroyed]
+        berry_bushes = [bush for bush in berry_bushes if not bush.destroyed]
+        dead_bushes = [bush for bush in dead_bushes if not bush.destroyed]
+        ferns = [fern for fern in ferns if not fern.destroyed]
+        fruit_plants = [plant for plant in fruit_plants if not plant.destroyed]
+        gemstone_rocks = [gr for gr in gemstone_rocks if not gr.destroyed]
+        metal_ore_rocks = [ore for ore in metal_ore_rocks if not ore.destroyed]
+        metal_vein_rocks = [vein for vein in metal_vein_rocks if not vein.destroyed]
+        gold_ore_rocks = [ore for ore in gold_ore_rocks if not ore.destroyed]
+        gold_vein_rocks = [vein for vein in gold_vein_rocks if not vein.destroyed]
+        
         collectibles = sticks + stones + grasses + savannah_grasses + mushrooms + dropped_items 
         all_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants + ponds + lavas
 
         visible_collectibles = [col for col in collectibles if col.rect.x- cam_x > -1000 and col.rect.y - cam_x < width + 1000]
-        all_objects_no_liquids = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants
+        all_objects_no_liquids = rocks + trees + boulders + gemstone_rocks + metal_ore_rocks + metal_vein_rocks + gold_ore_rocks + gold_vein_rocks + berry_bushes + dead_bushes + ferns + fruit_plants
         visible_objects = [obj for obj in all_objects_no_liquids if obj.rect.x - cam_x > -1000 and obj.rect.x - cam_x < width + 1000]
         
         visible_liquids = [obj for obj in (ponds + lavas) if obj.rect.x - cam_x > -1000 and obj.rect.x - cam_x < width + 1000]
@@ -1465,11 +1502,15 @@ while running:
                 "Campfire",
                 "Tent",
                 "Fire Dragon Scale Sword",
-                "Fire Dragon Scale Axe"
+                "Fire Dragon Scale Axe",
+                "Fire Dragon Scale Pickaxe"
             ]
             # Add 50 torches (will stack) plus other starter items
             torch_stack = ["Torch"] * 50
             inventory.add(torch_stack + starter_items)
+            
+            from world import gemstone_rocks, GemstoneRock
+            gemstone_rocks.append(GemstoneRock(int(player_pos.x + cam_x + 100), int(player_pos.y + 50)))
 
             game_just_started = False 
         
@@ -2402,14 +2443,24 @@ while running:
                             facing_object = True
 
                         if facing_object:
-                            if getattr(obj, "resource", None) == "Stone" and not has_pickaxe_equipped:
+                            from world import GemstoneRock, MetalOreRock, MetalVeinRock, GoldOreRock, GoldVeinRock
+                            is_gemstone_rock = isinstance(obj, GemstoneRock)
+                            is_ore_or_vein = isinstance(obj, (MetalOreRock, MetalVeinRock, GoldOreRock, GoldVeinRock))
+                            if (getattr(obj, "resource", None) == "Stone" or is_gemstone_rock or is_ore_or_vein) and not has_pickaxe_equipped:
                                 need_pickaxe_message_timer = 1.5
                                 continue
                             current_tool_resource = getattr(obj, "resource", None)
+                            if is_gemstone_rock or is_ore_or_vein:
+                                current_tool_resource = "Stone"
                             harvest_power = get_harvest_power(held_item, current_tool_resource)
                             special_chance_mult = get_special_drop_multiplier(held_item)
                             special_yield_mult = get_special_yield_multiplier(held_item)
                             resource = obj.harvest(player, harvest_power, special_chance_mult, special_yield_mult)
+                            
+                            if is_gemstone_rock or is_ore_or_vein:
+                                sound_manager.play_sound(random.choice([f"harvest_stone{i}" for i in range(1, 7)]))
+                                inventory.decrement_durability(inventory.selected_hotbar_slot, True, 1)
+                            
                             if resource:
                                 if hasattr(obj, 'resource'):
                                     if obj.resource == "Stone":
@@ -2423,14 +2474,15 @@ while running:
                                     resource_counts = group_resources_by_type(resource)
                                     for resource_name, count in resource_counts.items():
                                         add_collection_message(resource_name, count)
-                                # Tool durability loss on successful harvest
-                                inventory.decrement_durability(inventory.selected_hotbar_slot, True, 1)
-
-                                if obj.destroyed:
-                                    visible_objects.remove(obj)
                                 
-                                harvest_cooldown = current_time
-                                break
+                                if not is_gemstone_rock and not is_ore_or_vein:
+                                    inventory.decrement_durability(inventory.selected_hotbar_slot, True, 1)
+                            
+                            if obj.destroyed:
+                                visible_objects.remove(obj)
+                                
+                            harvest_cooldown = current_time
+                            break
                     
         # Update thrown items physics - straight line movement with collision detection
         for thrown in thrown_items[:]:
@@ -2534,8 +2586,21 @@ while running:
 
         keys = pygame.key.get_pressed()
 
+        rocks = [rock for rock in rocks if not rock.destroyed]
+        boulders = [boulder for boulder in boulders if not boulder.destroyed]
+        trees = [tree for tree in trees if not tree.destroyed]
+        berry_bushes = [bush for bush in berry_bushes if not bush.destroyed]
+        dead_bushes = [bush for bush in dead_bushes if not bush.destroyed]
+        ferns = [fern for fern in ferns if not fern.destroyed]
+        fruit_plants = [plant for plant in fruit_plants if not plant.destroyed]
+        gemstone_rocks = [gr for gr in gemstone_rocks if not gr.destroyed]
+        metal_ore_rocks = [ore for ore in metal_ore_rocks if not ore.destroyed]
+        metal_vein_rocks = [vein for vein in metal_vein_rocks if not vein.destroyed]
+        gold_ore_rocks = [ore for ore in gold_ore_rocks if not ore.destroyed]
+        gold_vein_rocks = [vein for vein in gold_vein_rocks if not vein.destroyed]
+        
         collectibles = sticks + stones + grasses + savannah_grasses + mushrooms + dropped_items
-        all_objects_no_liquids = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants
+        all_objects_no_liquids = rocks + trees + boulders + gemstone_rocks + metal_ore_rocks + metal_vein_rocks + gold_ore_rocks + gold_vein_rocks + berry_bushes + dead_bushes + ferns + fruit_plants
         all_objects = all_objects_no_liquids + ponds + lavas
         mobs = cats + squirrels + cows + chickens + crawlers + duskwretches + pocks + deers + black_bears + brown_bears + gilas + crows + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
         all_mobs = mobs

@@ -43,8 +43,17 @@ num_dead_bushes = 300
 num_fruit_plants = 300
 num_fire_ferns = 50
 num_frost_ferns = 50
+num_gemstone_rocks = 20
+num_metal_ore_rocks = 100
+num_metal_vein_rocks = 100
+num_gold_ore_rocks = 100
+num_gold_vein_rocks = 100
 
 rocks = []
+metal_ore_rocks = []
+metal_vein_rocks = []
+gold_ore_rocks = []
+gold_vein_rocks = []
 dead_bushes = []
 grasses = []
 stones = []
@@ -58,6 +67,7 @@ fruit_plants = []
 ferns = []
 ponds = []
 lavas = []
+gemstone_rocks = []
 dropped_items = []
 
 
@@ -66,6 +76,14 @@ pond_images = ["assets/sprites/biomes/grassland/pond1.png", "assets/sprites/biom
 lava_pond_images = ["assets/sprites/biomes/lavastone/lavapond1.png", "assets/sprites/biomes/lavastone/lavapond2.png", "assets/sprites/biomes/lavastone/lavapond3.png", "assets/sprites/biomes/lavastone/lavapond4.png", "assets/sprites/biomes/lavastone/lavapond5.png", "assets/sprites/biomes/lavastone/lavapond6.png", "assets/sprites/biomes/lavastone/lavapond7.png", "assets/sprites/biomes/lavastone/lavapond8.png", "assets/sprites/biomes/lavastone/lavapond9.png", "assets/sprites/biomes/lavastone/lavapond10.png"]
 
 rock_images = ["assets/sprites/biomes/grassland/Rock1.png", "assets/sprites/biomes/grassland/Rock2.png", "assets/sprites/biomes/grassland/Rock3.png", "assets/sprites/biomes/grassland/Rock4.png", "assets/sprites/biomes/grassland/Rock6.png"]
+
+metal_ore_images = ["assets/sprites/biomes/grassland/MetalOreRock1.png", "assets/sprites/biomes/grassland/MetalOreRock2.png", "assets/sprites/biomes/grassland/MetalOreRock3.png"]
+
+metal_vein_images = ["assets/sprites/biomes/grassland/MetalVeinRock1.png", "assets/sprites/biomes/grassland/MetalVeinRock2.png", "assets/sprites/biomes/grassland/MetalVeinRock3.png"]
+
+gold_ore_images = ["assets/sprites/biomes/grassland/GoldOreRock1.png", "assets/sprites/biomes/grassland/GoldOreRock2.png", "assets/sprites/biomes/grassland/GoldOreRock3.png"]
+
+gold_vein_images = ["assets/sprites/biomes/grassland/GoldVeinRock1.png", "assets/sprites/biomes/grassland/GoldVeinRock2.png", "assets/sprites/biomes/grassland/GoldVeinRock3.png"]
 
 
 grassland_tree_types = [
@@ -385,6 +403,112 @@ class Boulder(Solid):
 
         return resources
 
+
+class GemstoneRock(Solid):
+    def __init__(self, x, y):
+        self.full_image = pygame.transform.scale(
+            pygame.image.load("assets/sprites/biomes/grassland/GemstoneRock.png").convert_alpha(), (64, 64)
+        )
+        self.cracked_image = pygame.transform.scale(
+            pygame.image.load("assets/sprites/biomes/grassland/CrackedGemstoneRock.png").convert_alpha(), (64, 64)
+        )
+        self.image = self.full_image
+        self.rect = self.image.get_rect(topleft=(x, y))
+        self.destroyed = False
+        self.resource = None
+        self.max_health = 400
+        self.resource_amount = self.max_health
+        self.has_cracked = False
+        
+        self.gemstones = [
+            "Amethyst", "Aquamarine", "Garnet", "Diamond", "Emerald",
+            "Opal", "Pearl", "Ruby", "Sapphire", "Topaz"
+        ]
+    
+    def draw(self, screen, cam_x):
+        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
+    
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
+        if not self.destroyed:
+            power = max(1, int(harvest_power))
+            damage = power
+            self.resource_amount -= damage
+            
+            health_percent = self.resource_amount / self.max_health
+            if health_percent <= 0.5 and not self.has_cracked:
+                self.image = self.cracked_image
+                self.has_cracked = True
+            
+            if self.resource_amount <= 0:
+                self.destroyed = True
+                chosen_gemstone = random.choice(self.gemstones)
+                if player:
+                    player.experience += harvest_experience * 10
+                    player.exp_total += harvest_experience * 10
+                return [chosen_gemstone]
+            
+            return []
+        return []
+
+
+class MetalOreRock(Solid):
+    def __init__(self, x, y):
+        img = random.choice(metal_ore_images)
+        super().__init__(img, x, y, (64, 64))
+        self.resource = "Stone"
+        self.resource_amount = random.randint(10, 15)
+    
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
+        resources = super().harvest(player, harvest_power, special_chance_mult, special_yield_mult)
+        special_yield = max(1, int(special_yield_mult))
+        if random.random() < min(1.0, 0.75 * special_chance_mult):
+            resources.extend(["Raw Metal"] * special_yield)
+        return resources
+
+
+class MetalVeinRock(Solid):
+    def __init__(self, x, y):
+        img = random.choice(metal_vein_images)
+        super().__init__(img, x, y, (64, 64))
+        self.resource = "Stone"
+        self.resource_amount = random.randint(10, 15)
+    
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
+        resources = super().harvest(player, harvest_power, special_chance_mult, special_yield_mult)
+        special_yield = max(1, int(special_yield_mult))
+        if random.random() < min(1.0, 0.35 * special_chance_mult):
+            resources.extend(["Raw Metal"] * special_yield)
+        return resources
+
+
+class GoldOreRock(Solid):
+    def __init__(self, x, y):
+        img = random.choice(gold_ore_images)
+        super().__init__(img, x, y, (64, 64))
+        self.resource = "Stone"
+        self.resource_amount = random.randint(10, 15)
+    
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
+        resources = super().harvest(player, harvest_power, special_chance_mult, special_yield_mult)
+        special_yield = max(1, int(special_yield_mult))
+        if random.random() < min(1.0, 0.75 * special_chance_mult):
+            resources.extend(["Raw Gold"] * special_yield)
+        return resources
+
+
+class GoldVeinRock(Solid):
+    def __init__(self, x, y):
+        img = random.choice(gold_vein_images)
+        super().__init__(img, x, y, (64, 64))
+        self.resource = "Stone"
+        self.resource_amount = random.randint(10, 15)
+    
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
+        resources = super().harvest(player, harvest_power, special_chance_mult, special_yield_mult)
+        special_yield = max(1, int(special_yield_mult))
+        if random.random() < min(1.0, 0.35 * special_chance_mult):
+            resources.extend(["Raw Gold"] * special_yield)
+        return resources
 
 
 class BerryBush(pygame.sprite.Sprite):
@@ -1258,7 +1382,7 @@ for tile_x, tile_image in tiles:
 
 
 def generate_world():
-    global rocks, dead_bushes, grasses, stones, boulders, berry_bushes, trees, sticks, savannah_grasses, mushrooms, fruit_plants, ferns, ponds, lavas, dropped_items
+    global rocks, dead_bushes, grasses, stones, boulders, berry_bushes, trees, sticks, savannah_grasses, mushrooms, fruit_plants, ferns, ponds, lavas, gemstone_rocks, metal_ore_rocks, metal_vein_rocks, gold_ore_rocks, gold_vein_rocks, dropped_items
     
     rocks.clear()
     dead_bushes.clear()
@@ -1274,6 +1398,11 @@ def generate_world():
     ferns.clear()
     ponds.clear()
     lavas.clear()
+    gemstone_rocks.clear()
+    metal_ore_rocks.clear()
+    metal_vein_rocks.clear()
+    gold_ore_rocks.clear()
+    gold_vein_rocks.clear()
     dropped_items.clear()
 
     for _ in range(num_rocks):
@@ -1299,6 +1428,35 @@ def generate_world():
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
         boulders.append(Boulder(x, y))
+    
+    for _ in range(num_gemstone_rocks):
+        x = random.randint(0, 512000 - 64)
+        y = random.randint(0, height - 64)
+        gemstone_rocks.append(GemstoneRock(x, y))
+    
+    for _ in range(num_metal_ore_rocks):
+        tile_x, tile_image = random.choice(weighted_rock_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        metal_ore_rocks.append(MetalOreRock(x, y))
+    
+    for _ in range(num_metal_vein_rocks):
+        tile_x, tile_image = random.choice(weighted_rock_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        metal_vein_rocks.append(MetalVeinRock(x, y))
+    
+    for _ in range(num_gold_ore_rocks):
+        tile_x, tile_image = random.choice(weighted_rock_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        gold_ore_rocks.append(GoldOreRock(x, y))
+    
+    for _ in range(num_gold_vein_rocks):
+        tile_x, tile_image = random.choice(weighted_rock_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        gold_vein_rocks.append(GoldVeinRock(x, y))
     
     for _ in range(num_bushes):
         tile_x, tile_image = random.choice(weighted_berry_bush_tiles)
@@ -1397,4 +1555,4 @@ def generate_world():
         y = random.randint(0, height - 128)
         lavas.append(Lavapond(x, y))
     
-    return rocks, boulders, berry_bushes, trees, sticks, stones, grasses, savannah_grasses, mushrooms, dead_bushes, fruit_plants, ferns, ponds, lavas
+    return rocks, boulders, berry_bushes, trees, sticks, stones, grasses, savannah_grasses, mushrooms, dead_bushes, fruit_plants, ferns, ponds, lavas, gemstone_rocks, metal_ore_rocks, metal_vein_rocks, gold_ore_rocks, gold_vein_rocks
