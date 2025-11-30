@@ -4373,9 +4373,6 @@ items_list = [
         "tags": ["material", "ore"],
         "output_amount": 1
     },
-
-    # Crafted at Alchemy Bench
-
     {
         "item_name": "Medium Glass Olive Oil",
         "icon": "MediumGlassOliveOil.png",
@@ -4389,7 +4386,7 @@ items_list = [
         "durability": None,
         "recipe": [{"item": "Olives", "amount": 15}, {"item": "Glass Bottle", "amount": 1}],
         "crafting_medium": "alchemy_bench",
-        "tags": ["crafted", "material", "fuel"],
+        "tags": ["crafted", "oil", "fuel"],
         "output_amount": 1
     },
     {
@@ -4405,7 +4402,7 @@ items_list = [
         "durability": None,
         "recipe": [{"item": "Olives", "amount": 20}, {"item": "Large Metal Canteen", "amount": 1}],
         "crafting_medium": "alchemy_bench",
-        "tags": ["material", "ore", "fuel"],
+        "tags": ["material", "oil", "fuel"],
         "output_amount": 1
     },
     {

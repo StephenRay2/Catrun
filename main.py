@@ -8,7 +8,7 @@ from sounds import *
 from crafting_bench import CraftingBench
 from smelter import Smelter
 from campfire import Campfire
-from world import DroppedItem, dropped_items
+from world import DroppedItem, dropped_items, Bank, banks
 
 clock = pygame.time.Clock()
 from inventory import *
@@ -25,11 +25,12 @@ dungeon_depth_high = 0
 font = pygame.font.SysFont(None, 24)
 scroll = 0
 dungeon_traversal_speed = .1
-time_of_day = 8.00
+time_of_day = 2.00
 total_elapsed_time = 00.00
 time_of_day_start = time_of_day
 stamina_depleted_message_timer = 0
 need_pickaxe_message_timer = 0
+need_shovel_message_timer = 0
 player_world_x = player_pos.x + cam_x
 player_world_y = player_pos.y
 
@@ -73,6 +74,9 @@ light_mask_cache = {}  # Cache for radial light masks
 light_flicker_timer = 0
 light_flicker_speed = 0.05
 
+# Default placeable sizing
+default_placeable_sprite_size = (64, 64)
+
 # Placement system variables
 placement_mode = False
 placement_item = None
@@ -86,7 +90,50 @@ fast_travel_menu_active = False
 sleeping_in_tent = False
 sleeping_tent_x = 0
 sleeping_tent_y = 0
+sleeping_tent_height = default_placeable_sprite_size[1]
 tent_hide_active = False
+tent_exit_offset = 20
+tent_hover_highlight_surface = None
+tent_hover_highlight_rect = None
+current_tent_hover_option = None
+
+def place_player_below_tent():
+    tent_bottom_y = sleeping_tent_y + (sleeping_tent_height // 2)
+    base_screen_y = tent_bottom_y + tent_exit_offset
+    base_screen_x = sleeping_tent_x - cam_x
+
+    def player_collides_at(screen_x, screen_y):
+        if not hasattr(player, "rect"):
+            return False
+        player_rect = player.rect.copy()
+        player_rect.center = (screen_x, screen_y)
+        world_rect = player_rect.copy()
+        world_rect.x += cam_x
+        return world_rect_collides(world_rect)
+
+    min_y = size / 2
+    max_y = height - size / 2
+    min_x = size / 2
+    max_x = width - size / 2
+    y_steps = [0, 10, 20, 30, 40, 60, 80, 100, 130, 160]
+    x_offsets = [0, -20, 20, -40, 40, -60, 60]
+
+    for y_offset in y_steps:
+        target_y = max(min_y, min(base_screen_y + y_offset, max_y))
+        for x_offset in x_offsets:
+            target_x = max(min_x, min(base_screen_x + x_offset, max_x))
+            if not player_collides_at(target_x, target_y):
+                player_pos.x = target_x
+                player_pos.y = target_y
+                if hasattr(player, "rect"):
+                    player.rect.center = (player_pos.x, player_pos.y)
+                return
+
+    # Fallback to base position even if colliding, but keep within bounds
+    player_pos.x = max(min_x, min(base_screen_x, max_x))
+    player_pos.y = max(min_y, min(base_screen_y, max_y))
+    if hasattr(player, "rect"):
+        player.rect.center = (player_pos.x, player_pos.y)
 
 # Crafting bench variables
 crafting_bench = None
@@ -95,8 +142,6 @@ smelter = None
 smelter_in_use = False
 campfire = None
 campfire_in_use = False
-
-default_placeable_sprite_size = (64, 64)
 
 placeable_size_settings = {
     "Torch": {
@@ -733,24 +778,10 @@ def cancel_placement():
     placement_item = None
     placement_position = (0, 0)
 
-def check_placement_collision(x, y, item_data):
-    """Check if placement position collides with world objects or mobs"""
-    # Define collision bounds based on item sizing
-    _, collision_size = get_placeable_sizes(item_data)
-    
-    # Handle both old format (width, height) and new format (x_offset, y_offset, width, height)
-    if len(collision_size) == 4:
-        collision_x_offset, collision_y_offset, collision_width, collision_height = collision_size
-    else:
-        # Fallback for old format - center the collision box
-        collision_width, collision_height = collision_size
-        collision_x_offset = -collision_width // 2
-        collision_y_offset = -collision_height // 2
-
-    collision_rect = pygame.Rect(x + collision_x_offset, y + collision_y_offset, collision_width, collision_height)
-
+def world_rect_collides(collision_rect):
+    """Return True if the provided world-space rect hits any blocking object."""
     # Check collision with world objects
-    from world import rocks, boulders, trees, berry_bushes, ponds, lavas, dead_bushes, grasses, sticks, stones, savannah_grasses, mushrooms, fruit_plants, ferns, gemstone_rocks, metal_ore_rocks, metal_vein_rocks, gold_ore_rocks, gold_vein_rocks
+    from world import rocks, boulders, trees, berry_bushes, ponds, lavas, dead_bushes, grasses, sticks, stones, savannah_grasses, mushrooms, fruit_plants, ferns, gemstone_rocks, metal_ore_rocks, metal_vein_rocks, gold_ore_rocks, gold_vein_rocks, banks
 
     # Check rocks (use their actual collision rect in world space)
     for rock in rocks:
@@ -800,6 +831,11 @@ def check_placement_collision(x, y, item_data):
             if boulder_collision.colliderect(collision_rect):
                 return True
 
+    # Check banks
+    for bank in banks:
+        if hasattr(bank, 'rect') and bank.rect.colliderect(collision_rect):
+            return True
+
     # Check trees
     for tree in trees:
         if hasattr(tree, 'rect') and tree.rect.colliderect(collision_rect):
@@ -835,6 +871,24 @@ def check_placement_collision(x, y, item_data):
             return True
 
     return False
+
+def check_placement_collision(x, y, item_data):
+    """Check if placement position collides with world objects or mobs"""
+    # Define collision bounds based on item sizing
+    _, collision_size = get_placeable_sizes(item_data)
+    
+    # Handle both old format (width, height) and new format (x_offset, y_offset, width, height)
+    if len(collision_size) == 4:
+        collision_x_offset, collision_y_offset, collision_width, collision_height = collision_size
+    else:
+        # Fallback for old format - center the collision box
+        collision_width, collision_height = collision_size
+        collision_x_offset = -collision_width // 2
+        collision_y_offset = -collision_height // 2
+
+    collision_rect = pygame.Rect(x + collision_x_offset, y + collision_y_offset, collision_width, collision_height)
+
+    return world_rect_collides(collision_rect)
 
 def place_structure(x, y, item_data):
     """Place a structure at the given position"""
@@ -931,6 +985,14 @@ def is_axe_item(item):
     item_name = item.get("item_name", "").lower()
     return "axe" in item_name and "pickaxe" not in item_name
 
+def is_shovel_item(item):
+    """Return True if the item is a digging tool."""
+    if not item:
+        return False
+    item_name = item.get("item_name", "").lower()
+    tags = item.get("tags", [])
+    return "shovel" in item_name or "digging" in tags
+
 def get_harvest_power(tool_item, resource_name):
     """Return how many resources a single harvest hit should yield based on the held tool."""
     base_power = 1
@@ -943,6 +1005,7 @@ def get_harvest_power(tool_item, resource_name):
 
     is_pickaxe = is_pickaxe_item(tool_item)
     is_axe = is_axe_item(tool_item)
+    is_shovel = is_shovel_item(tool_item)
     is_special = resource_name in special_resources
 
     if is_pickaxe and resource_name in mining_resources:
@@ -951,6 +1014,10 @@ def get_harvest_power(tool_item, resource_name):
 
     if is_axe and is_wood_resource(resource_name):
         mult = tool_multipliers.get(tier, {"normal": 1})
+        return max(base_power, mult.get("normal", 1))
+
+    if is_shovel and resource_name in shovel_resources:
+        mult = tool_multipliers.get(tier, {"normal": 1, "special": 1})
         return max(base_power, mult.get("normal", 1))
 
     # Future: shovel support for dirt/sand/etc.
@@ -1052,6 +1119,7 @@ tool_multipliers = HARVEST_TOOL_MULTS
 
 special_resources = {"Flint", "Raw Metal", "Raw Gold"}
 mining_resources = {"Stone", "Flint", "Raw Metal", "Raw Gold"}
+shovel_resources = {"Salt", "Clay", "Sand", "Snow"}
 
 def is_wood_resource(resource_name):
     lower_name = resource_name.lower()
@@ -1066,12 +1134,18 @@ def adjust_resources_with_tool(resources, tool_item):
         return resources
     is_pickaxe = is_pickaxe_item(tool_item)
     is_axe = is_axe_item(tool_item)
-    if not (is_pickaxe or is_axe):
+    is_shovel = is_shovel_item(tool_item)
+    if not (is_pickaxe or is_axe or is_shovel):
         return resources
 
     adjusted = []
     for res in resources:
         res_name = res if isinstance(res, str) else str(res)
+        if is_shovel and res_name in shovel_resources:
+            mult = tool_multipliers.get(tier, {"normal": 1, "special": 1})
+            factor = mult.get("normal", 1)
+            adjusted.extend([res_name] * max(1, factor))
+            continue
         # Enforce tool applicability by resource family.
         if is_pickaxe and res_name not in mining_resources:
             adjusted.append(res_name)
@@ -1195,12 +1269,13 @@ while running:
         metal_vein_rocks = [vein for vein in metal_vein_rocks if not vein.destroyed]
         gold_ore_rocks = [ore for ore in gold_ore_rocks if not ore.destroyed]
         gold_vein_rocks = [vein for vein in gold_vein_rocks if not vein.destroyed]
+        banks = [bank for bank in banks if not bank.destroyed]
         
         collectibles = sticks + stones + grasses + savannah_grasses + mushrooms + dropped_items 
-        all_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants + ponds + lavas
+        all_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants + ponds + lavas + banks
 
         visible_collectibles = [col for col in collectibles if col.rect.x- cam_x > -1000 and col.rect.y - cam_x < width + 1000]
-        all_objects_no_liquids = rocks + trees + boulders + gemstone_rocks + metal_ore_rocks + metal_vein_rocks + gold_ore_rocks + gold_vein_rocks + berry_bushes + dead_bushes + ferns + fruit_plants
+        all_objects_no_liquids = rocks + trees + boulders + gemstone_rocks + metal_ore_rocks + metal_vein_rocks + gold_ore_rocks + gold_vein_rocks + berry_bushes + dead_bushes + ferns + fruit_plants + banks
         visible_objects = [obj for obj in all_objects_no_liquids if obj.rect.x - cam_x > -1000 and obj.rect.x - cam_x < width + 1000]
         
         visible_liquids = [obj for obj in (ponds + lavas) if obj.rect.x - cam_x > -1000 and obj.rect.x - cam_x < width + 1000]
@@ -1259,12 +1334,13 @@ while running:
             total_elapsed_time += time_dt
             time_of_day = (time_of_day_start + (total_elapsed_time / 60)) % 24
             light_flicker_timer += dt
-            if sleeping_in_tent:
+            if sleeping_in_tent or tent_hide_active:
                 absolute_cam_x = sleeping_tent_x - width // 2
             if sleeping_in_tent and time_of_day >= 6 and time_of_day < 18:
                 sleeping_in_tent = False
                 time_speed_multiplier = 1.0
                 absolute_cam_x = player_world_x - width // 2
+                place_player_below_tent()
             # Update crafting flash
             inventory.update_flash(dt)
             for dropped in list(dropped_items):
@@ -1497,16 +1573,16 @@ while running:
             inventory.state = "inventory"
             starter_items = [
                 "Smelter",
-                "Waterskin",
                 "Workbench",
                 "Campfire",
                 "Tent",
                 "Fire Dragon Scale Sword",
                 "Fire Dragon Scale Axe",
+                "Fire Dragon Scale Shovel",
                 "Fire Dragon Scale Pickaxe"
             ]
-            # Add 50 torches (will stack) plus other starter items
-            torch_stack = ["Torch"] * 50
+            # Add 20 torches (will stack) plus other starter items
+            torch_stack = ["Torch"] * 20
             inventory.add(torch_stack + starter_items)
             
             from world import gemstone_rocks, GemstoneRock
@@ -1514,8 +1590,8 @@ while running:
 
             game_just_started = False 
         
-        if sleeping_in_tent:
-            # During sleep, use tent position as world center for mob AI
+        if sleeping_in_tent or tent_hide_active:
+            # During sleep/hide, use tent position as world center for mob AI
             player_world_x = sleeping_tent_x
             player_world_y = player_pos.y
         else:
@@ -1539,10 +1615,12 @@ while running:
                 # Exit hide/sleep states with E
                 if tent_hide_active and event.key == pygame.K_e:
                     tent_hide_active = False
+                    place_player_below_tent()
                     continue
                 if sleeping_in_tent and event.key == pygame.K_e:
                     sleeping_in_tent = False
                     time_speed_multiplier = 1.0
+                    place_player_below_tent()
                     continue
                 if tent_menu_active and event.key == pygame.K_e:
                     tent_menu_active = False
@@ -2102,11 +2180,18 @@ while running:
                         time_speed_multiplier = 30.0
                         sleeping_tent_x = tent_menu_tent['x']
                         sleeping_tent_y = tent_menu_tent['y']
+                        sprite_size = tent_menu_tent.get('sprite_size', default_placeable_sprite_size)
+                        sleeping_tent_height = sprite_size[1] if sprite_size else default_placeable_sprite_size[1]
                         tent_menu_active = False
                         tent_menu_tent = None
                         tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
                 elif option == "hide":
                     tent_hide_active = True
+                    sleeping_tent_x = tent_menu_tent['x']
+                    sleeping_tent_y = tent_menu_tent['y']
+                    sprite_size = tent_menu_tent.get('sprite_size', default_placeable_sprite_size)
+                    sleeping_tent_height = sprite_size[1] if sprite_size else default_placeable_sprite_size[1]
+                    time_speed_multiplier = 1.0
                     tent_menu_active = False
                     tent_menu_tent = None
                     tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
@@ -2167,7 +2252,7 @@ while running:
                             struct_collision = structure['rect']
                             horizontal_dist = abs(struct_collision.centerx - player_world_x)
                             vertical_dist = abs(struct_collision.centery - player_world_y)
-                            workbench_reach = 40
+                            workbench_reach = 20
                             horizontal_range = (struct_collision.width / 2) + workbench_reach
                             vertical_range = (struct_collision.height / 2) + workbench_reach
                             
@@ -2192,7 +2277,7 @@ while running:
                                 struct_collision = structure['rect']
                                 horizontal_dist = abs(struct_collision.centerx - player_world_x)
                                 vertical_dist = abs(struct_collision.centery - player_world_y)
-                                smelter_reach = 40
+                                smelter_reach = 20
                                 horizontal_range = (struct_collision.width / 2) + smelter_reach
                                 vertical_range = (struct_collision.height / 2) + smelter_reach
                                 
@@ -2217,7 +2302,7 @@ while running:
                                 struct_collision = structure['rect']
                                 horizontal_dist = abs(struct_collision.centerx - player_world_x)
                                 vertical_dist = abs(struct_collision.centery - player_world_y)
-                                campfire_reach = 40
+                                campfire_reach = 20
                                 horizontal_range = (struct_collision.width / 2) + campfire_reach
                                 vertical_range = (struct_collision.height / 2) + campfire_reach
                                 
@@ -2420,6 +2505,7 @@ while running:
                 base_attack_val = int(round(player.damage + (player.strength_leveler - 1) * player.strength_level_gain))
                 player.attack = compute_weapon_attack(base_attack_val, held_item)
                 has_pickaxe_equipped = is_pickaxe_item(held_item)
+                has_shovel_equipped = is_shovel_item(held_item)
                 for obj in visible_objects:
                     if hasattr(obj, 'harvest') and hasattr(obj, 'destroyed') and not obj.destroyed:
 
@@ -2446,8 +2532,12 @@ while running:
                             from world import GemstoneRock, MetalOreRock, MetalVeinRock, GoldOreRock, GoldVeinRock
                             is_gemstone_rock = isinstance(obj, GemstoneRock)
                             is_ore_or_vein = isinstance(obj, (MetalOreRock, MetalVeinRock, GoldOreRock, GoldVeinRock))
+                            is_bank = isinstance(obj, Bank)
                             if (getattr(obj, "resource", None) == "Stone" or is_gemstone_rock or is_ore_or_vein) and not has_pickaxe_equipped:
                                 need_pickaxe_message_timer = 1.5
+                                continue
+                            if is_bank and not has_shovel_equipped:
+                                need_shovel_message_timer = 1.5
                                 continue
                             current_tool_resource = getattr(obj, "resource", None)
                             if is_gemstone_rock or is_ore_or_vein:
@@ -2500,7 +2590,7 @@ while running:
                                        thrown["sprite_size"], thrown["sprite_size"])
                 
                 collision_detected = False
-                collision_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants + ponds + lavas
+                collision_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants + ponds + lavas + banks
                 collision_mobs = cats + squirrels + cows + chickens + crawlers + pocks + deers + black_bears + brown_bears + gilas + crows + duskwretches
                 
                 for obj in collision_objects:
@@ -2560,6 +2650,7 @@ while running:
         fruit_plants = [fp for fp in fruit_plants if not fp.destroyed]
         ponds = [pond for pond in ponds if not pond.destroyed]
         lavas = [lava for lava in lavas if not lava.destroyed]
+        banks = [bank for bank in banks if not bank.destroyed]
 
         cats = [cat for cat in cats if not cat.destroyed]
         squirrels = [squirrel for squirrel in squirrels if not squirrel.destroyed]
@@ -2600,15 +2691,16 @@ while running:
         gold_vein_rocks = [vein for vein in gold_vein_rocks if not vein.destroyed]
         
         collectibles = sticks + stones + grasses + savannah_grasses + mushrooms + dropped_items + marsh_reeds
-        all_objects_no_liquids = rocks + trees + boulders + gemstone_rocks + metal_ore_rocks + metal_vein_rocks + gold_ore_rocks + gold_vein_rocks + berry_bushes + dead_bushes + ferns + fruit_plants
+        all_objects_no_liquids = rocks + trees + boulders + gemstone_rocks + metal_ore_rocks + metal_vein_rocks + gold_ore_rocks + gold_vein_rocks + berry_bushes + dead_bushes + ferns + fruit_plants + banks
         all_objects = all_objects_no_liquids + ponds + lavas
         mobs = cats + squirrels + cows + chickens + crawlers + duskwretches + pocks + deers + black_bears + brown_bears + gilas + crows + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
         all_mobs = mobs
 
+        visibility_cam_x = sleeping_tent_x if (sleeping_in_tent or tent_hide_active) else cam_x
         visible_collectibles = [col for col in collectibles if col.rect.x- cam_x > -256 and col.rect.x - cam_x < width + 256]
         visible_liquids = [obj for obj in (ponds + lavas) if obj.rect.x - cam_x > -256 and obj.rect.x - cam_x < width + 256 and obj.rect.y > -256 and obj.rect.y < height + 256]
         visible_objects = [obj for obj in all_objects_no_liquids if obj.rect.x - cam_x > -256 and obj.rect.x - cam_x < width + 256 and obj.rect.y > -256 and obj.rect.y < height + 256]
-        visible_mobs = [mob for mob in mobs if mob.rect.x - (sleeping_tent_x if sleeping_in_tent else cam_x) > -256 and mob.rect.x - (sleeping_tent_x if sleeping_in_tent else cam_x) < width + 256 and mob.rect.y > -256 and mob.rect.y < height + 256]
+        visible_mobs = [mob for mob in mobs if mob.rect.x - visibility_cam_x > -256 and mob.rect.x - visibility_cam_x < width + 256 and mob.rect.y > -256 and mob.rect.y < height + 256]
 
         # Add visible placed structures
         visible_structures = []
@@ -2801,7 +2893,7 @@ while running:
                 width_mult = 0.4
                 height_mult = 0.2
             elif name == "Torch":
-                y_offset = rect.height * 0.12
+                y_offset = rect.height * 0.05
             if name in ("Rock", "RedrockRock", "SnowyRock", "MetalOreRock", "MetalVeinRock", "GoldOreRock", "GoldVeinRock", "GemstoneRock"):
                 y_offset = 0
             if name in ("Boulder","RedrockBoulder", "SnowyBoulder"):
@@ -2842,7 +2934,7 @@ while running:
             return options[row][col]
 
         def draw_tent_menu(screen, dt_local):
-            global tent_hover_timers
+            global tent_hover_timers, tent_hover_highlight_surface, tent_hover_highlight_rect, current_tent_hover_option
             overlay = pygame.Surface((width, height), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 140))
             screen.blit(overlay, (0, 0))
@@ -2857,6 +2949,21 @@ while running:
             pygame.draw.line(screen, (120, 120, 140), (menu_x + 2 * menu_w // 3, menu_y), (menu_x + 2 * menu_w // 3, menu_y + menu_h), 2)
             pygame.draw.line(screen, (120, 120, 140), (menu_x, menu_y + menu_h // 2), (menu_x + menu_w, menu_y + menu_h // 2), 2)
 
+            options_grid = [
+                ["sleep", "hide", "pickup"],
+                ["fast_travel", "demolish", "cancel"],
+            ]
+            option_rects = {}
+            for row in range(2):
+                for col in range(3):
+                    cell_rect = pygame.Rect(
+                        menu_x + col * (menu_w // 3),
+                        menu_y + row * (menu_h // 2),
+                        menu_w // 3,
+                        menu_h // 2,
+                    )
+                    option_rects[options_grid[row][col]] = cell_rect
+
             labels = {
                 "sleep": "Sleep",
                 "hide": "Hide",
@@ -2868,21 +2975,31 @@ while running:
             mouse_pos = pygame.mouse.get_pos()
             hovered_option = get_tent_menu_option(mouse_pos, rect)
 
+            if hovered_option != current_tent_hover_option:
+                current_tent_hover_option = hovered_option
+                if hovered_option:
+                    highlight_rect = option_rects.get(hovered_option)
+                    if highlight_rect:
+                        tent_hover_highlight_surface = pygame.Surface(highlight_rect.size, pygame.SRCALPHA)
+                        tent_hover_highlight_surface.fill((255, 255, 255, 50))
+                        tent_hover_highlight_rect = highlight_rect.copy()
+                    else:
+                        tent_hover_highlight_surface = None
+                        tent_hover_highlight_rect = None
+                else:
+                    tent_hover_highlight_surface = None
+                    tent_hover_highlight_rect = None
+
             for key in tent_hover_timers.keys():
                 if hovered_option != key:
                     tent_hover_timers[key] = 0.0
 
             for row in range(2):
                 for col in range(3):
-                    option = [["sleep", "hide", "pickup"], ["fast_travel", "demolish", "cancel"]][row][col]
-                    cell_rect = pygame.Rect(
-                        menu_x + col * (menu_w // 3),
-                        menu_y + row * (menu_h // 2),
-                        menu_w // 3,
-                        menu_h // 2,
-                    )
-                    if hovered_option == option:
-                        pygame.draw.rect(screen, (255, 255, 255, 30), cell_rect)
+                    option = options_grid[row][col]
+                    cell_rect = option_rects[option]
+                    if option == current_tent_hover_option and tent_hover_highlight_surface and tent_hover_highlight_rect:
+                        screen.blit(tent_hover_highlight_surface, cell_rect.topleft)
                         if option in tent_hover_timers:
                             tent_hover_timers[option] += dt_local
                     text_surface = pygame.font.SysFont(None, 24).render(labels[option], True, (255, 255, 255))
@@ -2927,7 +3044,7 @@ while running:
             else:
                 object_mid_y = obj.rect.y + obj.rect.height / 2
 
-            if not player_drawn and (player.rect.centery + 20) <= object_mid_y and not sleeping_in_tent:
+            if not player_drawn and (player.rect.centery + 20) <= object_mid_y and not (sleeping_in_tent or tent_hide_active):
                 # Draw axe first for left/up directions (behind the player)
                 if player.last_direction in ["left", "up"]:
                     draw_held_item()
@@ -3016,7 +3133,7 @@ while running:
             if hasattr(obj, 'breath_image') and obj.breath_image:
                 screen.blit(obj.breath_image, (obj.breath_image_x - cam_x, obj.breath_image_y))
         
-        if not player_drawn and not sleeping_in_tent:
+        if not player_drawn and not (sleeping_in_tent or tent_hide_active):
             if player.last_direction in ["left", "up"]:
                 draw_held_item()
 
@@ -3122,8 +3239,10 @@ while running:
         # Add nearby structures to nearby_objects for mob collision detection
         nearby_objects.extend(nearby_structures)
 
+        mob_reference_x = sleeping_tent_x if (sleeping_in_tent or tent_hide_active) else player_pos.x + cam_x
+        mob_reference_radius = 10000 if (sleeping_in_tent or tent_hide_active) else 3000
         nearby_mobs = [mob for mob in mobs
-                    if abs(mob.rect.x - (sleeping_tent_x if sleeping_in_tent else player_pos.x + cam_x)) < (10000 if sleeping_in_tent else 3000)
+                    if abs(mob.rect.x - mob_reference_x) < mob_reference_radius
                     and abs(mob.rect.y - player_pos.y) < 800]
 
         def lerp(a, b, t):
@@ -3393,15 +3512,19 @@ while running:
 
                     
             
-                mob.update(time_dt, None, mob_nearby_objects, mob_nearby_mobs, sleeping_in_tent)
+                mob.update(time_dt, None, mob_nearby_objects, mob_nearby_mobs, sleeping_in_tent or tent_hide_active)
                 mob.keep_in_screen(height)
-            player_world_x = player_pos.x + cam_x
-            player_world_y = player_pos.y
+            if sleeping_in_tent or tent_hide_active:
+                player_world_x = sleeping_tent_x
+                player_world_y = player_pos.y
+            else:
+                player_world_x = player_pos.x + cam_x
+                player_world_y = player_pos.y
             player.attacking(nearby_mobs, player_world_x, player_world_y, mouse_over_hotbar)
             for mob in nearby_mobs:
-                mob.handle_health(screen, cam_x, dt, sleeping_in_tent)
+                mob.handle_health(screen, cam_x, dt, sleeping_in_tent or tent_hide_active)
                 mob.handle_lava_damage(dt)
-                mob.flee(player_world_x, player_world_y, dt, sleeping_in_tent)
+                mob.flee(player_world_x, player_world_y, dt, sleeping_in_tent or tent_hide_active)
                 
                 # Liquid collision for mobs
                 mob_in_liquid = False
@@ -3796,6 +3919,15 @@ while running:
             screen.blit(temp_surface, (x - 5, y - 5))
             screen.blit(pickaxe_text, (x, y))
             need_pickaxe_message_timer -= dt
+        if need_shovel_message_timer > 0:
+            shovel_text = font.render("Use a shovel to harvest this.", True, (180, 220, 255))
+            x = screen.get_width()//2 - shovel_text.get_width()//2
+            y = 110
+            temp_surface = pygame.Surface((shovel_text.get_width() + 10, shovel_text.get_height() + 10), pygame.SRCALPHA)
+            temp_surface.fill((0, 0, 0, 120))
+            screen.blit(temp_surface, (x - 5, y - 5))
+            screen.blit(shovel_text, (x, y))
+            need_shovel_message_timer -= dt
         if inventory.inventory_full_message_timer > 0:
             full_text = font.render("Inventory Full! Cannot pick up items.", True, (255, 50, 50))
             x = screen.get_width()//2 - full_text.get_width()//2

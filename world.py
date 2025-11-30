@@ -50,6 +50,10 @@ num_metal_vein_rocks = 50
 num_gold_ore_rocks = 50
 num_gold_vein_rocks = 50
 num_marsh_reeds = 1000
+num_salt_banks = 20
+num_clay_banks = 35
+num_snow_banks = 20
+num_sand_banks = 20
 
 rocks = []
 metal_ore_rocks = []
@@ -72,6 +76,7 @@ lavas = []
 gemstone_rocks = []
 dropped_items = []
 marsh_reeds = []
+banks = []
 
 
 pond_images = ["assets/sprites/biomes/grassland/pond1.png", "assets/sprites/biomes/grassland/pond2.png", "assets/sprites/biomes/grassland/pond3.png", "assets/sprites/biomes/grassland/pond4.png", "assets/sprites/biomes/grassland/pond5.png", "assets/sprites/biomes/grassland/pond6.png", "assets/sprites/biomes/grassland/pond7.png", "assets/sprites/biomes/grassland/pond8.png", "assets/sprites/biomes/grassland/pond9.png", "assets/sprites/biomes/grassland/pond10.png"]
@@ -1056,6 +1061,28 @@ class RedrockBoulder(Solid):
             resources.extend(["Raw Gold"] * special_yield)
         return resources
         
+class Bank(Solid):
+    def __init__(self, image, x, y, resource, resource_amount=40, size=(64, 64)):
+        super().__init__(image, x, y, size)
+        self.resource = resource
+        self.resource_amount = resource_amount
+
+class SaltBank(Bank):
+    def __init__(self, x, y):
+        super().__init__("assets/sprites/biomes/beach/SaltBank.png", x, y, "Salt", resource_amount=random.randint(20, 40))
+
+class ClayBank(Bank):
+    def __init__(self, x, y):
+        super().__init__("assets/sprites/biomes/grassland/ClayBank.png", x, y, "Clay", resource_amount=random.randint(20, 40))
+
+class SnowBank(Bank):
+    def __init__(self, x, y):
+        super().__init__("assets/sprites/biomes/snow/SnowBank.png", x, y, "Snow", resource_amount=random.randint(20, 40))
+
+class SandBank(Bank):
+    def __init__(self, x, y):
+        super().__init__("assets/sprites/biomes/desert/SandBank.png", x, y, "Sand", resource_amount=random.randint(20, 40))
+
 class Grass(Collectible):
     def __init__(self, x, y):
         image_index = random.randint(1, 4)
@@ -1438,6 +1465,49 @@ for tile_x, tile_image in tiles:
     weighted_mushroom_tiles.extend([(tile_x, tile_image)] * weight)
 
 
+allowed_clay_bank_tiles = [bg_compact, bg_riverrock, bg_bigrock, bg_wasteland]
+clay_bank_weights = {
+    bg_compact: 4,
+    bg_riverrock: 2,
+    bg_bigrock: 1,
+    bg_wasteland: 1
+}
+weighted_clay_bank_tiles = []
+for tile_x, tile_image in tiles:
+    weight = clay_bank_weights.get(tile_image, 0)
+    if weight > 0:
+        weighted_clay_bank_tiles.extend([(tile_x, tile_image)] * weight)
+
+allowed_salt_bank_tiles = [bg_sand]
+salt_bank_weights = {
+    bg_sand: 1
+}
+weighted_salt_bank_tiles = []
+for tile_x, tile_image in tiles:
+    weight = salt_bank_weights.get(tile_image, 0)
+    if weight > 0:
+        weighted_salt_bank_tiles.extend([(tile_x, tile_image)] * weight)
+
+allowed_sand_bank_tiles = [bg_wasteland]
+sand_bank_weights = {
+    bg_sand: 1
+}
+weighted_sand_bank_tiles = []
+for tile_x, tile_image in tiles:
+    weight = sand_bank_weights.get(tile_image, 0)
+    if weight > 0:
+        weighted_sand_bank_tiles.extend([(tile_x, tile_image)] * weight)
+
+allowed_snow_bank_tiles = [bg_snow]
+snow_bank_weights = {
+    bg_snow: 1
+}
+weighted_snow_bank_tiles = []
+for tile_x, tile_image in tiles:
+    weight = snow_bank_weights.get(tile_image, 0)
+    if weight > 0:
+        weighted_snow_bank_tiles.extend([(tile_x, tile_image)] * weight)
+
 
 allowed_dead_bush_tiles = [bg_grass, bg_dirt, bg_compact, bg_duskstone, bg_wasteland]
 
@@ -1565,6 +1635,7 @@ def generate_world():
     gold_vein_rocks.clear()
     dropped_items.clear()
     marsh_reeds.clear()
+    banks.clear()
 
     for _ in range(num_rocks):
         tile_x, tile_image = random.choice(weighted_rock_tiles)
@@ -1704,6 +1775,34 @@ def generate_world():
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
         dead_bushes.append(DeadBush(x, y))
+
+    if weighted_clay_bank_tiles:
+        for _ in range(num_clay_banks):
+            tile_x, tile_image = random.choice(weighted_clay_bank_tiles)
+            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            y = random.randint(0, height - 64)
+            banks.append(ClayBank(x, y))
+
+    if weighted_salt_bank_tiles:
+        for _ in range(num_salt_banks):
+            tile_x, tile_image = random.choice(weighted_salt_bank_tiles)
+            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            y = random.randint(0, height - 64)
+            banks.append(SaltBank(x, y))
+
+    if weighted_sand_bank_tiles:
+        for _ in range(num_sand_banks):
+            tile_x, tile_image = random.choice(weighted_sand_bank_tiles)
+            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            y = random.randint(0, height - 64)
+            banks.append(SandBank(x, y))
+
+    if weighted_snow_bank_tiles:
+        for _ in range(num_snow_banks):
+            tile_x, tile_image = random.choice(weighted_snow_bank_tiles)
+            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            y = random.randint(0, height - 64)
+            banks.append(SnowBank(x, y))
 
     if weighted_fruit_plant_tiles:
         for _ in range(num_fruit_plants):
