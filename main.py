@@ -2599,7 +2599,7 @@ while running:
         gold_ore_rocks = [ore for ore in gold_ore_rocks if not ore.destroyed]
         gold_vein_rocks = [vein for vein in gold_vein_rocks if not vein.destroyed]
         
-        collectibles = sticks + stones + grasses + savannah_grasses + mushrooms + dropped_items
+        collectibles = sticks + stones + grasses + savannah_grasses + mushrooms + dropped_items + marsh_reeds
         all_objects_no_liquids = rocks + trees + boulders + gemstone_rocks + metal_ore_rocks + metal_vein_rocks + gold_ore_rocks + gold_vein_rocks + berry_bushes + dead_bushes + ferns + fruit_plants
         all_objects = all_objects_no_liquids + ponds + lavas
         mobs = cats + squirrels + cows + chickens + crawlers + duskwretches + pocks + deers + black_bears + brown_bears + gilas + crows + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
@@ -2784,9 +2784,12 @@ while running:
                 rect = obj.rect
             if rect is None:
                 return
+            # Skip drawing shadow for destroyed objects
+            if hasattr(obj, 'destroyed') and obj.destroyed:
+                return
             is_player_obj = obj is player
             name = getattr(obj, "__class__", type("x", (), {})).__name__ if not isinstance(obj, dict) else obj.get("item_name", "")
-            alpha = 60
+            alpha = 40
             width_mult = 0.8
             height_mult = 0.25
             y_offset = 0
@@ -2794,27 +2797,23 @@ while running:
             if name == "SavannahGrass":
                 width_mult = 0.55
                 height_mult = 0.25
-                alpha = 40
-            elif name in ("Grass", "Stick", "DroppedItem", "Mushroom"):
+            elif name in ("Grass", "Stick", "DroppedItem", "Mushroom", "MarshReed"):
                 width_mult = 0.4
                 height_mult = 0.2
-                alpha = 40
             elif name == "Torch":
                 y_offset = rect.height * 0.12
-            if name == "Rock" or name == "RedrockRock":
+            if name in ("Rock", "RedrockRock", "SnowyRock", "MetalOreRock", "MetalVeinRock", "GoldOreRock", "GoldVeinRock", "GemstoneRock"):
                 y_offset = 0
-            if name == "Boulder" or name == "RedrockBoulder":
+            if name in ("Boulder","RedrockBoulder", "SnowyBoulder"):
                 y_offset = -25
             if name in ("Squirrel",):
                 width_mult = 0.45
                 height_mult = 0.18
-                alpha = 50
             if hasattr(obj, "resource") and getattr(obj, "resource", "") == "Willow Wood":
                 y_offset = -rect.height * 0.08
             if name in ("Crow", "Bird", "Duck"):
                 width_mult = 0.35
                 height_mult = 0.18
-                alpha = 45
             if is_player_obj:
                 y_offset += rect.height * 0.16
             shadow_width = max(8, int(rect.width * width_mult))

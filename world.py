@@ -49,6 +49,7 @@ num_metal_ore_rocks = 50
 num_metal_vein_rocks = 50
 num_gold_ore_rocks = 50
 num_gold_vein_rocks = 50
+num_marsh_reeds = 1000
 
 rocks = []
 metal_ore_rocks = []
@@ -70,6 +71,7 @@ ponds = []
 lavas = []
 gemstone_rocks = []
 dropped_items = []
+marsh_reeds = []
 
 
 pond_images = ["assets/sprites/biomes/grassland/pond1.png", "assets/sprites/biomes/grassland/pond2.png", "assets/sprites/biomes/grassland/pond3.png", "assets/sprites/biomes/grassland/pond4.png", "assets/sprites/biomes/grassland/pond5.png", "assets/sprites/biomes/grassland/pond6.png", "assets/sprites/biomes/grassland/pond7.png", "assets/sprites/biomes/grassland/pond8.png", "assets/sprites/biomes/grassland/pond9.png", "assets/sprites/biomes/grassland/pond10.png"]
@@ -99,6 +101,11 @@ savannah_tree_types = [{"type": "Orange Tree", "image": "assets/sprites/biomes/g
 {"type": "Olive Tree", "image": "assets/sprites/biomes/grassland/OliveTree.png", "bare_image": "assets/sprites/biomes/grassland/BareOliveTree.png", "fruit": "Olives", "wood": "Olive Wood", "width" : 96, "height" : 128}]
 
 beach_tree_types = [{"type": "Palm Tree", "image": "assets/sprites/biomes/beach/PalmTree.png", "bare_image": "assets/sprites/biomes/beach/BarePalmTree.png", "fruit": "Coconuts", "wood": "Palm Wood", "width" : 64, "height" : 128}]
+
+snowy_tree_types = [
+    {"type": "Snowy Oak Tree", "image": "assets/sprites/biomes/snow/SnowyOakTree.png", "bare_image": None, "fruit": None, "wood": "Oak Wood", "width": 64, "height": 128},
+    {"type": "Snowy Fir Tree", "image": "assets/sprites/biomes/snow/SnowyFirTree.png", "bare_image": None, "fruit": None, "wood": "Fir Wood", "width": 64, "height": 128},
+]
 
 fruit_plant_types = [{"type": "Pineapple", "image": "assets/sprites/biomes/grassland/PineapplePlant.png", "bare_image": "assets/sprites/biomes/grassland/BarePineapplePlant.png", "fruit": "Pineapple", "resource": "Fiber", "width" : 64, "height" : 64},
 {"type": "Watermelon", "image": "assets/sprites/biomes/grassland/WatermelonPlant.png", "bare_image": "assets/sprites/biomes/grassland/BareWatermelonPlant.png", "fruit": "Watermelon", "resource": "Fiber", "width" : 32, "height" : 32}]
@@ -888,7 +895,12 @@ class Collectible(pygame.sprite.Sprite):
 class DroppedItem(Collectible):
     ICON_SIZE = 16
     DESPAWN_TIME = 180.0
-    drop_font = pygame.font.SysFont(None, 18)
+
+    @classmethod
+    def get_drop_font(cls):
+        if not hasattr(cls, '_drop_font'):
+            cls._drop_font = pygame.font.SysFont(None, 18)
+        return cls._drop_font
 
     def __init__(self, x, y, resource, icon_path, amount=1):
         size = (self.ICON_SIZE, self.ICON_SIZE)
@@ -924,8 +936,8 @@ class DroppedItem(Collectible):
 
         screen.blit(self.image, (self.rect.x - cam_x, self.rect.y + offset_y))
         if self.amount > 1:
-            qty_text = self.drop_font.render(str(self.amount), True, (255, 255, 255))
-            shadow = self.drop_font.render(str(self.amount), True, (0, 0, 0))
+            qty_text = self.get_drop_font().render(str(self.amount), True, (255, 255, 255))
+            shadow = self.get_drop_font().render(str(self.amount), True, (0, 0, 0))
             text_x = self.rect.x - cam_x + self.rect.width - qty_text.get_width() - 2
             text_y = self.rect.y + self.rect.height - qty_text.get_height() - 4 + offset_y
             screen.blit(shadow, (text_x + 1, text_y + 1))
@@ -1056,6 +1068,15 @@ class SavannahGrass(Collectible):
         image_index = random.randint(1, 4)
         image_path = f"assets/sprites/biomes/grassland/SavannahGrass{image_index}.png"
         super().__init__(x, y, image_path, "Fiber", size=(64, 64))
+
+class MarshReed(Collectible):
+    def __init__(self, x, y):
+        super().__init__(x, y, "assets/sprites/biomes/grassland/MarshReed.png", "Marsh Reed", size=(64, 64))
+
+    def draw(self, screen, cam_x):
+        if self.destroyed:
+            return
+        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
 
 class Mushroom(Collectible):
     def __init__(self, x, y):
@@ -1521,7 +1542,7 @@ for tile_x, tile_image in tiles:
 
 
 def generate_world():
-    global rocks, dead_bushes, grasses, stones, boulders, berry_bushes, trees, sticks, savannah_grasses, mushrooms, fruit_plants, ferns, ponds, lavas, gemstone_rocks, metal_ore_rocks, metal_vein_rocks, gold_ore_rocks, gold_vein_rocks, dropped_items
+    global rocks, dead_bushes, grasses, stones, boulders, berry_bushes, trees, sticks, savannah_grasses, mushrooms, fruit_plants, ferns, ponds, lavas, gemstone_rocks, metal_ore_rocks, metal_vein_rocks, gold_ore_rocks, gold_vein_rocks, dropped_items, marsh_reeds
     
     rocks.clear()
     dead_bushes.clear()
@@ -1543,6 +1564,7 @@ def generate_world():
     gold_ore_rocks.clear()
     gold_vein_rocks.clear()
     dropped_items.clear()
+    marsh_reeds.clear()
 
     for _ in range(num_rocks):
         tile_x, tile_image = random.choice(weighted_rock_tiles)
@@ -1625,8 +1647,13 @@ def generate_world():
     spawn_trees(trees, grassland_tree_types, weighted_grassland_tiles, num_grassland_trees, height)
     spawn_trees(trees, savannah_tree_types, weighted_savannah_tiles, num_savannah_trees, height)
     spawn_trees(trees, beach_tree_types, weighted_beach_tiles, num_beach_trees, height)
-    
-    
+
+    weighted_snow_tree_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image == bg_snow]
+    if weighted_snow_tree_tiles:
+        num_snow_trees = 50
+        spawn_trees(trees, snowy_tree_types, weighted_snow_tree_tiles, num_snow_trees, height)
+
+
     for _ in range(num_sticks):
         tile_x, tile_image = random.choice(weighted_stick_tiles)
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
@@ -1657,7 +1684,14 @@ def generate_world():
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
         savannah_grasses.append(SavannahGrass(x, y))
-    
+
+    weighted_compact_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image == bg_compact]
+    for _ in range(num_marsh_reeds):
+        tile_x, tile_image = random.choice(weighted_compact_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        marsh_reeds.append(MarshReed(x, y))
+
     for _ in range(num_mushrooms):
         tile_x, tile_image = random.choice(weighted_mushroom_tiles)
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
@@ -1709,4 +1743,4 @@ def generate_world():
         y = random.randint(0, height - 128)
         lavas.append(Lavapond(x, y))
     
-    return rocks, boulders, berry_bushes, trees, sticks, stones, grasses, savannah_grasses, mushrooms, dead_bushes, fruit_plants, ferns, ponds, lavas, gemstone_rocks, metal_ore_rocks, metal_vein_rocks, gold_ore_rocks, gold_vein_rocks
+    return rocks, boulders, berry_bushes, trees, sticks, stones, grasses, savannah_grasses, mushrooms, dead_bushes, fruit_plants, ferns, ponds, lavas, gemstone_rocks, metal_ore_rocks, metal_vein_rocks, gold_ore_rocks, gold_vein_rocks, marsh_reeds

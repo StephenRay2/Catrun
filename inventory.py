@@ -1322,8 +1322,8 @@ items_list = [
         "placeable": False,
         "consumable": False,
         "durability": None,
-        "recipe": [{"item": "Bucket of Sand", "amount": 1}],
-        "output_amount": 5,
+        "recipe": [{"item": "Sand", "amount": 1}],
+        "output_amount": 1,
         "crafting_medium": "smelter",
         "tags": ["crafted", "material"]
     },
@@ -1372,7 +1372,7 @@ items_list = [
         "placeable": False,
         "consumable": False,
         "durability": None,
-        "recipe": [{"item": "Fiber", "amount": 4}],
+        "recipe": [{"item_tag": "Fiber", "amount": 4}],
         "crafting_medium": "hand",
         "tags": ["crafted", "material"],
         "output_amount": 1
@@ -1577,7 +1577,7 @@ items_list = [
         "placeable": False,
         "consumable": True,
         "durability": None,
-        "recipe": [{"item": "Stone", "amount": 1}, {"item_tag": "oil", "amount": 1}, {"item": "Fiber", "amount": 1}],
+        "recipe": [{"item": "Stone", "amount": 1}, {"item_tag": "oil", "amount": 1}, {"item_tag": "Fiber", "amount": 1}],
         "output_amount": 10,
         "crafting_medium": "mortar_and_pestle",
         "tags": ["crafted", "material"]
@@ -1609,7 +1609,7 @@ items_list = [
         "placeable": False,
         "consumable": True,
         "durability": None,
-        "recipe": [{"item": "Fiber", "amount": 10}, {"item": "Twilight Drupes", "amount": 3}, {"item": "Small Water", "amount": 1}],
+        "recipe": [{"item_tag": "Fiber", "amount": 10}, {"item": "Twilight Drupes", "amount": 3}, {"item": "Small Water", "amount": 1}],
         "crafting_medium": "mortar_and_pestle",
         "tags": ["potion", "consumable"],
         "output_amount": 1
@@ -4230,18 +4230,18 @@ items_list = [
     # Crafted through Gameplay
     {
     
-        "item_name": "Bucket of Sand",
-        "icon": "SandBucket.png",
+        "item_name": "Sand",
+        "icon": "Sand.png",
         "stack_size": 100,
-        "weight": 3,
+        "weight": .5,
         "type": "raw_material",
-        "description": "It's a bucket... with sand in it... I call it a bucket of sand.",
+        "description": "It's a pile... it's sand... It's a lil pile of sand.",
         "use_effect": None,
         "placeable": False,
         "consumable": False,
         "durability": None,
-        "recipe": [{"item": "Metal Bucket", "amount": 1}],
-        "crafting_medium": "gameplay",
+        "recipe": None,
+        "crafting_medium": None,
         "tags": ["item"],
         "output_amount": 1
     },
@@ -4435,7 +4435,7 @@ items_list = [
         "placeable": False,
         "consumable": True,
         "durability": None,
-        "recipe": [{"item": "Fiber", "amount": 15}, {"item": "Twilight Drupes", "amount": 4}, {"item": "Medium Glass Water", "amount": 1}],
+        "recipe": [{"item_tag": "Fiber", "amount": 15}, {"item": "Twilight Drupes", "amount": 4}, {"item": "Medium Glass Water", "amount": 1}],
         "crafting_medium": "alchemy_bench",
         "tags": ["potion", "consumable"],
         "output_amount": 1
@@ -4967,7 +4967,7 @@ items_list = [
         "placeable": False,
         "consumable": False,
         "durability": None,
-        "recipe": [{"item": "Hide", "amount": 4}, {"item": "Fiber", "amount": 2}],
+        "recipe": [{"item": "Hide", "amount": 4}, {"item_tag": "Fiber", "amount": 2}],
         "crafting_medium": "hand",
         "tags": ["container"],
         "output_amount": 1
@@ -5079,7 +5079,7 @@ items_list = [
         "placeable": False,
         "consumable": False,
         "durability": 300,
-        "recipe": [{"item_tag": "wood", "amount": 1}],
+        "recipe": [{"item_tag": "wood", "amount": 1}, {"item": "Marsh Reed", "amount" : 1}],
         "crafting_medium": "workbench",
         "tags": ["tool", "instrument"],
         "output_amount": 1
@@ -5218,14 +5218,14 @@ items_list = [
         "stack_size": 100,
         "weight": 0.15,
         "type": "raw_material",
-        "description": "A reed from a marsh. Flexible and useful for crafting.",
+        "description": "A reed from a marsh. Who'd've thunk?.",
         "use_effect": None,
         "placeable": False,
         "consumable": False,
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["plant", "material"],
+        "tags": ["plant", "material", "fiber"],
         "output_amount": 1
     },
     {
@@ -5747,7 +5747,7 @@ items_list = [
         "placeable": False,
         "consumable": False,
         "durability": 500,
-        "recipe": [{"item_tag": "wood", "amount": 20}, {"item": "Fiber", "amount": 3}, {"item": "Sealing Paste", "amount": 6}],
+        "recipe": [{"item_tag": "wood", "amount": 20}, {"item_tag": "Metal Nail", "amount": 15}, {"item": "Sealing Paste", "amount": 6}],
         "crafting_medium": "workbench",
         "tags": ["tool", "transport"],
         "output_amount": 1
