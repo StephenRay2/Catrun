@@ -3209,15 +3209,16 @@ class Dragon(Enemy):
             self.frame_index = min(self.frame_index + effective_animation_speed, len(frames) - 1)
             self.image = frames[int(self.frame_index)]
     
-    def animate_walk(self):
+    def animate_walk(self, animation_speed_multiplier=1.0):
         if self.state == "walking":
             if self.direction.x > 0:
                 self.last_direction = "right"
             elif self.direction.x < 0:
                 self.last_direction = "left"
-            
+
             frames = self.walk_right_images if self.last_direction == "right" else self.walk_left_images
-            self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+            effective_animation_speed = self.animation_speed * animation_speed_multiplier
+            self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
             self.image = frames[int(self.frame_index)]
         else:
-            self.animate_stand()
+            self.animate_stand(animation_speed_multiplier)

@@ -2,6 +2,7 @@ import pygame
 import random
 import time
 import math
+import copy
 
 screen = pygame.display.set_mode((1280, 720), pygame.FULLSCREEN)
 width = screen.get_width()
@@ -43,11 +44,11 @@ num_dead_bushes = 300
 num_fruit_plants = 300
 num_fire_ferns = 50
 num_frost_ferns = 50
-num_gemstone_rocks = 20
-num_metal_ore_rocks = 100
-num_metal_vein_rocks = 100
-num_gold_ore_rocks = 100
-num_gold_vein_rocks = 100
+num_gemstone_rocks = 15
+num_metal_ore_rocks = 50
+num_metal_vein_rocks = 50
+num_gold_ore_rocks = 50
+num_gold_vein_rocks = 50
 
 rocks = []
 metal_ore_rocks = []
@@ -104,6 +105,27 @@ fruit_plant_types = [{"type": "Pineapple", "image": "assets/sprites/biomes/grass
 
 boulder_images = ["assets/sprites/biomes/grassland/Boulder1.png", "assets/sprites/biomes/grassland/Boulder2.png", "assets/sprites/biomes/grassland/Boulder3.png", "assets/sprites/biomes/grassland/Boulder4.png", "assets/sprites/biomes/grassland/Boulder5.png", "assets/sprites/biomes/grassland/Boulder6.png", "assets/sprites/biomes/grassland/Boulder7.png", ]
 
+snowy_rock_images = ["assets/sprites/biomes/snow/SnowyRock1.png", "assets/sprites/biomes/snow/SnowyRock2.png", "assets/sprites/biomes/snow/SnowyRock3.png", "assets/sprites/biomes/snow/SnowyRock4.png", "assets/sprites/biomes/snow/SnowyRock5.png", "assets/sprites/biomes/snow/SnowyRock6.png"]
+
+snowy_boulder_images = ["assets/sprites/biomes/snow/SnowyBoulder1.png", "assets/sprites/biomes/snow/SnowyBoulder2.png", "assets/sprites/biomes/snow/SnowyBoulder3.png", "assets/sprites/biomes/snow/SnowyBoulder4.png", "assets/sprites/biomes/snow/SnowyBoulder5.png", "assets/sprites/biomes/snow/SnowyBoulder6.png", "assets/sprites/biomes/snow/SnowyBoulder7.png"]
+
+snowy_stone_data = [
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image1": "assets/sprites/biomes/snow/SnowyStone1.png"},
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image2": "assets/sprites/biomes/snow/SnowyStone2.png"},
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image3": "assets/sprites/biomes/snow/SnowyStone3.png"},
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image4": "assets/sprites/biomes/snow/SnowyStone4.png"},
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image5": "assets/sprites/biomes/snow/SnowyStone5.png"},
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image6": "assets/sprites/biomes/snow/SnowyStone6.png"},
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image7": "assets/sprites/biomes/snow/SnowyStone7.png"},
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image8": "assets/sprites/biomes/snow/SnowyStone8.png"},
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image9": "assets/sprites/biomes/snow/SnowyStone9.png"},
+    {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image10": "assets/sprites/biomes/snow/SnowyStone10.png"}
+]
+
+redrock_rock_images = ["assets/sprites/biomes/grassland/RedrockRock1.png", "assets/sprites/biomes/grassland/RedrockRock2.png", "assets/sprites/biomes/grassland/RedrockRock3.png", "assets/sprites/biomes/grassland/RedrockRock4.png", "assets/sprites/biomes/grassland/RedrockRock6.png"]
+
+redrock_boulder_images = ["assets/sprites/biomes/grassland/RedrockBoulder1.png", "assets/sprites/biomes/grassland/RedrockBoulder2.png", "assets/sprites/biomes/grassland/RedrockBoulder3.png", "assets/sprites/biomes/grassland/RedrockBoulder4.png", "assets/sprites/biomes/grassland/RedrockBoulder5.png", "assets/sprites/biomes/grassland/RedrockBoulder6.png", "assets/sprites/biomes/grassland/RedrockBoulder7.png", ]
+
 berry_bush_types = [
     {"image": "assets/sprites/biomes/grassland/BloodBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareBloodBerryBush.png", "berry": "Blood Berries", "resource": "Sticks"},
     {"image": "assets/sprites/biomes/grassland/DawnBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareDawnBerryBush.png", "berry": "Dawn Berries", "resource": "Sticks"},
@@ -156,6 +178,19 @@ stone_data = [
     {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image8": "assets/sprites/biomes/grassland/Stone8.png"},
     {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image9": "assets/sprites/biomes/grassland/Stone9.png"},
     {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image10": "assets/sprites/biomes/grassland/Stone10.png"}
+]
+
+redrock_stone_data = [
+    {"resource": "Redrock Stone", "icon": "assets/sprites/items/RedrockStone.png", "image1": "assets/sprites/biomes/grassland/RedrockStone1.png"},
+    {"resource": "Redrock Stone", "icon": "assets/sprites/items/RedrockStone.png", "image2": "assets/sprites/biomes/grassland/RedrockStone2.png"},
+    {"resource": "Redrock Stone", "icon": "assets/sprites/items/RedrockStone.png", "image3": "assets/sprites/biomes/grassland/RedrockStone3.png"},
+    {"resource": "Redrock Stone", "icon": "assets/sprites/items/RedrockStone.png", "image4": "assets/sprites/biomes/grassland/RedrockStone4.png"},
+    {"resource": "Redrock Stone", "icon": "assets/sprites/items/RedrockStone.png", "image5": "assets/sprites/biomes/grassland/RedrockStone5.png"},
+    {"resource": "Redrock Stone", "icon": "assets/sprites/items/RedrockStone.png", "image6": "assets/sprites/biomes/grassland/RedrockStone6.png"},
+    {"resource": "Redrock Stone", "icon": "assets/sprites/items/RedrockStone.png", "image7": "assets/sprites/biomes/grassland/RedrockStone7.png"},
+    {"resource": "Redrock Stone", "icon": "assets/sprites/items/RedrockStone.png", "image8": "assets/sprites/biomes/grassland/RedrockStone8.png"},
+    {"resource": "Redrock Stone", "icon": "assets/sprites/items/RedrockStone.png", "image9": "assets/sprites/biomes/grassland/RedrockStone9.png"},
+    {"resource": "Redrock Stone", "icon": "assets/sprites/items/RedrockStone.png", "image10": "assets/sprites/biomes/grassland/RedrockStone10.png"}
 ]
 
 mushroom_data = [
@@ -456,7 +491,7 @@ class MetalOreRock(Solid):
         img = random.choice(metal_ore_images)
         super().__init__(img, x, y, (64, 64))
         self.resource = "Stone"
-        self.resource_amount = random.randint(10, 15)
+        self.resource_amount = random.randint(20, 35)
     
     def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
         resources = super().harvest(player, harvest_power, special_chance_mult, special_yield_mult)
@@ -471,7 +506,7 @@ class MetalVeinRock(Solid):
         img = random.choice(metal_vein_images)
         super().__init__(img, x, y, (64, 64))
         self.resource = "Stone"
-        self.resource_amount = random.randint(10, 15)
+        self.resource_amount = random.randint(20, 35)
     
     def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
         resources = super().harvest(player, harvest_power, special_chance_mult, special_yield_mult)
@@ -486,7 +521,7 @@ class GoldOreRock(Solid):
         img = random.choice(gold_ore_images)
         super().__init__(img, x, y, (64, 64))
         self.resource = "Stone"
-        self.resource_amount = random.randint(10, 15)
+        self.resource_amount = random.randint(20, 35)
     
     def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
         resources = super().harvest(player, harvest_power, special_chance_mult, special_yield_mult)
@@ -501,7 +536,7 @@ class GoldVeinRock(Solid):
         img = random.choice(gold_vein_images)
         super().__init__(img, x, y, (64, 64))
         self.resource = "Stone"
-        self.resource_amount = random.randint(10, 15)
+        self.resource_amount = random.randint(20, 35)
     
     def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
         resources = super().harvest(player, harvest_power, special_chance_mult, special_yield_mult)
@@ -914,6 +949,100 @@ class Stone(Collectible):
         image_index = random.randint(1, 10)
         image_path = f"assets/sprites/biomes/grassland/Stone{image_index}.png"
         super().__init__(x, y, image_path, "Stone", size=(25, 25))
+
+class SnowyStone(Collectible):
+    def __init__(self, x, y):
+        image_index = random.randint(1, 10)
+        image_path = f"assets/sprites/biomes/snow/SnowyStone{image_index}.png"
+        super().__init__(x, y, image_path, "Stone", size=(25, 25))
+
+class RedrockStone(Collectible):
+    def __init__(self, x, y):
+        image_index = random.randint(1, 10)
+        image_path = f"assets/sprites/biomes/grassland/Stone{image_index}.png"
+        super().__init__(x, y, image_path, "Redrock Stone", size=(25, 25))
+
+class SnowyRock(Solid):
+    def __init__(self, x, y):
+        img = random.choice(snowy_rock_images)
+        super().__init__(img, x, y, (64, 64))
+        self.resource = "Stone"
+        self.resource_amount = random.randint(10, 15)
+
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
+        resources = super().harvest(player, harvest_power, special_chance_mult, special_yield_mult)
+        special_yield = max(1, int(special_yield_mult))
+        if random.random() < min(1.0, 0.07 * special_chance_mult):
+            resources.extend(["Flint"] * special_yield)
+        if random.random() < min(1.0, 0.05 * special_chance_mult):
+            resources.extend(["Raw Metal"] * special_yield)
+        if random.random() < min(1.0, 0.002 * special_chance_mult):
+            resources.extend(["Raw Gold"] * special_yield)
+        return resources
+
+class RedrockRock(Solid):
+    def __init__(self, x, y):
+        img = random.choice(redrock_rock_images)
+        super().__init__(img, x, y, (64, 64))
+        self.resource = "Redrock Stone"
+        self.resource_amount = random.randint(10, 15)
+
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
+        resources = super().harvest(player, harvest_power, special_chance_mult, special_yield_mult)
+        special_yield = max(1, int(special_yield_mult))
+        if random.random() < min(1.0, 0.07 * special_chance_mult):
+            resources.extend(["Flint"] * special_yield)
+        if random.random() < min(1.0, 0.05 * special_chance_mult):
+            resources.extend(["Raw Metal"] * special_yield)
+        if random.random() < min(1.0, 0.002 * special_chance_mult):
+            resources.extend(["Raw Gold"] * special_yield)
+        return resources
+
+class SnowyBoulder(Solid):
+    def __init__(self, x, y):
+        img = random.choice(snowy_boulder_images)
+        super().__init__(img, x, y, (128, 128))
+        self.image_rect = self.rect.copy()
+        self.rect = pygame.Rect(self.rect.x, self.rect.y + 50, 128, 96)
+        self.resource = "Stone"
+        self.resource_amount = random.randint(40, 80)
+
+    def draw(self, screen, cam_x):
+        screen.blit(self.image, (self.image_rect.x - cam_x, self.image_rect.y))
+
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
+        resources = super().harvest(player, harvest_power, special_chance_mult, special_yield_mult)
+        special_yield = max(1, int(special_yield_mult))
+        if random.random() < min(1.0, 0.07 * special_chance_mult):
+            resources.extend(["Flint"] * special_yield)
+        if random.random() < min(1.0, 0.05 * special_chance_mult):
+            resources.extend(["Raw Metal"] * special_yield)
+        if random.random() < min(1.0, 0.002 * special_chance_mult):
+            resources.extend(["Raw Gold"] * special_yield)
+        return resources
+
+class RedrockBoulder(Solid):
+    def __init__(self, x, y):
+        img = random.choice(redrock_boulder_images)
+        super().__init__(img, x, y, (128, 128))
+        self.image_rect = self.rect.copy()
+        self.rect = pygame.Rect(self.rect.x, self.rect.y + 50, 128, 96)
+        self.resource = "Redrock Stone"
+        self.resource_amount = random.randint(40, 80)
+
+    def draw(self, screen, cam_x):
+        screen.blit(self.image, (self.image_rect.x - cam_x, self.image_rect.y))
+
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
+        resources = super().harvest(player, harvest_power, special_chance_mult, special_yield_mult)
+        special_yield = max(1, int(special_yield_mult))
+        if random.random() < min(1.0, 0.07 * special_chance_mult):
+            resources.extend(["Flint"] * special_yield)
+        if random.random() < min(1.0, 0.05 * special_chance_mult):
+            resources.extend(["Raw Metal"] * special_yield)
+        if random.random() < min(1.0, 0.002 * special_chance_mult):
+            resources.extend(["Raw Gold"] * special_yield)
+        return resources
         
 class Grass(Collectible):
     def __init__(self, x, y):
@@ -1024,10 +1153,10 @@ rock_weights = {
     bg_bigrock: 4,
     bg_duskstone: 1,
     bg_lavastone: 1,
-    bg_snow: 0,
+    bg_snow: 1,
     bg_wasteland: 1,
     bg_blackstone: 1,
-    bg_redrock: 1
+    bg_redrock: 10
 }
 
 weighted_rock_tiles = []
@@ -1147,10 +1276,10 @@ boulder_weights = {
     bg_bigrock: 4,
     bg_duskstone: 3,
     bg_lavastone: 1,
-    bg_snow: 0,
+    bg_snow: 1,
     bg_wasteland: 3,
     bg_blackstone: 2,
-    bg_redrock: 2
+    bg_redrock: 10
 }
 
 weighted_boulder_tiles = []
@@ -1202,10 +1331,10 @@ stone_weights = {
     bg_bigrock: 1,
     bg_duskstone: 1,
     bg_lavastone: 0,
-    bg_snow: 0,
+    bg_snow: 1,
     bg_wasteland: 2,
     bg_blackstone: 1,
-    bg_redrock: 1
+    bg_redrock: 10
 
 }
 
@@ -1380,6 +1509,16 @@ for tile_x, tile_image in tiles:
     if weight > 0:
         weighted_frost_fern_tiles.extend([(tile_x, tile_image)] * weight)
 
+weighted_snow_tiles = []
+for tile_x, tile_image in tiles:
+    if tile_image == bg_snow:
+        weighted_snow_tiles.append((tile_x, tile_image))
+
+weighted_redrock_tiles = []
+for tile_x, tile_image in tiles:
+    if tile_image == bg_redrock:
+        weighted_redrock_tiles.append((tile_x, tile_image))
+
 
 def generate_world():
     global rocks, dead_bushes, grasses, stones, boulders, berry_bushes, trees, sticks, savannah_grasses, mushrooms, fruit_plants, ferns, ponds, lavas, gemstone_rocks, metal_ore_rocks, metal_vein_rocks, gold_ore_rocks, gold_vein_rocks, dropped_items
@@ -1409,7 +1548,12 @@ def generate_world():
         tile_x, tile_image = random.choice(weighted_rock_tiles)
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
-        rocks.append(Rock(x, y))
+        if tile_image == bg_snow:
+            rocks.append(SnowyRock(x, y))
+        elif tile_image == bg_redrock:
+            rocks.append(RedrockRock(x, y))
+        else:
+            rocks.append(Rock(x, y))
 
     rock_border_locations = [(0, i * 28) for i in range(28)] + [(512000, i * 28) for i in range(28)]
 
@@ -1427,7 +1571,12 @@ def generate_world():
         tile_x, tile_image = random.choice(weighted_boulder_tiles)
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
-        boulders.append(Boulder(x, y))
+        if tile_image == bg_snow:
+            boulders.append(SnowyBoulder(x, y))
+        elif tile_image == bg_redrock:
+            boulders.append(RedrockBoulder(x, y))
+        else:
+            boulders.append(Boulder(x, y))
     
     for _ in range(num_gemstone_rocks):
         x = random.randint(0, 512000 - 64)
@@ -1489,7 +1638,12 @@ def generate_world():
         tile_x, tile_image = random.choice(weighted_stone_tiles)
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
-        stones.append(Stone(x, y))
+        if tile_image == bg_snow:
+            stones.append(SnowyStone(x, y))
+        elif tile_image == bg_redrock:
+            stones.append(RedrockStone(x, y))
+        else:
+            stones.append(Stone(x, y))
     
     
     for _ in range(num_grasses):

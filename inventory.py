@@ -571,6 +571,22 @@ items_list = [
         "output_amount": 1
     },
     {
+        "item_name": "Redrock Stone",
+        "icon": "RedrockStone.png",
+        "stack_size": 100,
+        "weight": 1,
+        "type": "raw_material",
+        "description": "A chunk of redrock stone. Useful for building and crafting.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": None,
+        "tags": ["material", "crafting"],
+        "output_amount": 1
+    },
+    {
         "item_name": "Clay",
         "icon": "Clay.png",
         "stack_size": 100,

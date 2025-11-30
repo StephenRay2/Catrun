@@ -2801,9 +2801,9 @@ while running:
                 alpha = 40
             elif name == "Torch":
                 y_offset = rect.height * 0.12
-            if name == "Rock":
+            if name == "Rock" or name == "RedrockRock":
                 y_offset = 0
-            if name == "Boulder":
+            if name == "Boulder" or name == "RedrockBoulder":
                 y_offset = -25
             if name in ("Squirrel",):
                 width_mult = 0.45
