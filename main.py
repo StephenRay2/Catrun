@@ -69,6 +69,10 @@ loaded_item_sprites = {}  # Cache for loaded item sprites
 placeable_animation_cache = {}  # Cache for animated placeable sprites (keyed by name and size)
 light_mask_cache = {}  # Cache for radial light masks
 
+# Light flicker variables
+light_flicker_timer = 0
+light_flicker_speed = 0.05
+
 # Placement system variables
 placement_mode = False
 placement_item = None
@@ -80,6 +84,8 @@ tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
 tent_hold_threshold = 0.6
 fast_travel_menu_active = False
 sleeping_in_tent = False
+sleeping_tent_x = 0
+sleeping_tent_y = 0
 tent_hide_active = False
 
 # Crafting bench variables
@@ -1215,17 +1221,21 @@ while running:
             time_dt = dt * time_speed_multiplier
             total_elapsed_time += time_dt
             time_of_day = (time_of_day_start + (total_elapsed_time / 60)) % 24
+            light_flicker_timer += dt
+            if sleeping_in_tent:
+                absolute_cam_x = sleeping_tent_x - width // 2
             if sleeping_in_tent and time_of_day >= 6 and time_of_day < 18:
                 sleeping_in_tent = False
                 time_speed_multiplier = 1.0
+                absolute_cam_x = player_world_x - width // 2
             # Update crafting flash
             inventory.update_flash(dt)
             for dropped in list(dropped_items):
-                dropped.update_lifetime(dt)
+                dropped.update_lifetime(time_dt)
             if smelter:
-                smelter.update(dt)
+                smelter.update(time_dt)
             if campfire:
-                campfire.update(dt)
+                campfire.update(time_dt)
             # Update placement position if in placement mode
             update_placement_position()
         else:
@@ -1463,8 +1473,13 @@ while running:
 
             game_just_started = False 
         
-        player_world_x = player_pos.x + cam_x
-        player_world_y = player_pos.y
+        if sleeping_in_tent:
+            # During sleep, use tent position as world center for mob AI
+            player_world_x = sleeping_tent_x
+            player_world_y = player_pos.y
+        else:
+            player_world_x = player_pos.x + cam_x
+            player_world_y = player_pos.y
         inventory.ui_open = inventory_in_use or campfire_in_use or smelter_in_use or crafting_bench_in_use or inventory.drop_menu_active or tent_menu_active or fast_travel_menu_active
         
         player_speed = player.get_speed()
@@ -2043,7 +2058,9 @@ while running:
                     if time_of_day >= 18 or time_of_day < 6:
                         sleeping_in_tent = True
                         tent_hide_active = False
-                        time_speed_multiplier = 20.0
+                        time_speed_multiplier = 30.0
+                        sleeping_tent_x = tent_menu_tent['x']
+                        sleeping_tent_y = tent_menu_tent['y']
                         tent_menu_active = False
                         tent_menu_tent = None
                         tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
@@ -2526,7 +2543,7 @@ while running:
         visible_collectibles = [col for col in collectibles if col.rect.x- cam_x > -256 and col.rect.x - cam_x < width + 256]
         visible_liquids = [obj for obj in (ponds + lavas) if obj.rect.x - cam_x > -256 and obj.rect.x - cam_x < width + 256 and obj.rect.y > -256 and obj.rect.y < height + 256]
         visible_objects = [obj for obj in all_objects_no_liquids if obj.rect.x - cam_x > -256 and obj.rect.x - cam_x < width + 256 and obj.rect.y > -256 and obj.rect.y < height + 256]
-        visible_mobs = [mob for mob in mobs if mob.rect.x - cam_x > -256 and mob.rect.x - cam_x < width + 256 and mob.rect.y > -256 and mob.rect.y < height + 256]
+        visible_mobs = [mob for mob in mobs if mob.rect.x - (sleeping_tent_x if sleeping_in_tent else cam_x) > -256 and mob.rect.x - (sleeping_tent_x if sleeping_in_tent else cam_x) < width + 256 and mob.rect.y > -256 and mob.rect.y < height + 256]
 
         # Add visible placed structures
         visible_structures = []
@@ -2846,11 +2863,11 @@ while running:
             else:
                 object_mid_y = obj.rect.y + obj.rect.height / 2
 
-            if not player_drawn and (player.rect.centery + 20) <= object_mid_y:
+            if not player_drawn and (player.rect.centery + 20) <= object_mid_y and not sleeping_in_tent:
                 # Draw axe first for left/up directions (behind the player)
                 if player.last_direction in ["left", "up"]:
                     draw_held_item()
-                
+
                 # Draw player (with shadow)
                 draw_shadow_for_obj(player)
                 if player.swimming and player.current_liquid:
@@ -2858,30 +2875,30 @@ while running:
                     liquid_center_y = player.current_liquid.rect.centery
                     liquid_width = player.current_liquid.rect.width
                     liquid_height = player.current_liquid.rect.height
-                    
+
                     distance_x = abs((player_pos.x + cam_x) - liquid_center_x)
                     distance_y = abs(player_pos.y - liquid_center_y)
                     max_distance_x = liquid_width / 2
                     max_distance_y = liquid_height / 2
-                    
+
                     normalized_x = min(1, distance_x / max_distance_x) if max_distance_x > 0 else 0
                     normalized_y = min(1, distance_y / max_distance_y) if max_distance_y > 0 else 0
-                    
+
                     sinking_ratio = max(0, 1 - max(normalized_x, normalized_y))
-                    
+
                     clip_height = int(player_current_image.get_height() * (1 - sinking_ratio * 0.5))
                     clip_rect = pygame.Rect(0, 0, player_current_image.get_width(), clip_height)
                     clipped_image = player_current_image.subsurface(clip_rect)
-                    
+
                     y_offset = sinking_ratio * 4
                     screen.blit(clipped_image, (player_pos.x - size/2, player_pos.y - size/2 + y_offset))
                 else:
                     screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size + 20))
-                
+
                 # Draw axe after for right/down directions (in front of the player)
                 if player.last_direction in ["right", "down"]:
                     draw_held_item()
-                
+
                 player_drawn = True
 
             draw_shadow_for_obj(obj)
@@ -2935,36 +2952,36 @@ while running:
             if hasattr(obj, 'breath_image') and obj.breath_image:
                 screen.blit(obj.breath_image, (obj.breath_image_x - cam_x, obj.breath_image_y))
         
-        if not player_drawn:
+        if not player_drawn and not sleeping_in_tent:
             if player.last_direction in ["left", "up"]:
                 draw_held_item()
-            
+
             draw_shadow_for_obj(player)
             if player.swimming and player.current_liquid:
                 liquid_center_x = player.current_liquid.rect.centerx
                 liquid_center_y = player.current_liquid.rect.centery
                 liquid_width = player.current_liquid.rect.width
                 liquid_height = player.current_liquid.rect.height
-                
+
                 distance_x = abs((player_pos.x + cam_x) - liquid_center_x)
                 distance_y = abs(player_pos.y - liquid_center_y)
                 max_distance_x = liquid_width / 2
                 max_distance_y = liquid_height / 2
-                
+
                 normalized_x = min(1, distance_x / max_distance_x) if max_distance_x > 0 else 0
                 normalized_y = min(1, distance_y / max_distance_y) if max_distance_y > 0 else 0
-                
+
                 sinking_ratio = max(0, 1 - max(normalized_x, normalized_y))
-                
+
                 clip_height = int(player_current_image.get_height() * (1 - sinking_ratio * 0.5))
                 clip_rect = pygame.Rect(0, 0, player_current_image.get_width(), clip_height)
                 clipped_image = player_current_image.subsurface(clip_rect)
-                
+
                 y_offset = sinking_ratio * 4
                 screen.blit(clipped_image, (player_pos.x - size/2, player_pos.y - size/2 + y_offset))
             else:
                 screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size/2))
-            
+
             if player.last_direction in ["right", "down"]:
                 draw_held_item()
 
@@ -3042,16 +3059,16 @@ while running:
         nearby_objects.extend(nearby_structures)
 
         nearby_mobs = [mob for mob in mobs
-                    if abs(mob.rect.x - (player_pos.x + cam_x)) < 3000
-                    and abs(mob.rect.y - player_pos.y) < 800]        
+                    if abs(mob.rect.x - (sleeping_tent_x if sleeping_in_tent else player_pos.x + cam_x)) < (10000 if sleeping_in_tent else 3000)
+                    and abs(mob.rect.y - player_pos.y) < 800]
 
         def lerp(a, b, t):
             """Linear interpolation between a and b for t in [0,1]."""
             return a + (b - a) * max(0, min(1, t))
 
-        def get_light_mask(radius, max_alpha):
+        def get_light_mask(radius, max_alpha, tint_color=(0, 0, 0)):
             """Return a cached radial gradient mask used to subtract darkness."""
-            key = (radius, max_alpha)
+            key = (radius, max_alpha, tint_color)
             if key in light_mask_cache:
                 return light_mask_cache[key]
 
@@ -3066,7 +3083,7 @@ while running:
             for r_scale, a_scale in zip(ring_radii, ring_alphas):
                 r = max(1, int(radius * r_scale))
                 alpha = int(max_alpha * a_scale)
-                pygame.draw.circle(surf, (0, 0, 0, alpha), center, r)
+                pygame.draw.circle(surf, (tint_color[0], tint_color[1], tint_color[2], alpha), center, r)
 
             light_mask_cache[key] = surf
             return surf
@@ -3139,9 +3156,24 @@ while running:
                 lights.append((player_pos.x, player_pos.y, 220))
 
             for lx, ly, radius in lights:
-                mask = get_light_mask(radius, A_value)
+                flicker_seed = int(lx * 1000 + ly * 1000 + light_flicker_timer * 10)
+                random.seed(flicker_seed)
+                
+                radius_flicker = random.uniform(-3, 3)
+                flickered_radius = int(radius + radius_flicker)
+                
+                tint_choice = random.choice([
+                    (0, 0, 0),
+                    (5, 3, 0),
+                    (3, 2, 0),
+                    (4, 1, 0)
+                ])
+                
+                mask = get_light_mask(flickered_radius, A_value, tint_choice)
                 mask_rect = mask.get_rect(center=(int(lx), int(ly)))
                 day_night_overlay.blit(mask, mask_rect.topleft, special_flags=pygame.BLEND_RGBA_SUB)
+                
+                random.seed()
 
         screen.blit(day_night_overlay, (0, 0))
 
@@ -3149,7 +3181,7 @@ while running:
         inventory.draw_hotbar(screen)
 
 
-        if not paused and not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not tent_menu_active and not fast_travel_menu_active and not sleeping_in_tent and not tent_hide_active and player.dead == False:
+        if not paused and not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not tent_menu_active and not fast_travel_menu_active and not tent_hide_active and player.dead == False:
 
             if keys[pygame.K_e] and current_time - collect_cooldown > collect_delay:
                 for obj in visible_objects:
@@ -3254,13 +3286,13 @@ while running:
                                 break
 
             for bush in berry_bushes:
-                bush.update(dt)
+                bush.update(time_dt)
             
             for tree in trees:
-                tree.update(dt)
+                tree.update(time_dt)
             
             for plant in fruit_plants:
-                plant.update(dt)
+                plant.update(time_dt)
 
             visible_mob_set = set(visible_mobs)
             for mob in nearby_mobs:
@@ -3297,15 +3329,15 @@ while running:
 
                     
             
-                mob.update(dt, None, mob_nearby_objects, mob_nearby_mobs)
+                mob.update(time_dt, None, mob_nearby_objects, mob_nearby_mobs, sleeping_in_tent)
                 mob.keep_in_screen(height)
             player_world_x = player_pos.x + cam_x
             player_world_y = player_pos.y
             player.attacking(nearby_mobs, player_world_x, player_world_y, mouse_over_hotbar)
             for mob in nearby_mobs:
-                mob.handle_health(screen, cam_x, dt)
+                mob.handle_health(screen, cam_x, dt, sleeping_in_tent)
                 mob.handle_lava_damage(dt)
-                mob.flee(player_world_x, player_world_y, dt)
+                mob.flee(player_world_x, player_world_y, dt, sleeping_in_tent)
                 
                 # Liquid collision for mobs
                 mob_in_liquid = False

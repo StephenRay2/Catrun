@@ -962,13 +962,17 @@ class Mob(pygame.sprite.Sprite):
         else:
             screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
 
-    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
         if not self.is_alive:
             self.direction.xy = (0, 0)
             return
         
+        sleep_multiplier = 40 if player_sleeping else 1
+        animation_speed_multiplier = sleep_multiplier  # Use same multiplier for animations
+        
         if not hasattr(self, "cow") and self.move_timer <= 0 and self.is_alive and not self.fleeing:
-            if random.random() < 0.02:
+            decision_chance = min(0.02 * sleep_multiplier, 1.0)
+            if random.random() < decision_chance:
                 self.direction.xy = random.choice([(-1,0), (1,0), (0,-1), (0,1), (0,0), (0,0), (0,0)])
                 self.move_timer = random.randint(30, 120)
             else:
@@ -977,7 +981,8 @@ class Mob(pygame.sprite.Sprite):
             self.move_timer -= 1
 
         if hasattr(self, "cow") and self.move_timer <= 0 and self.is_alive and not self.fleeing:
-            if random.random() < 0.02:
+            decision_chance = min(0.02 * sleep_multiplier, 1.0)
+            if random.random() < decision_chance:
                 self.direction.xy = random.choice([(0,0), (-1,0), (1,0), (0,-1), (0,1), (0,0), (0,0)])
                 self.move_timer = random.randint(30, 120)
             else:
@@ -995,27 +1000,28 @@ class Mob(pygame.sprite.Sprite):
             new_y = self.rect.y + movement.y if can_move_y else self.rect.y
             self.rect.topleft = (new_x, new_y)
 
-            self.animate_walk()
+            self.animate_walk(animation_speed_multiplier)
         else:
-            self.animate_stand()
+            self.animate_stand(animation_speed_multiplier)
 
-    def animate_walk(self):
+    def animate_walk(self, animation_speed_multiplier=1.0):
         if self.direction.x > 0:
-            self.animate_frames("right")
+            self.animate_frames("right", animation_speed_multiplier)
         elif self.direction.x < 0:
-            self.animate_frames("left")
+            self.animate_frames("left", animation_speed_multiplier)
         elif self.direction.y != 0:
-            self.animate_frames(self.last_direction)
+            self.animate_frames(self.last_direction, animation_speed_multiplier)
         else:
-            self.animate_stand()
+            self.animate_stand(animation_speed_multiplier)
 
-    def animate_frames(self, direction):
+    def animate_frames(self, direction, animation_speed_multiplier=1.0):
         self.last_direction = direction
-        self.frame_index = (self.frame_index + self.animation_speed) % len(self.walk_right_images)
+        effective_animation_speed = self.animation_speed * animation_speed_multiplier
+        self.frame_index = (self.frame_index + effective_animation_speed) % len(self.walk_right_images)
         frames = self.walk_right_images if direction == "right" else self.walk_left_images
         self.image = frames[int(self.frame_index)]
 
-    def animate_stand(self):
+    def animate_stand(self, animation_speed_multiplier=1.0):
         if self.last_direction == "right":
             stand_attr = getattr(self, "stand_right_image", None) or getattr(self, "stand_right_images", None)
         else:
@@ -1027,10 +1033,11 @@ class Mob(pygame.sprite.Sprite):
         if isinstance(stand_attr, pygame.Surface):
             self.image = stand_attr
         elif isinstance(stand_attr, (list, tuple)):
-            self.frame_index = (self.frame_index + self.animation_speed) % len(stand_attr)
+            effective_animation_speed = self.animation_speed * animation_speed_multiplier
+            self.frame_index = (self.frame_index + effective_animation_speed) % len(stand_attr)
             self.image = stand_attr[int(self.frame_index)]
 
-    def handle_health(self, screen, cam_x, dt):
+    def handle_health(self, screen, cam_x, dt, player_sleeping=False):
         max_health = self.full_health
         health = self.health
         bar_width = 25
@@ -1104,7 +1111,7 @@ class Mob(pygame.sprite.Sprite):
             return resources
         return []
     
-    def flee(self, player_world_x, player_world_y, dt):
+    def flee(self, player_world_x, player_world_y, dt, player_sleeping=False):
         dx = player_world_x - self.rect.centerx
         dy = player_world_y - self.rect.centery
         distance_sq = dx*dx + dy*dy
@@ -1117,7 +1124,9 @@ class Mob(pygame.sprite.Sprite):
                 
             if self.fleeing and self.is_alive:
                 if self.move_timer <= 0:
-                    if random.random() < 0.02:
+                    sleep_multiplier = 40 if player_sleeping else 1
+                    decision_chance = min(0.02 * sleep_multiplier, 1.0)
+                    if random.random() < decision_chance:
                         direction = pygame.Vector2(random.choice([(-1,0), (1,0), (0,-1), (0,1)]))
                     else:
                         direction = pygame.Vector2(-dx, -dy)
@@ -1203,8 +1212,8 @@ class Cat(Mob):
         self.follow_radius = 200  # Cats must stay within 500px of player
         self.target_enemy = None  # Enemy cat is attacking
 
-    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
-        super().update(dt, player, nearby_objects, nearby_mobs)
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
+        super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
         
         # Update taming bar timer
         if self.tame_bar_timer > 0:
@@ -1432,8 +1441,8 @@ class Squirrel(Mob):
         self.dead_squirrel_right_image = pygame.transform.scale(pygame.image.load(squirrel_dead_image).convert_alpha(), (48, 48))
         self.dead_squirrel_left_image = pygame.transform.flip(self.dead_squirrel_right_image, True, False)
 
-    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
-        super().update(dt, player, nearby_objects, nearby_mobs)
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
+        super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
 
         if not self.is_alive:
             if self.last_direction == "right":
@@ -1478,8 +1487,8 @@ class Cow(Mob):
         self.dead_cow_right_image = pygame.transform.scale(pygame.image.load(self.cow_type["dead_image"]).convert_alpha(), (size, size))
         self.dead_cow_left_image = pygame.transform.flip(self.dead_cow_right_image, True, False)
 
-    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
-        super().update(dt, player, nearby_objects, nearby_mobs)
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
+        super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
 
         if not self.is_alive:
             if self.last_direction == "right":
@@ -1520,8 +1529,8 @@ class Chicken(Mob):
         self.dead_chicken_right_image = pygame.transform.scale(pygame.image.load(chicken_dead_image).convert_alpha(), (40, 40))
         self.dead_chicken_left_image = pygame.transform.flip(self.dead_chicken_right_image, True, False)
 
-    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
-        super().update(dt, player, nearby_objects, nearby_mobs)
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
+        super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
 
         if not self.is_alive:
             if self.last_direction == "right":
@@ -1556,7 +1565,7 @@ class Enemy(Mob):
                     direction = direction.normalize()
                 self.direction = direction 
 
-    def flee(self, player_world_x, player_world_y, dt):
+    def flee(self, player_world_x, player_world_y, dt, player_sleeping=False):
         dx = player_world_x - self.rect.centerx
         dy = player_world_y - self.rect.centery
         distance_sq = dx*dx + dy*dy
@@ -1581,13 +1590,18 @@ class Enemy(Mob):
             if distance_sq > 600*600:
                 self.fleeing = False
 
-    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
         if self.is_alive:
             if getattr(self, "attacking", False):
                 return
+            
+            sleep_multiplier = 40 if player_sleeping else 1
+            animation_speed_multiplier = sleep_multiplier  # Use same multiplier for animations
+            
             if not self.chasing:
                 if self.move_timer <= 0:
-                    if random.random() < 0.02:
+                    decision_chance = min(0.02 * sleep_multiplier, 1.0)
+                    if random.random() < decision_chance:
                         self.direction.xy = random.choice([(-1,0), (1,0), (0,-1), (0,1), (0,0)])
                         self.move_timer = random.randint(30, 120)
                     else:
@@ -1605,9 +1619,9 @@ class Enemy(Mob):
                 new_y = self.rect.y + movement.y if can_move_y else self.rect.y
                 self.rect.topleft = (new_x, new_y)
 
-                self.animate_walk()
+                self.animate_walk(animation_speed_multiplier)
             else:
-                self.animate_stand()
+                self.animate_stand(animation_speed_multiplier)
 
 class Crawler(Enemy):
     def __init__(self, x, y, name):
@@ -1687,8 +1701,8 @@ class Crawler(Enemy):
                 self.image = (self.stand_right_images[0] if self.last_direction == "right"
                             else self.stand_left_images[0])
 
-    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
-        super().update(dt, player, nearby_objects, nearby_mobs)
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
+        super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
 
         if not self.is_alive:
             if self.last_direction == "left":
@@ -1780,8 +1794,8 @@ class Duskwretch(Enemy):
                 self.frame_index = 0.0
                 self.state = "idle"
 
-    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
-        super().update(dt, player, nearby_objects, nearby_mobs)
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
+        super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
 
         if self.attacking:
             return
@@ -1826,18 +1840,22 @@ class Duskwretch(Enemy):
                 sound_manager.play_sound(random.choice([f"duskwretch_chase_steps{i}" for i in range(1, 6)]))
                 self.chase_steps_timer = 0.3
 
-        self.animate_state(dt)
+        sleep_multiplier = 40 if player_sleeping else 1
+        animation_speed_multiplier = sleep_multiplier
+        
+        self.animate_state(dt, animation_speed_multiplier)
         self.was_moving = self.is_moving
 
 
-    def animate_state(self, dt):
+    def animate_state(self, dt, animation_speed_multiplier=1.0):
         if self.state == "attacking":
             return
             
         elif self.state == "start_walk":
             self.animation_speed = .1
             frames = self.start_walk_right_images if self.last_direction == "right" else self.start_walk_left_images
-            self.frame_index += self.animation_speed
+            effective_animation_speed = self.animation_speed * animation_speed_multiplier
+            self.frame_index += effective_animation_speed
             if self.frame_index >= len(frames):
                 if self.chasing:
                     self.state = "chase"
@@ -1849,18 +1867,21 @@ class Duskwretch(Enemy):
 
         elif self.state == "walk":
             frames = self.walk_right_images if self.last_direction == "right" else self.walk_left_images
-            self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+            effective_animation_speed = self.animation_speed * animation_speed_multiplier
+            self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
             self.image = frames[int(self.frame_index)]
 
         elif self.state == "chase":
             self.animation_speed = .13
             frames = self.chase_right_images if self.last_direction == "right" else self.chase_left_images
-            self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+            effective_animation_speed = self.animation_speed * animation_speed_multiplier
+            self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
             self.image = frames[int(self.frame_index)]
 
         elif self.state == "end_walk":
             frames = self.end_walk_right_images if self.last_direction == "right" else self.end_walk_left_images
-            self.frame_index += self.animation_speed
+            effective_animation_speed = self.animation_speed * animation_speed_multiplier
+            self.frame_index += effective_animation_speed
             if self.frame_index >= len(frames):
                 self.state = "idle"
                 self.frame_index = 0
@@ -1869,10 +1890,11 @@ class Duskwretch(Enemy):
 
         elif self.state == "idle":
             frames = self.stand_right_images if self.last_direction == "right" else self.stand_left_images
-            self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+            effective_animation_speed = self.animation_speed * animation_speed_multiplier
+            self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
             self.image = frames[int(self.frame_index)]
 
-    def flee(self, player_world_x, player_world_y, dt):
+    def flee(self, player_world_x, player_world_y, dt, player_sleeping=False):
         return
     
 
@@ -1902,7 +1924,7 @@ class AggressiveMob(Mob):
                     direction = direction.normalize()
                 self.direction = direction
 
-    def flee(self, player_world_x, player_world_y, dt):
+    def flee(self, player_world_x, player_world_y, dt, player_sleeping=False):
         dx = player_world_x - self.rect.centerx
         dy = player_world_y - self.rect.centery
         distance_sq = dx*dx + dy*dy
@@ -1914,7 +1936,9 @@ class AggressiveMob(Mob):
 
             if self.fleeing and self.is_alive:
                 if self.move_timer <= 0:
-                    if random.random() < 0.02:
+                    sleep_multiplier = 40 if player_sleeping else 1
+                    decision_chance = min(0.02 * sleep_multiplier, 1.0)
+                    if random.random() < decision_chance:
                         direction = pygame.Vector2(random.choice([(-1,0), (1,0), (0,-1), (0,1)]))
                     else:
                         direction = pygame.Vector2(-dx, -dy)
@@ -1940,8 +1964,8 @@ class AggressiveMob(Mob):
                     self.fleeing = False
                     self.speed = 1.0
 
-    def handle_health(self, screen, cam_x, dt):
-        super().handle_health(screen, cam_x, dt)
+    def handle_health(self, screen, cam_x, dt, player_sleeping=False):
+        super().handle_health(screen, cam_x, dt, player_sleeping)
         if self.health < self.last_health and not self.aggressive:
             self.aggressive = True
             self.enemy = True
@@ -2011,8 +2035,8 @@ class Pock(Enemy):
                 self.image = (self.stand_right_images[0] if self.last_direction == "right"
                             else self.stand_left_images[0])
 
-    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
-        super().update(dt, player, nearby_objects, nearby_mobs)
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
+        super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
 
         if not self.is_alive:
             if self.last_direction == "left":
@@ -2088,7 +2112,7 @@ class Deer(AggressiveMob):
                 rect = self.rect
                 return pygame.Rect(rect.x - cam_x + 5, rect.y + 20, rect.width - 20, rect.height - 35)
 
-    def handle_health(self, screen, cam_x, dt):
+    def handle_health(self, screen, cam_x, dt, player_sleeping=False):
         max_health = self.full_health
         health = self.health
         bar_width = 25
@@ -2116,7 +2140,7 @@ class Deer(AggressiveMob):
         if self.health <= 0:
             self.is_alive = False
     
-    def flee(self, player_world_x, player_world_y, dt):
+    def flee(self, player_world_x, player_world_y, dt, player_sleeping=False):
         if not self.is_buck:
             dx = player_world_x - self.rect.centerx
             dy = player_world_y - self.rect.centery
@@ -2199,12 +2223,12 @@ class Deer(AggressiveMob):
                 self.image = (self.stand_right_images[0] if self.last_direction == "right"
                             else self.stand_left_images[0])
     
-    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
         if self.attacking:
-            super().update(dt, player, nearby_objects, nearby_mobs)
+            super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
             return
         
-        super().update(dt, player, nearby_objects, nearby_mobs)
+        super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
         
         self.is_moving = self.direction.length_squared() > 0 and self.is_alive
         
@@ -2264,7 +2288,7 @@ class BlackBear(AggressiveMob):
         rect = self.rect
         return pygame.Rect(rect.x - cam_x + 5, rect.y + 20, rect.width - 10, rect.height - 40)
     
-    def handle_health(self, screen, cam_x, dt):
+    def handle_health(self, screen, cam_x, dt, player_sleeping=False):
         max_health = self.full_health
         health = self.health
         bar_width = 25
@@ -2318,7 +2342,7 @@ class BlackBear(AggressiveMob):
             elif not self.attacking and not self.fleeing:
                 self.speed = 1.0
     
-    def flee(self, player_world_x, player_world_y, dt):
+    def flee(self, player_world_x, player_world_y, dt, player_sleeping=False):
         if self.aggressive:
             self.fleeing = False
             return
@@ -2330,7 +2354,9 @@ class BlackBear(AggressiveMob):
         if self.is_alive:
             if self.fleeing and self.is_alive:
                 if self.move_timer <= 0:
-                    if random.random() < 0.02:
+                    sleep_multiplier = 40 if player_sleeping else 1
+                    decision_chance = min(0.02 * sleep_multiplier, 1.0)
+                    if random.random() < decision_chance:
                         direction = pygame.Vector2(random.choice([(-1,0), (1,0), (0,-1), (0,1)]))
                     else:
                         direction = pygame.Vector2(-dx, -dy)
@@ -2387,7 +2413,7 @@ class BlackBear(AggressiveMob):
                 self.image = (self.stand_right_images[0] if self.last_direction == "right"
                             else self.stand_left_images[0])
     
-    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
         if self.attacking:
             return
         
@@ -2426,7 +2452,7 @@ class BlackBear(AggressiveMob):
             else:
                 self.animate_stand()
         else:
-            super().update(dt, player, nearby_objects, nearby_mobs)
+            super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
 
 class BrownBear(AggressiveMob):
     def __init__(self, x, y, name):
@@ -2469,7 +2495,7 @@ class BrownBear(AggressiveMob):
         rect = self.rect
         return pygame.Rect(rect.x - cam_x + 5, rect.y + 30, rect.width - 10, rect.height - 50)
     
-    def handle_health(self, screen, cam_x, dt):
+    def handle_health(self, screen, cam_x, dt, player_sleeping=False):
         max_health = self.full_health
         health = self.health
         bar_width = 25
@@ -2519,7 +2545,7 @@ class BrownBear(AggressiveMob):
             elif not self.attacking:
                 self.speed = 1.0
     
-    def flee(self, player_world_x, player_world_y, dt):
+    def flee(self, player_world_x, player_world_y, dt, player_sleeping=False):
         self.fleeing = False
     
     def attack(self, player_world_x, player_world_y, player):
@@ -2553,7 +2579,7 @@ class BrownBear(AggressiveMob):
                 self.image = (self.stand_right_images[0] if self.last_direction == "right"
                             else self.stand_left_images[0])
     
-    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
         if self.attacking:
             return
         
@@ -2579,7 +2605,7 @@ class BrownBear(AggressiveMob):
             else:
                 self.animate_stand()
         else:
-            super().update(dt, player, nearby_objects, nearby_mobs)
+            super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
 
 class Gila(AggressiveMob):
     def __init__(self, x, y, name):
@@ -2623,7 +2649,7 @@ class Gila(AggressiveMob):
             rect = self.rect
             return pygame.Rect(rect.x - cam_x, rect.y + 30, rect.width, rect.height - 40)
 
-    def handle_health(self, screen, cam_x, dt):
+    def handle_health(self, screen, cam_x, dt, player_sleeping=False):
         max_health = self.full_health
         health = self.health
         bar_width = 25
@@ -2650,7 +2676,7 @@ class Gila(AggressiveMob):
         if self.health <= 0:
             self.is_alive = False
     
-    def flee(self, player_world_x, player_world_y, dt):
+    def flee(self, player_world_x, player_world_y, dt, player_sleeping=False):
         self.fleeing = False
     
     def attack(self, player_world_x, player_world_y, player):
@@ -2684,7 +2710,7 @@ class Gila(AggressiveMob):
                 self.image = (self.stand_right_images[0] if self.last_direction == "right"
                             else self.stand_left_images[0])
     
-    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
         if self.attacking:
             return
         
@@ -2710,7 +2736,7 @@ class Gila(AggressiveMob):
             else:
                 self.animate_stand()
         else:
-            super().update(dt, player, nearby_objects, nearby_mobs)
+            super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
 
 
 class Crow(Mob):
@@ -2752,7 +2778,7 @@ class Crow(Mob):
             rect = self.rect
             return pygame.Rect(rect.x - cam_x + 25, rect.y + 30, rect.width - 43, rect.height - 47)
     
-    def handle_health(self, screen, cam_x, dt):
+    def handle_health(self, screen, cam_x, dt, player_sleeping=False):
         max_health = self.full_health
         health = self.health
         bar_width = 25
@@ -2788,7 +2814,7 @@ class Crow(Mob):
             return True, True 
         return super().check_collision(direction, nearby_objects, nearby_mobs)
     
-    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
         if not self.is_alive:
             self.direction.xy = (0, 0)
             self.state = "walking"
@@ -2798,7 +2824,9 @@ class Crow(Mob):
                 self.image = crow_dead_image
             return
         
-        if self.state == "walking" and random.random() < 0.001:
+        sleep_multiplier = 40 if player_sleeping else 1
+        decision_chance = min(0.001 * sleep_multiplier, 1.0)
+        if self.state == "walking" and random.random() < decision_chance:
             self.state = "flying"
             self.frame_index = 0
             self.flying_timer = random.randint(60, 180)
@@ -2830,25 +2858,28 @@ class Crow(Mob):
                     self.last_direction = "left"
             self.animate_stand()
         else:
-            super().update(dt, player, nearby_objects, nearby_mobs)
+            super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
     
-    def animate_stand(self):
+    def animate_stand(self, animation_speed_multiplier=1.0):
         if self.state == "walking":
-            super().animate_stand()
+            super().animate_stand(animation_speed_multiplier)
         elif self.state == "flying":
             if self.frame_index < len(self.start_fly_left_images):
                 frames = self.start_fly_right_images if self.last_direction == "right" else self.start_fly_left_images
-                self.frame_index += self.animation_speed
+                effective_animation_speed = self.animation_speed * animation_speed_multiplier
+                self.frame_index += effective_animation_speed
                 if self.frame_index >= len(self.start_fly_left_images):
                     self.frame_index = 0
                 self.image = frames[int(min(self.frame_index, len(frames) - 1))]
             else:
                 frames = self.fly_right_images if self.last_direction == "right" else self.fly_left_images
-                self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+                effective_animation_speed = self.animation_speed * animation_speed_multiplier
+                self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
                 self.image = frames[int(self.frame_index)]
         elif self.state == "landing":
             frames = self.landing_right_images if self.last_direction == "right" else self.landing_left_images
-            self.frame_index = min(self.frame_index + self.animation_speed, len(frames) - 1)
+            effective_animation_speed = self.animation_speed * animation_speed_multiplier
+            self.frame_index = min(self.frame_index + effective_animation_speed, len(frames) - 1)
             self.image = frames[int(self.frame_index)]
 
 
@@ -2962,7 +2993,7 @@ class Dragon(Enemy):
         base_rect = pygame.Rect(rect.x - cam_x + x_offset, rect.y + y_offset, width, height)
         return base_rect
     
-    def handle_health(self, screen, cam_x, dt):
+    def handle_health(self, screen, cam_x, dt, player_sleeping=False):
         max_health = self.full_health
         health = self.health
         bar_width = 40
@@ -2974,7 +3005,9 @@ class Dragon(Enemy):
         
         if self.health < self.last_health:
             self.bar_timer = 5
-            if self.state != "flying" and random.random() < 0.6:
+            sleep_multiplier = 40 if player_sleeping else 1
+            decision_chance = min(0.6 * sleep_multiplier, 1.0)
+            if self.state != "flying" and random.random() < decision_chance:
                 self.state = "flying"
                 self.frame_index = 0
                 self.flying_timer = random.randint(600, 1200)
@@ -3101,11 +3134,13 @@ class Dragon(Enemy):
                 else:
                     self.frame_index = 0.0
     
-    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None):
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
         if self.attacking:
             return
         
-        if self.state == "walking" and random.random() < 0.001:
+        sleep_multiplier = 40 if player_sleeping else 1
+        decision_chance = min(0.001 * sleep_multiplier, 1.0)
+        if self.state == "walking" and random.random() < decision_chance:
             self.state = "flying"
             self.frame_index = 0
             self.flying_timer = random.randint(600, 1200)
@@ -3138,7 +3173,7 @@ class Dragon(Enemy):
                     self.last_direction = "left"
             self.animate_stand()
         else:
-            super().update(dt, player, nearby_objects, nearby_mobs)
+            super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
         
         if not self.is_alive:
             if self.last_direction == "right":
@@ -3146,28 +3181,32 @@ class Dragon(Enemy):
             else:
                 self.image = self.dead_image_left
     
-    def animate_stand(self):
+    def animate_stand(self, animation_speed_multiplier=1.0):
         if self.state == "walking":
             if self.last_direction == "right":
                 frames = self.idle_right_images
             else:
                 frames = self.idle_left_images
-            self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+            effective_animation_speed = self.animation_speed * animation_speed_multiplier
+            self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
             self.image = frames[int(self.frame_index)]
         elif self.state == "flying":
             total_start_frames = len(self.start_fly_left_images)
             if self.frame_index < total_start_frames:
                 frames = self.start_fly_right_images if self.last_direction == "right" else self.start_fly_left_images
-                self.frame_index += self.animation_speed
+                effective_animation_speed = self.animation_speed * animation_speed_multiplier
+                self.frame_index += effective_animation_speed
                 self.image = frames[int(min(self.frame_index, total_start_frames - 1))]
             else:
                 frames = self.fly_right_images if self.last_direction == "right" else self.fly_left_images
                 fly_frame_index = (self.frame_index - total_start_frames) % len(frames)
-                self.frame_index += self.animation_speed
+                effective_animation_speed = self.animation_speed * animation_speed_multiplier
+                self.frame_index += effective_animation_speed
                 self.image = frames[int(fly_frame_index)]
         elif self.state == "landing":
             frames = self.end_fly_right_images if self.last_direction == "right" else self.end_fly_left_images
-            self.frame_index = min(self.frame_index + self.animation_speed, len(frames) - 1)
+            effective_animation_speed = self.animation_speed * animation_speed_multiplier
+            self.frame_index = min(self.frame_index + effective_animation_speed, len(frames) - 1)
             self.image = frames[int(self.frame_index)]
     
     def animate_walk(self):
