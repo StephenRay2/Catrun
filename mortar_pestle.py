@@ -2,20 +2,20 @@ import pygame
 from inventory import items_list, hotbar_image
 from buttons import inventory_tab
 
-class CraftingBench:
+class MortarPestle:
     def __init__(self, inventory_obj):
         self.inventory = inventory_obj
         self.active = False
-        self.workbench_pos = None
+        self.mortar_pestle_pos = None
         
-        self.workbench_screen_image = None
+        self.mortar_pestle_screen_image = None
         try:
-            self.workbench_screen_image = pygame.image.load("assets/sprites/buttons/workbench_screen.png").convert_alpha()
-            self.workbench_screen_image = pygame.transform.scale(self.workbench_screen_image, (1100, 600))
+            self.mortar_pestle_screen_image = pygame.image.load("assets/sprites/buttons/mortar_and_pestle_screen.png").convert_alpha()
+            self.mortar_pestle_screen_image = pygame.transform.scale(self.mortar_pestle_screen_image, (1100, 600))
         except:
-            self.workbench_screen_image = None
+            self.mortar_pestle_screen_image = None
         
-        self.recipes = self._load_workbench_recipes()
+        self.recipes = self._load_mortar_pestle_recipes()
         
         self.scroll_offset = 0
         self.recipe_columns = 6
@@ -43,39 +43,20 @@ class CraftingBench:
         self.font_medium = pygame.font.SysFont(None, 22)
         self.font_large = pygame.font.SysFont(None, 28)
     
-    def _load_workbench_recipes(self):
+    def _load_mortar_pestle_recipes(self):
         recipes = []
         seen = set()
         for item in items_list:
             medium = item.get("crafting_medium")
-            if (medium == "workbench" or medium == "hand") and item.get("recipe"):
+            if medium == "mortar_and_pestle" and item.get("recipe"):
                 item_name = item["item_name"]
                 if item_name not in seen:
                     recipes.append(item)
                     seen.add(item_name)
-            
-            for alt in item.get("recipe_alternatives", []):
-                alt_medium = alt.get("crafting_medium")
-                if (alt_medium == "workbench" or alt_medium == "hand") and alt.get("recipe"):
-                    recipe_obj = alt.copy()
-                    recipe_obj["item_name"] = item["item_name"]
-                    recipe_obj["icon"] = item.get("icon")
-                    recipe_obj["image"] = item.get("image")
-                    recipe_obj["image_hotbar"] = item.get("image_hotbar")
-                    recipe_obj["stack_size"] = item.get("stack_size")
-                    recipe_obj["weight"] = item.get("weight")
-                    recipe_obj["type"] = item.get("type")
-                    recipe_obj["description"] = item.get("description")
-                    recipe_obj["use_effect"] = item.get("use_effect")
-                    recipe_obj["placeable"] = item.get("placeable")
-                    recipe_obj["consumable"] = item.get("consumable")
-                    recipe_obj["durability"] = item.get("durability")
-                    recipe_obj["tags"] = item.get("tags")
-                    recipes.append(recipe_obj)
         return recipes
 
     def _select_slot(self, slot_index, is_hotbar):
-        """Keep inventory selection in sync while using the workbench UI."""
+        """Keep inventory selection in sync while using the mortar pestle UI."""
         if slot_index is None:
             return
         if is_hotbar:
@@ -192,7 +173,6 @@ class CraftingBench:
                     self.inventory.hotbar_slots[self.dragged_from_slot] = self.dragged_item
                 else:
                     self.inventory.inventory_list[self.dragged_from_slot] = self.dragged_item
-            # After stacking, keep selection on the target slot
             if is_hotbar:
                 new_selection_hotbar = slot_index
             else:
@@ -233,7 +213,6 @@ class CraftingBench:
         else:
             self.inventory.inventory_list[self.dragged_from_slot] = self.dragged_item
         
-        # Restore selection to the slot we canceled from
         if self.dragged_from_hotbar:
             self.inventory.selected_hotbar_slot = self.dragged_from_slot
             self.inventory.selection_mode = "hotbar"
@@ -250,8 +229,12 @@ class CraftingBench:
     
     def get_slot_at_mouse(self, mouse_pos, screen):
         mouse_x, mouse_y = mouse_pos
-        bg_x = screen.get_width() / 2 - self.workbench_screen_image.get_width() / 2
-        bg_y = screen.get_height() / 2 - self.workbench_screen_image.get_height() / 2
+        if self.mortar_pestle_screen_image:
+            bg_x = screen.get_width() / 2 - self.mortar_pestle_screen_image.get_width() / 2
+            bg_y = screen.get_height() / 2 - self.mortar_pestle_screen_image.get_height() / 2
+        else:
+            bg_x = screen.get_width() / 2 - 550
+            bg_y = screen.get_height() / 2 - 300
         
         hotbar_x = screen.get_width() // 2 - hotbar_image.get_width() // 2
         hotbar_y = screen.get_height() - 70
@@ -268,7 +251,6 @@ class CraftingBench:
             if x <= mouse_x <= x + slot_size and y <= mouse_y <= y + slot_size:
                 return (i, True)
         
-        # Inventory grid (match draw positions)
         start_x = bg_x + 18
         start_y = bg_y + 44
         columns = 8
@@ -286,16 +268,16 @@ class CraftingBench:
         
         return (None, None)
     
-    def open(self, workbench_pos):
+    def open(self, mortar_pestle_pos):
         self.active = True
-        self.workbench_pos = workbench_pos
+        self.mortar_pestle_pos = mortar_pestle_pos
         self.scroll_offset = 0
         self.selected_recipe = None
         self.double_click_recipe = None
     
     def close(self):
         self.active = False
-        self.workbench_pos = None
+        self.mortar_pestle_pos = None
         self.selected_recipe = None
         self.crafting_amount_menu = None
         self.inventory.close_drop_menu()
@@ -335,7 +317,6 @@ class CraftingBench:
             return
         
         slot_index, is_hotbar = self.get_slot_at_mouse(mouse_pos, screen)
-        # Left-clicking a slot is handled by the main loop drag logic to mirror smelter/campfire.
         if slot_index is not None and button == 1:
             return
         
@@ -405,8 +386,12 @@ class CraftingBench:
         if not self.active:
             return None
         
-        bg_x = screen.get_width() / 2 - self.workbench_screen_image.get_width() / 2
-        bg_y = screen.get_height() / 2 - self.workbench_screen_image.get_height() / 2
+        if self.mortar_pestle_screen_image:
+            bg_x = screen.get_width() / 2 - self.mortar_pestle_screen_image.get_width() / 2
+            bg_y = screen.get_height() / 2 - self.mortar_pestle_screen_image.get_height() / 2
+        else:
+            bg_x = screen.get_width() / 2 - 550
+            bg_y = screen.get_height() / 2 - 300
         recipe_start_x = bg_x + 18 + (8 * (64 + 4)) + 90
         recipe_start_y = bg_y + 290
         columns = 6
@@ -496,11 +481,13 @@ class CraftingBench:
         overlay.fill((0, 0, 0, 150))
         screen.blit(overlay, (0, 0))
         
-        x_pos = width / 2 - self.workbench_screen_image.get_width() / 2
-        y_pos = height / 2 - self.workbench_screen_image.get_height() / 2
-        
-        if self.workbench_screen_image:
-            screen.blit(self.workbench_screen_image, (x_pos, y_pos - 20))
+        if self.mortar_pestle_screen_image:
+            x_pos = width / 2 - self.mortar_pestle_screen_image.get_width() / 2
+            y_pos = height / 2 - self.mortar_pestle_screen_image.get_height() / 2
+            screen.blit(self.mortar_pestle_screen_image, (x_pos, y_pos - 20))
+        else:
+            x_pos = width / 2 - 550
+            y_pos = height / 2 - 300
         
         self._draw_inventory_items(screen, x_pos, y_pos)
         self._draw_recipe_preview(screen, x_pos, y_pos)
@@ -550,7 +537,7 @@ class CraftingBench:
                         screen.blit(item["image"], (x, y))
                         if pygame.Rect(x, y, slot_size, slot_size).collidepoint(mouse_pos):
                             self.inventory.register_hover_candidate(
-                                ("workbench_inventory", slot_index),
+                                ("mortar_pestle_inventory", slot_index),
                                 item_name,
                                 (x, y, slot_size, slot_size),
                                 slot_data=slot
@@ -601,7 +588,7 @@ class CraftingBench:
                         screen.blit(scaled_img, (x, y))
                         if pygame.Rect(x, y, slot_size, slot_size).collidepoint(mouse_pos):
                             self.inventory.register_hover_candidate(
-                                ("workbench_hotbar", slot_index),
+                                ("mortar_pestle_hotbar", slot_index),
                                 item_name,
                                 (x, y, slot_size, slot_size),
                                 slot_data=slot
@@ -673,13 +660,12 @@ class CraftingBench:
 
             if pygame.Rect(x, y, slot_size, slot_size).collidepoint(mouse_pos):
                 self.inventory.register_hover_candidate(
-                    ("workbench_recipe", recipe_idx),
+                    ("mortar_pestle_recipe", recipe_idx),
                     recipe.get("item_name", "Unknown"),
                     (x, y, slot_size, slot_size),
                     recipe=recipe.get("recipe")
                 )
 
-        # Draw a scrollbar to indicate that the list is scrollable when needed
         total_rows = (len(self.recipes) + columns - 1) // columns
         max_scroll = max(0, total_rows - self.recipe_rows_visible)
         if total_rows > self.recipe_rows_visible:

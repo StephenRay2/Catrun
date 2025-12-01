@@ -41,13 +41,18 @@ class Smelter:
             self.smelter_image = None
             self.smelter_lit_images = []
         
-        self.input_slots = [None] * 6
-        self.output_slots = [None] * 6
+        self.input_slot_count = 6
+        self.output_slot_count = 6
+        self.input_slots = [None] * self.input_slot_count
+        self.output_slots = [None] * self.output_slot_count
         self.fuel_slots = [None] * 4
         
-        self.smelting_progress = [0.0] * 6
-        self.smelting_times = [8.0] * 6
-        self.is_smelting = [False] * 6
+        self.smelting_progress = [0.0] * self.input_slot_count
+        self.smelting_times = [8.0] * self.input_slot_count
+        self.is_smelting = [False] * self.input_slot_count
+
+        # Per-device progress bar color (overridable by subclasses)
+        self.progress_color = (255, 100, 0)
         self.fuel_burn_duration = 0.0
         self.fuel_burn_remaining = 0.0
         self.current_fuel_name = None
@@ -164,7 +169,7 @@ class Smelter:
         if not self._has_fuel():
             return False
         
-        has_input = any(self.input_slots[i] is not None for i in range(6))
+        has_input = any(self.input_slots[i] is not None for i in range(self.input_slot_count))
         if not has_input:
             return False
         
@@ -181,7 +186,7 @@ class Smelter:
         self.fuel_burn_duration = self.get_fuel_burn_time(current_fuel_name)
         self.fuel_burn_remaining = self.fuel_burn_duration
         
-        for i in range(6):
+        for i in range(self.input_slot_count):
             if self.input_slots[i] is not None and not self.is_smelting[i]:
                 self.is_smelting[i] = True
                 self.smelting_progress[i] = 0.0
@@ -259,7 +264,7 @@ class Smelter:
             if self.fuel_burn_remaining <= 0 and not self._has_fuel():
                 self.put_out_fire()
             
-            for i in range(6):
+            for i in range(self.input_slot_count):
                 if self.is_smelting[i] and self.input_slots[i] is not None:
                     recipe = self.get_smelt_recipe(self.input_slots[i]["item_name"])
                     if recipe:
@@ -303,7 +308,7 @@ class Smelter:
             return
         # Find best output slot: first stack with space, otherwise first empty
         target_idx = None
-        for i in range(6):
+        for i in range(self.output_slot_count):
             slot = self.output_slots[i]
             if slot and slot["item_name"] == output_item_name:
                 max_stack = output_item.get("stack_size", 100)
@@ -578,7 +583,7 @@ class Smelter:
         input_start_y = layout["input_start_y"]
         
         # Prioritize smelter slots so the overlapping inventory grid doesn't capture the hover
-        for i in range(6):
+        for i in range(self.input_slot_count):
             col = i % 3
             row = i // 3
             x = input_start_x + col * (self.slot_size + self.gap_size)
@@ -589,7 +594,7 @@ class Smelter:
         
         output_start_x = layout["output_start_x"]
         
-        for i in range(6):
+        for i in range(self.input_slot_count):
             col = i % 3
             row = i // 3
             x = output_start_x + col * (self.slot_size + self.gap_size)
@@ -671,7 +676,7 @@ class Smelter:
         screen.blit(smelt_label, (input_start_x + 10, input_start_y - 35))
         
         font = pygame.font.SysFont(None, 20)
-        for i in range(6):
+        for i in range(self.input_slot_count):
             col = i % 3
             row = i // 3
             x = input_start_x + col * (self.slot_size + self.gap_size)
@@ -685,7 +690,7 @@ class Smelter:
             if self.is_smelting[i] and self.input_slots[i] is not None:
                 progress = max(0.0, min(1.0, self.smelting_progress[i] / self.smelting_times[i]))
                 bar_height = int((self.slot_size - 4) * progress)
-                pygame.draw.rect(screen, (255, 100, 0), (x + 2, y + self.slot_size - 2 - bar_height, self.slot_size - 4, bar_height))
+                pygame.draw.rect(screen, self.progress_color, (x + 2, y + self.slot_size - 2 - bar_height, self.slot_size - 4, bar_height))
             
             if self.input_slots[i] is not None:
                 item = self.input_slots[i]

@@ -1453,7 +1453,7 @@ items_list = [
         "placeable": False,
         "consumable": True,
         "durability": None,
-        "recipe": [{"item": "Oranges", "amount": 3}, {"item": "Wooden Cup", "amount": 1}],
+        "recipe": [{"item": "Oranges", "amount": 2}, {"item": "Wooden Cup", "amount": 1}],
         "crafting_medium": "hand",
         "tags": ["food", "consumable"],
         "output_amount": 1
@@ -2109,7 +2109,7 @@ items_list = [
         "consumable": False,
         "durability": None,
         "recipe": [{"item": "Stone", "amount": 25}, {"item": "Hide", "amount": 10}],
-        "crafting_medium": "workbench",
+        "crafting_medium": "hand",
         "tags": ["tool"],
         "output_amount": 1
     },
@@ -4271,14 +4271,26 @@ items_list = [
         "weight": .35,
         "type": "consumable",
         "description": "Fresh water in a small cup. Quenches thirst.",
-        "use_effect": "player.thirst += 15",
+        "use_effect": "player.thirst += 25",
         "placeable": False,
         "consumable": True,
         "durability": None,
         "recipe": [{"item": "Wooden Cup", "amount": 1}],
         "crafting_medium": "gameplay",
         "tags": ["food", "consumable"],
-        "output_amount": 1
+        "output_amount": 1,
+        "recipe_alternatives": [
+            {
+                "recipe": [{"item": "Large Metal Water", "amount": 1}, {"item": "Wooden Cup", "amount": 4}],
+                "output_amount": 4,
+                "crafting_medium": "hand"
+            },
+            {
+                "recipe": [{"item": "Medium Glass Water", "amount": 1}, {"item": "Wooden Cup", "amount": 2}],
+                "output_amount": 2,
+                "crafting_medium": "hand"
+            }
+        ]
     },
     {
         "item_name": "Small Milk",
@@ -4294,7 +4306,14 @@ items_list = [
         "recipe": [{"item": "Wooden Cup", "amount": 1}],
         "crafting_medium": "gameplay",
         "tags": ["food", "consumable"],
-        "output_amount": 1
+        "output_amount": 1,
+        "recipe_alternatives": [
+            {
+                "recipe": [{"item": "Coconut", "amount": 1}, {"item": "Wooden Cup", "amount": 1}],
+                "output_amount": 1,
+                "crafting_medium": "hand"
+            }
+        ]
     },
     {
         "item_name": "Medium Glass Water",
@@ -4310,7 +4329,19 @@ items_list = [
         "recipe": [{"item": "Glass Bottle", "amount": 1}],
         "crafting_medium": "gameplay",
         "tags": ["food", "consumable"],
-        "output_amount": 1
+        "output_amount": 1,
+        "recipe_alternatives": [
+            {
+                "recipe": [{"item": "Large Metal Water", "amount": 1}, {"item": "Glass Bottle", "amount": 2}],
+                "output_amount": 2,
+                "crafting_medium": "hand"
+            },
+            {
+                "recipe": [{"item": "Small Water", "amount": 2}, {"item": "Glass Bottle", "amount": 1}],
+                "output_amount": 1,
+                "crafting_medium": "hand"
+            }
+        ]
     },
     {
         "item_name": "Medium Glass Milk",
@@ -4326,7 +4357,14 @@ items_list = [
         "recipe": [{"item": "Glass Bottle", "amount": 1}],
         "crafting_medium": "gameplay",
         "tags": ["food", "consumable"],
-        "output_amount": 1
+        "output_amount": 1,
+        "recipe_alternatives": [
+            {
+                "recipe": [{"item": "Coconut", "amount": 2}, {"item": "Glass Bottle", "amount": 1}],
+                "output_amount": 1,
+                "crafting_medium": "hand"
+            }
+        ]
     },
     {
         "item_name": "Medium Glass Orange Juice",
@@ -4339,7 +4377,7 @@ items_list = [
         "placeable": False,
         "consumable": True,
         "durability": None,
-        "recipe": [{"item": "Oranges", "amount": 5}, {"item": "Glass Bottle", "amount": 1}],
+        "recipe": [{"item": "Oranges", "amount": 4}, {"item": "Glass Bottle", "amount": 1}],
         "crafting_medium": "hand",
         "tags": ["food", "consumable"],
         "output_amount": 1
@@ -4358,7 +4396,19 @@ items_list = [
         "recipe": [{"item": "Large Metal Canteen", "amount": 1}],
         "crafting_medium": "gameplay",
         "tags": ["material", "ore"],
-        "output_amount": 1
+        "output_amount": 1,
+        "recipe_alternatives": [
+            {
+                "recipe": [{"item": "Small Water", "amount": 4}, {"item": "Large Metal Canteen", "amount": 1}],
+                "output_amount": 1,
+                "crafting_medium": "hand"
+            },
+            {
+                "recipe": [{"item": "Medium Glass Water", "amount": 2}, {"item": "Large Metal Canteen", "amount": 1}],
+                "output_amount": 1,
+                "crafting_medium": "hand"
+            }
+        ]
     },
     {
         "item_name": "Large Metal Milk",
@@ -4374,7 +4424,14 @@ items_list = [
         "recipe": [{"item": "Large Metal Canteen", "amount": 1}],
         "crafting_medium": "gameplay",
         "tags": ["material", "ore"],
-        "output_amount": 1
+        "output_amount": 1,
+        "recipe_alternatives": [
+            {
+                "recipe": [{"item": "Coconut", "amount": 4}, {"item": "Large Metal Canteen", "amount": 1}],
+                "output_amount": 1,
+                "crafting_medium": "hand"
+            }
+        ]
     },
     {
         "item_name": "Large Metal Orange Juice",
