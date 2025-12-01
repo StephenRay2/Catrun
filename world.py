@@ -907,7 +907,7 @@ class DroppedItem(Collectible):
             cls._drop_font = pygame.font.SysFont(None, 18)
         return cls._drop_font
 
-    def __init__(self, x, y, resource, icon_path, amount=1):
+    def __init__(self, x, y, resource, icon_path, amount=1, item_instance=None):
         size = (self.ICON_SIZE, self.ICON_SIZE)
         image_surface = None
         if icon_path:
@@ -922,6 +922,18 @@ class DroppedItem(Collectible):
         self.amount = max(1, int(amount))
         self._float_phase = random.random() * math.tau
         self.age = 0.0
+        self.item_instance = copy.deepcopy(item_instance) if item_instance else None
+
+    def collect(self, player=None):
+        if self.destroyed or self.amount <= 0:
+            return []
+        self.destroyed = True
+        if player:
+            player.experience += collect_experience
+            player.exp_total += collect_experience
+        if self.item_instance:
+            return [{"__full_item__": copy.deepcopy(self.item_instance)}]
+        return [self.resource] * self.amount
 
     def draw(self, screen, cam_x):
         if self.destroyed:
@@ -1077,7 +1089,7 @@ class ClayBank(Bank):
 
 class SnowBank(Bank):
     def __init__(self, x, y):
-        super().__init__("assets/sprites/biomes/snow/SnowBank.png", x, y, "Snow", resource_amount=random.randint(20, 40))
+        super().__init__("assets/sprites/biomes/snow/SnowBank.png", x, y, "Snowball", resource_amount=random.randint(20, 40))
 
 class SandBank(Bank):
     def __init__(self, x, y):

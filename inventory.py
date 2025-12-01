@@ -3,6 +3,7 @@ import pygame
 import random
 import re
 import math
+import copy
 import mob_placement
 
 HARVEST_TOOL_MULTS = {
@@ -6588,6 +6589,7 @@ class Inventory():
         new_item["quantity"] = quantity
         if item_def.get("durability") is not None:
             new_item["durability"] = item_def["durability"]
+            new_item["max_durability"] = item_def["durability"]
         return new_item
 
     def decrement_durability(self, slot_index, is_hotbar=True, amount=1):
@@ -7231,7 +7233,16 @@ class Inventory():
     def add(self, resource):
         all_added = True
         
-        for item_name in resource:
+        for entry in resource:
+            if isinstance(entry, dict) and "__full_item__" in entry:
+                added = self._add_full_item_instance(entry["__full_item__"])
+                if not added:
+                    all_added = False
+                    if self.inventory_full_message_timer <= 0:
+                        self.inventory_full_message_timer = 2.0
+                continue
+
+            item_name = entry
             stacked = False
             
             for item_data in items_list:
@@ -7697,6 +7708,60 @@ class Inventory():
                 return True
         return False
 
+    def _place_full_stack(self, stack_item):
+        """Place a fully defined item stack into the first available slot."""
+        stack_copy = copy.deepcopy(stack_item)
+        for i in range(self.hotbar_size):
+            if self.hotbar_slots[i] is None:
+                self.hotbar_slots[i] = copy.deepcopy(stack_copy)
+                return True
+        for i in range(self.capacity):
+            if self.inventory_list[i] is None:
+                self.inventory_list[i] = copy.deepcopy(stack_copy)
+                return True
+        return False
+
+    def _add_full_item_instance(self, item_instance):
+        """Add a fully defined inventory item (preserving durability/metadata)."""
+        if not item_instance:
+            return False
+        instance_copy = copy.deepcopy(item_instance)
+        item_name = instance_copy.get("item_name")
+        if not item_name:
+            return False
+        quantity = int(instance_copy.get("quantity", 1)) or 1
+        max_stack = instance_copy.get("stack_size", 1) or 1
+
+        if max_stack > 1:
+            for slot_list in (self.hotbar_slots, self.inventory_list):
+                for slot in slot_list:
+                    if not slot:
+                        continue
+                    if slot.get("item_name") != item_name:
+                        continue
+                    if slot.get("durability") != instance_copy.get("durability"):
+                        continue
+                    if slot.get("max_durability") != instance_copy.get("max_durability"):
+                        continue
+                    available = max_stack - slot.get("quantity", 0)
+                    if available <= 0:
+                        continue
+                    add_amount = min(available, quantity)
+                    slot["quantity"] += add_amount
+                    quantity -= add_amount
+                    if quantity <= 0:
+                        return True
+
+        while quantity > 0:
+            stack_amount = min(max_stack, quantity)
+            stack_copy = copy.deepcopy(instance_copy)
+            stack_copy["quantity"] = stack_amount
+            placed = self._place_full_stack(stack_copy)
+            if not placed:
+                return False
+            quantity -= stack_amount
+        return True
+
     def _perform_drop_from_menu(self, amount):
         if self.drop_menu_slot is None:
             return None
@@ -7919,7 +7984,7 @@ class Inventory():
         """
         Remove the currently selected item from inventory for throwing.
         Does NOT apply the use_effect (unlike consume_item).
-        Returns: (success: bool, tags: list) - True if item removed, and the item's tags
+        Returns: (success: bool, tags: list, thrown_instance: dict|None)
         """
         # Determine which slot to throw from based on selection mode
         if self.selection_mode == "hotbar":
@@ -7928,16 +7993,16 @@ class Inventory():
             is_hotbar = True
         elif self.selection_mode == "inventory":
             if self.selected_inventory_slot is None:
-                return (False, [])
+                return (False, [], None)
             slot_index = self.selected_inventory_slot
             slot = self.inventory_list[slot_index]
             is_hotbar = False
         else:
-            return (False, [])
+            return (False, [], None)
         
         # Check if slot has an item
         if slot is None:
-            return (False, [])
+            return (False, [], None)
         
         item_name = slot["item_name"]
         
@@ -7949,7 +8014,12 @@ class Inventory():
                 break
         
         if item_data is None:
-            return (False, [])
+            return (False, [], None)
+
+        thrown_instance = copy.deepcopy(slot)
+        thrown_instance["quantity"] = 1
+        # Cat objects should never reach here, but guard against it
+        thrown_instance.pop("cat_object", None)
         
         # Reduce quantity by 1
         slot["quantity"] -= 1
@@ -7966,7 +8036,7 @@ class Inventory():
             self.add([item_data["return_item"]])
 
         self.recalc_weight()
-        return (True, item_data.get("tags", []))
+        return (True, item_data.get("tags", []), thrown_instance)
 
     def consume_item(self):
         """

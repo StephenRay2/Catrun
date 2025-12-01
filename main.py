@@ -69,6 +69,9 @@ thrown_items = []
 loaded_item_sprites = {}  # Cache for loaded item sprites
 placeable_animation_cache = {}  # Cache for animated placeable sprites (keyed by name and size)
 light_mask_cache = {}  # Cache for radial light masks
+LIGHT_THROW_ITEMS = {"Feathers", "Phoenix Feather"}
+STONE_THROW_ITEMS = {"Stone", "Redrock Stone", "Snowy Stone"}
+BREAK_ON_HIT_ITEMS = {"Throwing Star", "Throwing Knife"}
 
 # Light flicker variables
 light_flicker_timer = 0
@@ -481,6 +484,18 @@ def spawn_thrown_item(x, y, vel_x, vel_y, item_data, is_cat=False, throw_power=1
     sprite_size = 64 if is_cat else 32  # Cats are 64x64, regular items are 32x32
     cache_key = f"{item_data.get('icon', 'unknown')}_{sprite_size}" if item_data else None
     cat_payload = dict(item_data) if is_cat and item_data else None
+
+    break_on_hit = False
+    preserve_instance = False
+    if item_data and not is_cat:
+        preserve_instance = should_preserve_item_instance(item_data)
+        item_name = item_data.get("item_name", "")
+        lower_name = item_name.lower()
+        if item_name in BREAK_ON_HIT_ITEMS:
+            break_on_hit = True
+        elif is_regular_weapon_item(item_data):
+            preserve_instance = True
+            apply_flat_durability_cost(item_data, 31)
     
     if item_data and "icon" in item_data:
         icon_name = item_data["icon"]
@@ -523,9 +538,87 @@ def spawn_thrown_item(x, y, vel_x, vel_y, item_data, is_cat=False, throw_power=1
         "sprite_size": sprite_size,
         "is_cat": is_cat,
         "cat_data": cat_payload if is_cat else None,
-        "landed": False  # Track if item has landed
+        "landed": False,  # Track if item has landed
+        "break_on_hit": break_on_hit,
+        "preserve_instance": preserve_instance
     }
     thrown_items.append(thrown_item)
+
+def should_preserve_item_instance(item_data):
+    if not item_data:
+        return False
+    return item_data.get("durability") is not None
+
+def apply_fractional_durability_cost(item_data, fraction):
+    if not item_data or not fraction:
+        return False
+    durability = item_data.get("durability")
+    max_durability = item_data.get("max_durability", durability)
+    if durability is None or max_durability in (None, 0):
+        return False
+    cost = max(1, int(math.ceil(max_durability * fraction)))
+    item_data["durability"] = max(0, durability - cost)
+    return item_data["durability"] <= 0
+
+def apply_flat_durability_cost(item_data, amount):
+    if not item_data or amount is None:
+        return False
+    durability = item_data.get("durability")
+    if durability is None:
+        return False
+    item_data["durability"] = max(0, durability - amount)
+    return item_data["durability"] <= 0
+
+def is_regular_weapon_item(item_data):
+    if not item_data:
+        return False
+    item_name = item_data.get("item_name", "").lower()
+    if item_name in ("throwing star", "throwing knife"):
+        return False
+    tags = item_data.get("tags", [])
+    if "weapon" in tags:
+        return True
+    weapon_keywords = ["sword", "spear", "club", "axe", "shovel", "dagger", "mace", "knife"]
+    for keyword in weapon_keywords:
+        if keyword == "axe" and "pickaxe" in item_name:
+            continue
+        if keyword in item_name:
+            return True
+    return False
+
+def calculate_thrown_damage(item_data, base_attack):
+    if not item_data:
+        return 0
+    item_name = item_data.get("item_name", "")
+    lower_name = item_name.lower()
+    if item_name in LIGHT_THROW_ITEMS:
+        return 0
+    if item_name in STONE_THROW_ITEMS:
+        return random.randint(4, 8)
+    if "throwing star" in lower_name:
+        return random.randint(20, 25)
+    if "throwing knife" in lower_name:
+        return random.randint(15, 20)
+    if is_regular_weapon_item(item_data):
+        return compute_weapon_attack(base_attack, item_data) + 20
+    return 0
+
+def handle_thrown_hit(thrown_item, mob, base_attack):
+    if not thrown_item or thrown_item.get("is_cat"):
+        return
+    item_data = thrown_item.get("item")
+    if not item_data:
+        return
+    damage = calculate_thrown_damage(item_data, base_attack)
+    if damage > 0:
+        mob.health = max(0, mob.health - damage)
+    break_on_hit = thrown_item.get("break_on_hit", False)
+    should_drop = not break_on_hit
+    durability = item_data.get("durability")
+    if durability is not None and durability <= 0:
+        should_drop = False
+    if should_drop:
+        create_world_item_from_thrown(thrown_item)
 
 def build_cat_from_item(cat_data, x, y):
     """Recreate a cat mob from inventory item data when the cat object is missing."""
@@ -565,17 +658,25 @@ def resolve_item_icon_path(item_data):
         return icon
     return f"assets/sprites/items/{icon}"
 
-def spawn_dropped_collectible(item_data, quantity=1, drop_x=None, drop_y=None):
-    if not item_data or quantity is None or quantity <= 0:
+def spawn_dropped_collectible(item_data, quantity=1, drop_x=None, drop_y=None, item_instance=None):
+    payload = item_instance or item_data
+    if not payload or quantity is None or quantity <= 0:
         return False
-    icon_path = resolve_item_icon_path(item_data)
+    icon_path = resolve_item_icon_path(payload)
     x = player_world_x if drop_x is None else drop_x
     y = player_world_y if drop_y is None else drop_y
     # Offset so the item centers near the player position
     icon_size = getattr(DroppedItem, "ICON_SIZE", 16)
     half = icon_size // 2
     dropped_items.append(
-        DroppedItem(int(x - half), int(y - half), item_data.get("item_name", ""), icon_path, amount=quantity)
+        DroppedItem(
+            int(x - half),
+            int(y - half),
+            payload.get("item_name", ""),
+            icon_path,
+            amount=quantity,
+            item_instance=item_instance
+        )
     )
     return True
 
@@ -609,7 +710,18 @@ def create_world_item_from_thrown(thrown_item):
         return True
     
     # Fallback: spawn a generic dropped collectible that can be picked back up
-    spawn_dropped_collectible(thrown_item["item"], thrown_item.get("quantity", 1), x, y)
+    item_instance = None
+    if thrown_item.get("preserve_instance"):
+        item_instance = thrown_item["item"]
+        if item_instance.get("durability") is not None and item_instance["durability"] <= 0:
+            return False
+    spawn_dropped_collectible(
+        thrown_item["item"],
+        thrown_item.get("quantity", 1),
+        x,
+        y,
+        item_instance=item_instance
+    )
     return True
 
 def get_current_background(player_world_x, tiles):
@@ -949,10 +1061,11 @@ def update_placement_position():
 def group_resources_by_type(resource_list):
     resource_counts = {}
     for resource in resource_list:
-        if resource in resource_counts:
-            resource_counts[resource] += 1
+        if isinstance(resource, dict) and "__full_item__" in resource:
+            item_name = resource["__full_item__"].get("item_name", "Item")
         else:
-            resource_counts[resource] = 1
+            item_name = resource
+        resource_counts[item_name] = resource_counts.get(item_name, 0) + 1
     return resource_counts
 
 def add_collection_message(resource_name, count):
@@ -1053,6 +1166,23 @@ def compute_weapon_attack(base_attack, held_item):
     name = held_item.get("item_name", "").lower()
     tier = get_weapon_tier_from_name(name)
 
+    if "throwing knife" in name:
+        return max(1, int(base_attack + 15))
+
+    if "shovel" in name:
+        shovel_bonus = {
+            "wood": 5,
+            "stone": 7,
+            "metal": 12,
+            "bone": 12,
+            "gold": 12,
+            "obsidian": 15,
+            "dragon": 20
+        }
+        bonus = shovel_bonus.get(tier, 0)
+        if bonus > 0:
+            return max(1, int(base_attack + bonus))
+
     sword_mults = {
         "wood": (1.1, 5),
         "stone": (1.3, 9),
@@ -1085,6 +1215,12 @@ def compute_weapon_attack(base_attack, held_item):
     if "axe" in name and "pickaxe" not in name and tier in sword_mults:
         mult, flat = sword_mults[tier]
         reduced_base = base_attack // 1.5
+        return max(1, int(math.floor(reduced_base * mult) + flat))
+
+    # Pickaxes: similar scaling to axes but using one-third base damage
+    if "pickaxe" in name and tier in sword_mults:
+        mult, flat = sword_mults[tier]
+        reduced_base = base_attack // 3
         return max(1, int(math.floor(reduced_base * mult) + flat))
 
     # Spears: flat bonuses only
@@ -1583,8 +1719,10 @@ while running:
             ]
             # Add 20 torches (will stack) plus other starter items
             torch_stack = ["Torch"] * 20
-            beef_stack = ["Raw Beef"] * 100
-            inventory.add(torch_stack + starter_items + beef_stack)
+            beef_stack = ["Raw Beef"] * 20
+            star_stack = ["Throwing Star"] * 20
+            knife_stack = ["Throwing Knife"] * 20
+            inventory.add(torch_stack + starter_items + beef_stack + star_stack + knife_stack)
             
             from world import gemstone_rocks, GemstoneRock
             gemstone_rocks.append(GemstoneRock(int(player_pos.x + cam_x + 100), int(player_pos.y + 50)))
@@ -1714,20 +1852,19 @@ while running:
                 inventory.handle_level_up_event(event)
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_f and not inventory_in_use and not crafting_bench_in_use and player.is_alive:
-                drank_water = False
-                if player.swimming and player.current_liquid and not player.in_lava:
+                consumed_item = False
+                success, tags = inventory.consume_item()
+                if success:
+                    consumed_item = True
+                    if "food" in tags:
+                        sound_manager.play_sound(random.choice([f"consume_item{i}" for i in range(1, 7)]))
+                    elif any(tag in tags for tag in ["liquid", "consumable"]):
+                        sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
+                if not consumed_item and player.swimming and player.current_liquid and not player.in_lava:
                     if getattr(player.current_liquid, "liquid_type", "") == "water":
                         player.thirst = player.max_thirst
                         player.thirst_full_timer = getattr(player, "thirst_full_timer", 60)
                         sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
-                        drank_water = True
-                    if not drank_water:
-                        success, tags = inventory.consume_item()
-                        if success:
-                            if "food" in tags:
-                                sound_manager.play_sound(random.choice([f"consume_item{i}" for i in range(1, 7)]))
-                            elif any(tag in tags for tag in ["liquid", "consumable"]):
-                                sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_q and not crafting_bench_in_use and not smelter_in_use and not campfire_in_use:
                 inventory_in_use = not inventory_in_use
@@ -2026,7 +2163,7 @@ while running:
                             # Throw selected inventory item toward mouse
                             item = inventory.get_selected_item()
                             if item:
-                                success, tags = inventory.throw_item()
+                                success, tags, thrown_instance = inventory.throw_item()
                                 if success:
                                     # Calculate direction to mouse
                                     start_x = player_world_x
@@ -2046,8 +2183,9 @@ while running:
                                         vel_x = velocity * direction * 4
                                         vel_y = 0  # Straight horizontal throw
                                     
-                                    is_cat_item = "cat_type" in item if item else False
-                                    spawn_thrown_item(start_x, start_y, vel_x, vel_y, item, is_cat=is_cat_item, throw_power=throw_power)
+                                    thrown_payload = thrown_instance or item
+                                    is_cat_item = "cat_type" in thrown_payload if thrown_payload else False
+                                    spawn_thrown_item(start_x, start_y, vel_x, vel_y, thrown_payload, is_cat=is_cat_item, throw_power=throw_power)
                                     
                                     if "food" in tags:
                                         sound_manager.play_sound(random.choice([f"consume_item{i}" for i in range(1, 7)]))
@@ -2587,6 +2725,7 @@ while running:
                             harvest_cooldown = current_time
                             break
                     
+        base_throw_attack = int(round(player.damage + (player.strength_leveler - 1) * player.strength_level_gain))
         # Update thrown items physics - straight line movement with collision detection
         for thrown in thrown_items[:]:
             if not thrown["landed"]:
@@ -2613,11 +2752,18 @@ while running:
                         break
                 
                 # Check for collisions with mobs
+                removed_due_to_hit = False
                 if not collision_detected:
                     for mob in collision_mobs:
                         if item_rect.colliderect(mob.rect):
+                            handle_thrown_hit(thrown, mob, base_throw_attack)
+                            if thrown in thrown_items:
+                                thrown_items.remove(thrown)
+                            removed_due_to_hit = True
                             collision_detected = True
                             break
+                if removed_due_to_hit:
+                    continue
                 
                 # Check if item has traveled its max distance or hit an object
                 if thrown["distance_traveled"] >= thrown["max_distance"] or collision_detected:
