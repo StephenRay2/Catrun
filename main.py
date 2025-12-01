@@ -71,7 +71,7 @@ placeable_animation_cache = {}  # Cache for animated placeable sprites (keyed by
 light_mask_cache = {}  # Cache for radial light masks
 LIGHT_THROW_ITEMS = {"Feathers", "Phoenix Feather"}
 STONE_THROW_ITEMS = {"Stone", "Redrock Stone", "Snowy Stone"}
-BREAK_ON_HIT_ITEMS = {"Throwing Star", "Throwing Knife"}
+BREAK_ON_HIT_ITEMS = {"Throwing Star", "Throwing Knife", "Snowball"}
 
 # Light flicker variables
 light_flicker_timer = 0
@@ -591,6 +591,8 @@ def calculate_thrown_damage(item_data, base_attack):
         return 0
     item_name = item_data.get("item_name", "")
     lower_name = item_name.lower()
+    if "snowball" in lower_name:
+        return 1
     if item_name in LIGHT_THROW_ITEMS:
         return 0
     if item_name in STONE_THROW_ITEMS:
@@ -603,6 +605,14 @@ def calculate_thrown_damage(item_data, base_attack):
         return compute_weapon_attack(base_attack, item_data) + 20
     return 0
 
+def apply_snowball_slow_effect(mob, stack_duration=1.5, max_duration=7.5, max_stacks=5):
+    if not hasattr(mob, "snowball_slow_stacks"):
+        mob.snowball_slow_stacks = 0
+        mob.snowball_slow_timer = 0.0
+    mob.snowball_slow_stacks = min(max_stacks, getattr(mob, "snowball_slow_stacks", 0) + 1)
+    current_timer = getattr(mob, "snowball_slow_timer", 0.0)
+    mob.snowball_slow_timer = min(max_duration, current_timer + stack_duration)
+
 def handle_thrown_hit(thrown_item, mob, base_attack):
     if not thrown_item or thrown_item.get("is_cat"):
         return
@@ -612,6 +622,8 @@ def handle_thrown_hit(thrown_item, mob, base_attack):
     damage = calculate_thrown_damage(item_data, base_attack)
     if damage > 0:
         mob.health = max(0, mob.health - damage)
+        if item_data.get("item_name", "").lower() == "snowball":
+            apply_snowball_slow_effect(mob)
     break_on_hit = thrown_item.get("break_on_hit", False)
     should_drop = not break_on_hit
     durability = item_data.get("durability")

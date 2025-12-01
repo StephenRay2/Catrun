@@ -859,6 +859,8 @@ class Mob(pygame.sprite.Sprite):
         self.lava_damage_timer = 0
         self.immune_to_lava = False
         self.current_liquid = None
+        self.snowball_slow_stacks = 0
+        self.snowball_slow_timer = 0.0
 
 
     def handle_lava_damage(self, dt):
@@ -934,6 +936,9 @@ class Mob(pygame.sprite.Sprite):
         speed = self.base_speed * self.speed
         if self.swimming:
             speed *= 0.5
+        if getattr(self, "snowball_slow_stacks", 0) > 0:
+            slow_mult = max(0.2, 1 - 0.12 * self.snowball_slow_stacks)
+            speed *= slow_mult
         return speed
 
     def draw(self, screen, cam_x):
@@ -966,6 +971,11 @@ class Mob(pygame.sprite.Sprite):
         if not self.is_alive:
             self.direction.xy = (0, 0)
             return
+        
+        if self.snowball_slow_timer > 0:
+            self.snowball_slow_timer = max(0.0, self.snowball_slow_timer - dt)
+            if self.snowball_slow_timer == 0:
+                self.snowball_slow_stacks = 0
         
         sleep_multiplier = 40 if player_sleeping else 1
         animation_speed_multiplier = sleep_multiplier  # Use same multiplier for animations
