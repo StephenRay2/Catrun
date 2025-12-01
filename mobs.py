@@ -338,7 +338,14 @@ class Player(pygame.sprite.Sprite):
             current_time = pygame.time.get_ticks()
             if current_time - self.attack_cooldown > self.attack_delay:
                 self.attack_cooldown = current_time
+                # Track which mob the player is actively hitting this swing
+                self.attacking_target = None
+
                 for mob in nearby_mobs:
+                    # Prevent friendly fire on tamed cats
+                    if isinstance(mob, Cat) and getattr(mob, "tamed", False):
+                        continue
+
                     mob_collision = mob.get_collision_rect(0)
 
                     horizontal_dist = abs(mob_collision.centerx - player_world_x)
@@ -359,6 +366,8 @@ class Player(pygame.sprite.Sprite):
                         facing_object = True
 
                     if facing_object and 1 <= mob.health:
+                        # Remember this as the current attack target so pets can assist
+                        self.attacking_target = mob
                         old_health = mob.health
                         # Flat damage plus strength upgrades
                         mob.health -= self.attack
