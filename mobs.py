@@ -1,6 +1,7 @@
 import pygame
 import random
 import math
+import os
 from world import *
 from sounds import *
 from debug import font_path, font
@@ -84,6 +85,34 @@ cat_types = [
     {"type":"calico", "walk_right_image1" : "assets/sprites/mobs/CalicoCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/CalicoCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/CalicoCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/CalicoCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/CalicoCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/CalicoCatRightStanding.png", "dead_image": "assets/sprites/mobs/CalicoCatDead.png", "caged1": "calico_cat_caged_left", "caged2": "calico_cat_caged_right"}, 
     {"type":"gray", "walk_right_image1" : "assets/sprites/mobs/GrayCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/GrayCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/GrayCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/GrayCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/GrayCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/GrayCatRightStanding.png", "dead_image": "assets/sprites/mobs/GrayCatDead.png", "caged1": "gray_cat_caged_left", "caged2": "gray_cat_caged_right"}, 
     {"type":"white_and_orange", "walk_right_image1" : "assets/sprites/mobs/WandOCatRightMove1.png", "walk_right_image2" : "assets/sprites/mobs/WandOCatRightMove2.png", "walk_right_image3" : "assets/sprites/mobs/WandOCatRightMove3.png", "walk_right_image4" : "assets/sprites/mobs/WandOCatRightMove4.png", "walk_right_image5" : "assets/sprites/mobs/WandOCatRightMove5.png", "stand_right_image" : "assets/sprites/mobs/WandOCatRightStanding.png", "dead_image": "assets/sprites/mobs/WandOCatDead.png", "caged1": "WandO_cat_caged_left", "caged2": "WandO_cat_caged_right"}]
+
+
+def _load_cat_attack_paths(prefix):
+    """Load all right-facing attack frame paths for a cat sprite prefix.
+    Each cat can have a different number of attack frames; detect them dynamically.
+    """
+    paths = []
+    index = 1
+    while True:
+        path = f"assets/sprites/mobs/{prefix}RightAttack{index}.png"
+        if not os.path.exists(path):
+            break
+        paths.append(path)
+        index += 1
+    return paths
+
+
+CAT_ATTACK_IMAGE_PATHS = {
+    "black": _load_cat_attack_paths("BlackCat"),
+    "salt_and_pepper": _load_cat_attack_paths("SandPCat"),
+    "white": _load_cat_attack_paths("WhiteCat"),
+    "white_and_black": _load_cat_attack_paths("WandBCat"),
+    "sandy": _load_cat_attack_paths("SandyCat"),
+    "orange": _load_cat_attack_paths("OrangeCat"),
+    "calico": _load_cat_attack_paths("CalicoCat"),
+    "gray": _load_cat_attack_paths("GrayCat"),
+    "white_and_orange": _load_cat_attack_paths("WandOCat"),
+}
 
 
 squirrel_move_images = ["assets/sprites/mobs/SquirrelMove1.png", "assets/sprites/mobs/SquirrelMove2.png", "assets/sprites/mobs/SquirrelMove3.png", "assets/sprites/mobs/SquirrelMove4.png", "assets/sprites/mobs/SquirrelMove5.png", "assets/sprites/mobs/SquirrelMove6.png"]
@@ -911,8 +940,21 @@ class Mob(pygame.sprite.Sprite):
 
     def give_experience(self, player):
         if self.health < 1:
-            player.experience += self.death_experience
-            player.exp_total += self.death_experience
+            exp_gain = self.death_experience
+            player.experience += exp_gain
+            player.exp_total += exp_gain
+
+            # Tamed cats get 10% of any EXP the player gains from this source.
+            try:
+                from mob_placement import cats as world_cats
+                share = max(0, exp_gain * 0.1)
+                if share > 0:
+                    for cat in world_cats:
+                        if getattr(cat, "tamed", False):
+                            cat.gain_experience(share)
+            except Exception:
+                pass
+
             self.death_experience = 0
 
     def keep_in_screen(self, screen_height):
@@ -1001,26 +1043,29 @@ class Mob(pygame.sprite.Sprite):
         
         sleep_multiplier = 40 if player_sleeping else 1
         animation_speed_multiplier = sleep_multiplier  # Use same multiplier for animations
-        
-        if not hasattr(self, "cow") and self.move_timer <= 0 and self.is_alive and not self.fleeing:
-            decision_chance = min(0.02 * sleep_multiplier, 1.0)
-            if random.random() < decision_chance:
-                self.direction.xy = random.choice([(-1,0), (1,0), (0,-1), (0,1), (0,0), (0,0), (0,0)])
-                self.move_timer = random.randint(30, 120)
-            else:
-                self.direction.xy = (0, 0)
-        else:
-            self.move_timer -= 1
 
-        if hasattr(self, "cow") and self.move_timer <= 0 and self.is_alive and not self.fleeing:
-            decision_chance = min(0.02 * sleep_multiplier, 1.0)
-            if random.random() < decision_chance:
-                self.direction.xy = random.choice([(0,0), (-1,0), (1,0), (0,-1), (0,1), (0,0), (0,0)])
-                self.move_timer = random.randint(30, 120)
+        # Allow subclasses (like Cat) to take full control over movement
+        # decisions by setting disable_autonomous_movement = True.
+        if not getattr(self, "disable_autonomous_movement", False):
+            if not hasattr(self, "cow") and self.move_timer <= 0 and self.is_alive and not self.fleeing:
+                decision_chance = min(0.02 * sleep_multiplier, 1.0)
+                if random.random() < decision_chance:
+                    self.direction.xy = random.choice([(-1,0), (1,0), (0,-1), (0,1), (0,0), (0,0), (0,0)])
+                    self.move_timer = random.randint(30, 120)
+                else:
+                    self.direction.xy = (0, 0)
             else:
-                self.direction.xy = (0, 0)
-        else:
-            self.move_timer -= 1
+                self.move_timer -= 1
+
+            if hasattr(self, "cow") and self.move_timer <= 0 and self.is_alive and not self.fleeing:
+                decision_chance = min(0.02 * sleep_multiplier, 1.0)
+                if random.random() < decision_chance:
+                    self.direction.xy = random.choice([(0,0), (-1,0), (1,0), (0,-1), (0,1), (0,0), (0,0)])
+                    self.move_timer = random.randint(30, 120)
+                else:
+                    self.direction.xy = (0, 0)
+            else:
+                self.move_timer -= 1
 
         if self.direction.length_squared() > 0:
             can_move_x, can_move_y = self.check_collision(self.direction, nearby_objects or [], nearby_mobs or [])
@@ -1137,8 +1182,21 @@ class Mob(pygame.sprite.Sprite):
                 self.destroyed = True
             
             if player and resources:
-                player.experience += harvest_experience * len(resources)
-                player.exp_total += harvest_experience * len(resources)
+                gain = harvest_experience * len(resources)
+                player.experience += gain
+                player.exp_total += gain
+
+                # Tamed cats get 10% of any EXP the player gains
+                # from harvesting (similar to mob death EXP sharing).
+                try:
+                    from mob_placement import cats as world_cats
+                    share = max(0, gain * 0.1)
+                    if share > 0:
+                        for cat in world_cats:
+                            if getattr(cat, "tamed", False):
+                                cat.gain_experience(share)
+                except Exception:
+                    pass
             
             return resources
         return []
@@ -1192,6 +1250,12 @@ class Cat(Mob):
         self.walk_right_images = [pygame.image.load(self.cat_type[f"walk_right_image{i}"]).convert_alpha() for i in range(1, 6)]
         self.stand_right_image = pygame.image.load(self.cat_type[f"stand_right_image"]).convert_alpha()
 
+        # Load attack animations per-cat-type, supporting variable frame counts.
+        type_key = self.cat_type.get("type")
+        attack_paths = CAT_ATTACK_IMAGE_PATHS.get(type_key, [])
+        self.attack_right_images = [pygame.image.load(path).convert_alpha() for path in attack_paths]
+        self.attack_left_images = [pygame.transform.flip(img, True, False) for img in self.attack_right_images]
+
         self.walk_left_images = [pygame.transform.flip(img, True, False) for img in self.walk_right_images]
         self.stand_left_image = pygame.transform.flip(self.stand_right_image, True, False)
 
@@ -1235,13 +1299,33 @@ class Cat(Mob):
         self.max_health = self.full_health
         self.max_hunger = int(100 * self.hunger_leveler)
         self.hunger = self.max_hunger
-        self.base_speed = 160
+        # Match or exceed the player's base speed so cats can keep up,
+        # even when the player is sprinting.
+        self.base_speed = 275
         # Speed is stored as a percentage-like stat for UI (100 = default),
         # and converted to a movement multiplier for actual speed.
         self.speed_stat = 100
         self.speed = self.speed_stat / 100.0
         self.attack = max(5, int(self.level * 4 * self.attack_leveler))
         self.defense = max(5, int(self.level * 5 * self.defense_leveler))
+        # Let Cat control its own movement logic (follow/attack) without
+        # random wandering from the base Mob.update.
+        self.disable_autonomous_movement = True
+
+        # Passive experience gain timer (for time-based XP)
+        self._exp_time_accumulator = 0.0
+
+        # Attack state and timing
+        self.attacking = False
+        self.attack_timer = 0.0
+        # Attack duration scales with number of frames so each cat type
+        # plays its full animation at a consistent pace.
+        if self.attack_right_images:
+            # Slightly longer duration so the slower animation can play through.
+            self.attack_duration = max(0.5, 0.12 * len(self.attack_right_images))
+        else:
+            self.attack_duration = 0.5
+        self.attack_has_hit = False
 
         self.dead_cat_right_image = pygame.image.load(self.cat_type["dead_image"]).convert_alpha()
         self.dead_cat_left_image = pygame.transform.flip(self.dead_cat_right_image, True, False)
@@ -1255,84 +1339,175 @@ class Cat(Mob):
         self.sit = False
         self.wander = False
         self.passive = False
-        self.follow_radius = 200  # Cats must stay within 500px of player
+        # Desired distance from player before they start running
+        # to catch up. Smaller radius keeps cats closer.
+        self.follow_radius = 140
         self.target_enemy = None  # Enemy cat is attacking
 
     def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
-        super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
-        
-        # Update taming bar timer
+        # Timers
+        # Attack cooldown is managed implicitly by attack_duration; no extra delay.
         if self.tame_bar_timer > 0:
             self.tame_bar_timer -= dt
-        
-        # Tamed cat behavior - follow player and combat support
-        if self.tamed and player and self.follow_player:
-            dx = player.rect.centerx - self.rect.centerx
-            dy = player.rect.centery - self.rect.centery
-            distance = (dx**2 + dy**2) ** 0.5
-            
-            # Follow player if too far away
-            if distance > self.follow_radius:
-                if distance > 0:
-                    direction = pygame.Vector2(dx, dy).normalize()
-                    self.speed = 1.3  # Move faster when following
-                else:
-                    direction = pygame.Vector2(0, 0)
-                    self.speed = 1.0
-                self.direction = direction
-            else:
-                # Maintain position, slow wander if not in combat
-                if self.wander and not self.target_enemy:
-                    if self.move_timer <= 0:
-                        self.direction = pygame.Vector2(random.choice([(-1, 0), (1, 0), (0, -1), (0, 1)]))
-                        self.move_timer = random.randint(60, 180)
-                        self.speed = 0.7
-                    self.move_timer -= 1
-                else:
-                    self.direction = pygame.Vector2(0, 0)
-                    self.speed = 1.0
-            
-            # Target enemies that are attacking the player or that player is attacking
-            if nearby_mobs:
-                for mob in nearby_mobs:
-                    # Attack if mob is attacking player or if player is attacking mob
-                    if mob != self and mob.is_alive:
-                        if hasattr(mob, 'target') and mob.target == player:
-                            # This mob is attacking the player
-                            self.target_enemy = mob
-                            break
-                        elif hasattr(player, 'attacking_target') and player.attacking_target == mob:
-                            # Player is attacking this mob
-                            self.target_enemy = mob
-                            break
-            
-            # Attack target enemy if exists
-            if self.target_enemy and self.target_enemy.is_alive:
-                enemy_dx = self.target_enemy.rect.centerx - self.rect.centerx
-                enemy_dy = self.target_enemy.rect.centery - self.rect.centery
-                enemy_distance = (enemy_dx**2 + enemy_dy**2) ** 0.5
-                
-                # Move toward enemy if not in attack range
-                if enemy_distance > 50:
-                    if enemy_distance > 0:
-                        enemy_direction = pygame.Vector2(enemy_dx, enemy_dy).normalize()
-                        self.direction = enemy_direction
-                        self.speed = 1.2
-                    self.move_timer = 0
-                else:
-                    # Attack the enemy
-                    self.attacking = True
-                    self.attack_cooldown = 0.5
-            else:
-                # Clear target if it's dead or none found
-                if self.target_enemy and not self.target_enemy.is_alive:
-                    self.target_enemy = None
 
+        # Passive XP: 0.5 XP per second of game time while alive.
+        if self.is_alive:
+            self._exp_time_accumulator += dt
+            while self._exp_time_accumulator >= 1.0:
+                self._exp_time_accumulator -= 1.0
+                self.gain_experience(0.5)
+
+        # Handle death visuals for cats
         if not self.is_alive:
             if self.last_direction == "right":
                 self.image = self.dead_cat_right_image
             else:
                 self.image = self.dead_cat_left_image
+            return
+
+        # If currently attacking, play attack animation and skip normal movement
+        if self.attacking:
+            self._update_attack_animation(dt)
+            return
+
+        # Tamed cat behavior - follow player and combat support
+        if self.tamed and player and self.follow_player:
+            # Prefer the player's world-space position if available.
+            player_world_x = getattr(player, "world_x", player.rect.centerx)
+            player_world_y = getattr(player, "world_y", player.rect.centery)
+
+            # First, decide what enemy (if any) we should be attacking.
+            # Cats only become aggressive toward mobs once you're engaged with them.
+            if nearby_mobs:
+                for mob in nearby_mobs:
+                    if mob is self or not getattr(mob, "is_alive", True):
+                        continue
+                    # This mob is attacking the player
+                    if hasattr(mob, 'target') and mob.target == player:
+                        self.target_enemy = mob
+                        break
+                    # Player is attacking this mob
+                    if hasattr(player, 'attacking_target') and player.attacking_target == mob:
+                        self.target_enemy = mob
+                        break
+
+            # If we have a live target, attacking takes priority over following.
+            if self.target_enemy and getattr(self.target_enemy, "is_alive", True):
+                enemy_dx = self.target_enemy.rect.centerx - self.rect.centerx
+                enemy_dy = self.target_enemy.rect.centery - self.rect.centery
+                enemy_distance = (enemy_dx**2 + enemy_dy**2) ** 0.5
+
+                # Move toward enemy if not in attack range
+                if enemy_distance > 80:
+                    if enemy_distance > 0:
+                        enemy_direction = pygame.Vector2(enemy_dx, enemy_dy).normalize()
+                        self.direction = enemy_direction
+                        # Run fast enough to catch up to enemies while the player sprints.
+                        self.speed = 1.5
+                    self.move_timer = 0
+                else:
+                    # Begin an attack when in range
+                    if not self.attacking:
+                        self.attacking = True
+                        self.attack_timer = self.attack_duration
+                        self.attack_has_hit = False
+                        self.frame_index = 0.0
+                        self.last_direction = "right" if enemy_dx >= 0 else "left"
+                        # Stop moving during attack this frame; animation/movement
+                        # will be handled in _update_attack_animation on next call.
+                        self.direction = pygame.Vector2(0, 0)
+                        return
+            else:
+                # Clear target if it's dead or none found
+                if self.target_enemy and not getattr(self.target_enemy, "is_alive", False):
+                    self.target_enemy = None
+
+                # No combat target: follow player and optionally wander near them.
+                dx = player_world_x - self.rect.centerx
+                dy = player_world_y - self.rect.centery
+                distance = (dx**2 + dy**2) ** 0.5
+
+                # Follow player if too far away
+                if distance > self.follow_radius:
+                    if distance > 0:
+                        direction = pygame.Vector2(dx, dy).normalize()
+                        # Speed scales with distance so far-away cats run faster,
+                        # but they don't overshoot or get dragged at a fixed offset.
+                        extra_mult = min(1.5, max(0.0, (distance - self.follow_radius) / 300.0))
+                        self.speed = 1.0 + extra_mult  # between 1.0 and 2.5
+                        self.direction = direction
+                    else:
+                        self.direction = pygame.Vector2(0, 0)
+                        self.speed = 1.0
+                else:
+                    # Within follow radius: stay near the player. Optionally wander a bit
+                    # if not in combat, but never back away from the player.
+                    if self.wander and distance > 40:
+                        if self.move_timer <= 0:
+                            self.direction = pygame.Vector2(random.choice([(-1, 0), (1, 0), (0, -1), (0, 1)]))
+                            self.move_timer = random.randint(60, 180)
+                            self.speed = 0.7
+                        self.move_timer -= 1
+                    else:
+                        self.direction = pygame.Vector2(0, 0)
+                        self.speed = 1.0
+
+        # Default movement/idle behavior (uses self.direction set above if tamed)
+        super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
+
+    def get_collision_rect(self, cam_x):
+        """Smaller collision box near the bottom-center of the cat sprite."""
+        rect = self.rect
+        width = int(rect.width * 0.4)
+        height = int(rect.height * 0.35)
+        x_offset = (rect.width - width) // 2
+        y_offset = rect.height - height
+        return pygame.Rect(rect.x - cam_x + x_offset, rect.y + y_offset, width, height)
+
+    def _update_attack_animation(self, dt):
+        """Play the cat's attack animation and apply damage to its target."""
+        # Select appropriate attack frames based on last facing direction.
+        if self.last_direction == "right":
+            frames = getattr(self, "attack_right_images", [])
+        else:
+            frames = getattr(self, "attack_left_images", [])
+
+        if frames:
+            # Attack animations should be slower and more readable than walk animations.
+            effective_speed = self.animation_speed * 0.4
+            self.frame_index = (self.frame_index + effective_speed) % len(frames)
+            self.image = frames[int(self.frame_index)]
+        else:
+            # Fallback to standing frame if attack images are missing.
+            self.image = self.stand_right_image if self.last_direction == "right" else self.stand_left_image
+
+        # Apply damage roughly halfway through the swing, once per attack.
+        if self.target_enemy and getattr(self.target_enemy, "is_alive", True):
+            if not self.attack_has_hit and self.attack_timer <= self.attack_duration * 0.5:
+                self.target_enemy.health -= self.attack
+                if self.target_enemy.health <= 0:
+                    self.target_enemy.health = 0
+                    # Award cat XP for helping kill this enemy.
+                    xp_reward = 0
+                    if hasattr(self.target_enemy, "death_experience"):
+                        try:
+                            xp_reward = max(0, float(self.target_enemy.death_experience) * 0.1)
+                        except Exception:
+                            xp_reward = 0
+                    if xp_reward > 0:
+                        self.gain_experience(xp_reward)
+                    if hasattr(self.target_enemy, "is_alive"):
+                        self.target_enemy.is_alive = False
+                self.attack_has_hit = True
+
+        # Advance attack timer and finish attack when time is up or target is gone.
+        self.attack_timer -= dt
+        if (self.attack_timer <= 0 or
+                not self.target_enemy or
+                not getattr(self.target_enemy, "is_alive", False)):
+            self.attacking = False
+            self.frame_index = 0.0
+            self.attack_has_hit = False
 
     def feed_cat(self, item_name):
         """Feed the cat with food item. Returns the tame increase amount."""
@@ -1460,6 +1635,16 @@ class Cat(Mob):
         self.next_level_exp = int(100 + (self.level * 120))
         self.experience = 0
 
+    def gain_experience(self, amount):
+        """Increase this cat's experience and handle level-ups."""
+        if amount <= 0:
+            return
+        self.experience += amount
+        # Handle multiple possible level-ups if a big chunk of XP comes in.
+        while self.experience >= self.next_level_exp:
+            self.experience -= self.next_level_exp
+            self.level_up()
+
     def apply_stat_upgrade(self, stat_key):
         if self.unspent_stat_points <= 0:
             return False
@@ -1476,15 +1661,6 @@ class Cat(Mob):
             if self.attack < 5:
                 self.attack = 5
             self.attack += 2
-            upgraded = True
-        elif stat_key == "speed":
-            # Speed is shown as 100 by default in UI and
-            # increases by +5 per upgrade. Actual movement
-            # speed scales linearly from this stat.
-            if not hasattr(self, "speed_stat"):
-                self.speed_stat = int(self.speed * 100)
-            self.speed_stat += 5
-            self.speed = self.speed_stat / 100.0
             upgraded = True
         elif stat_key == "defense":
             # Defense starts at 5 and gains +2 per upgrade.

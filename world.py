@@ -293,8 +293,20 @@ class Liquid(pygame.sprite.Sprite):
             
             if self.resource_amount <= 0:
                 self.destroyed = True
-            player.experience += harvest_experience * resource_collected
-            player.exp_total += harvest_experience * resource_collected
+            gain = harvest_experience * resource_collected
+            player.experience += gain
+            player.exp_total += gain
+
+            # Tamed cats gain 10% of any EXP the player earns from harvesting.
+            try:
+                from mob_placement import cats as world_cats
+                share = max(0, gain * 0.1)
+                if share > 0:
+                    for cat in world_cats:
+                        if getattr(cat, "tamed", False):
+                            cat.gain_experience(share)
+            except Exception:
+                pass
             return [self.resource] * resource_collected
         return []
     
@@ -400,8 +412,19 @@ class Solid(pygame.sprite.Sprite):
 
             if self.resource_amount <= 0:
                 self.destroyed = True
-            player.experience += harvest_experience * resource_collected
-            player.exp_total += harvest_experience * resource_collected
+            gain = harvest_experience * resource_collected
+            player.experience += gain
+            player.exp_total += gain
+
+            try:
+                from mob_placement import cats as world_cats
+                share = max(0, gain * 0.1)
+                if share > 0:
+                    for cat in world_cats:
+                        if getattr(cat, "tamed", False):
+                            cat.gain_experience(share)
+            except Exception:
+                pass
             return [self.resource] * resource_collected
         return []
     
@@ -491,8 +514,19 @@ class GemstoneRock(Solid):
                 self.destroyed = True
                 chosen_gemstone = random.choice(self.gemstones)
                 if player:
-                    player.experience += harvest_experience * 10
-                    player.exp_total += harvest_experience * 10
+                    gain = harvest_experience * 10
+                    player.experience += gain
+                    player.exp_total += gain
+
+                    try:
+                        from mob_placement import cats as world_cats
+                        share = max(0, gain * 0.1)
+                        if share > 0:
+                            for cat in world_cats:
+                                if getattr(cat, "tamed", False):
+                                    cat.gain_experience(share)
+                    except Exception:
+                        pass
                 return [chosen_gemstone]
             
             return []
@@ -666,8 +700,19 @@ class DeadBush(pygame.sprite.Sprite):
         if not self.destroyed:
             resource_collected = random.randint(3, 9)
             self.destroyed = True
-            player.experience += harvest_experience * resource_collected
-            player.exp_total += harvest_experience * resource_collected
+            gain = harvest_experience * resource_collected
+            player.experience += gain
+            player.exp_total += gain
+
+            try:
+                from mob_placement import cats as world_cats
+                share = max(0, gain * 0.1)
+                if share > 0:
+                    for cat in world_cats:
+                        if getattr(cat, "tamed", False):
+                            cat.gain_experience(share)
+            except Exception:
+                pass
             return [self.resource] * resource_collected
         return []
     
@@ -711,8 +756,19 @@ class Tree(pygame.sprite.Sprite):
             self.wood_amount -= resource_collected
             if self.wood_amount <= 0:
                 self.destroyed = True
-            player.experience += harvest_experience * resource_collected
-            player.exp_total += harvest_experience * resource_collected
+            gain = harvest_experience * resource_collected
+            player.experience += gain
+            player.exp_total += gain
+
+            try:
+                from mob_placement import cats as world_cats
+                share = max(0, gain * 0.1)
+                if share > 0:
+                    for cat in world_cats:
+                        if getattr(cat, "tamed", False):
+                            cat.gain_experience(share)
+            except Exception:
+                pass
             return [self.resource] * resource_collected
         return []
         
@@ -723,8 +779,19 @@ class Tree(pygame.sprite.Sprite):
             self.image = self.bare_image
             self.is_empty = True
             self.timer = 0
-            player.experience += collect_experience * fruit_count
-            player.exp_total += collect_experience * fruit_count
+            gain = collect_experience * fruit_count
+            player.experience += gain
+            player.exp_total += gain
+
+            try:
+                from mob_placement import cats as world_cats
+                share = max(0, gain * 0.1)
+                if share > 0:
+                    for cat in world_cats:
+                        if getattr(cat, "tamed", False):
+                            cat.gain_experience(share)
+            except Exception:
+                pass
             return [self.fruit] * fruit_count
         return []
         

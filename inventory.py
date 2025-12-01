@@ -6425,13 +6425,12 @@ class Inventory():
         flash_cycle = unspent_points > 0 and (pygame.time.get_ticks() // 400) % 2 == 0
         mouse_pos = pygame.mouse.get_pos()
 
-        # Layout order: Health, Hunger, Attack, Defense, Speed
+        # Layout order: Health, Hunger, Attack, Defense (speed is no longer an upgradeable stat)
         stats_list = [
             ("Health", health, max_health, "health"),
             ("Hunger", hunger, max_hunger, "hunger"),
             ("Attack", attack, None, "attack"),
             ("Defense", defense, None, "defense"),
-            ("Speed", int(speed), None, "speed"),
         ]
 
         for label, value, max_val, key in stats_list:

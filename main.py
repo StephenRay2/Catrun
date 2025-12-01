@@ -1375,28 +1375,7 @@ def calculate_movement_rotation(frame_index, num_frames, direction, pendulum_off
     
     return 0
 
-def handle_debug_rotation_input(event):
-    global debug_movement_rotation
-    if event.type == pygame.KEYDOWN:
-        if event.key == pygame.K_EQUALS or event.key == pygame.K_PLUS:
-            debug_movement_rotation += 1
-            print(f"Movement rotation: {debug_movement_rotation}°")
-        elif event.key == pygame.K_MINUS:
-            debug_movement_rotation -= 1
-            print(f"Movement rotation: {debug_movement_rotation}°")
 
-def handle_debug_step_input(event):
-    global debug_step_mode, debug_should_step_frame
-    if event.type == pygame.KEYDOWN:
-        if event.key == pygame.K_h:
-            debug_step_mode = not debug_step_mode
-            if debug_step_mode:
-                print("DEBUG: Frame step mode ENABLED - Press SPACE to advance one frame")
-            else:
-                print("DEBUG: Frame step mode DISABLED")
-        elif event.key == pygame.K_SPACE and debug_step_mode:
-            debug_should_step_frame = True
-            print("DEBUG: Stepping one frame")
 
 while running:
     if state != previous_state:
@@ -1766,8 +1745,6 @@ while running:
         current_time = pygame.time.get_ticks()
 
         for event in pygame.event.get():
-            handle_debug_rotation_input(event)
-            handle_debug_step_input(event)
             
             if event.type == pygame.MOUSEWHEEL:
                 if inventory_in_use and inventory.state == "cats":
@@ -2920,10 +2897,32 @@ while running:
                 if not collision_detected:
                     for mob in collision_mobs:
                         if item_rect.colliderect(mob.rect):
-                            handle_thrown_hit(thrown, mob, base_throw_attack)
-                            if thrown in thrown_items:
-                                thrown_items.remove(thrown)
-                            removed_due_to_hit = True
+                            if thrown.get("is_cat"):
+                                # Thrown cats deal damage using player base attack
+                                # (no weapon) plus the cat's own base attack, and
+                                # count as an attack on this mob.
+                                # Avoid harming tamed cats.
+                                from mobs import Cat  # local import to avoid cycles
+                                if not (isinstance(mob, Cat) and getattr(mob, "tamed", False)):
+                                    cat_data = thrown.get("cat_data") or {}
+                                    cat_obj = cat_data.get("cat_object")
+                                    if cat_obj is not None:
+                                        cat_attack = getattr(cat_obj, "attack", 0)
+                                    else:
+                                        cat_level = cat_data.get("cat_level", 1)
+                                        cat_attack = max(5, int(cat_level * 4))
+                                    damage = max(0, int(base_throw_attack + cat_attack))
+                                    if damage > 0:
+                                        mob.health = max(0, mob.health - damage)
+                                        # Let mob AI and other cats treat this
+                                        # as a player attack on this target.
+                                        setattr(player, "attacking_target", mob)
+                                # Cat still "lands" via the landing logic below.
+                            else:
+                                handle_thrown_hit(thrown, mob, base_throw_attack)
+                                if thrown in thrown_items:
+                                    thrown_items.remove(thrown)
+                                removed_due_to_hit = True
                             collision_detected = True
                             break
                 if removed_due_to_hit:
@@ -3800,6 +3799,11 @@ while running:
             for plant in fruit_plants:
                 plant.update(time_dt)
 
+            # Expose player's world position on the player object so that
+            # follower pets (like tamed cats) can use consistent coordinates.
+            player.world_x = player_world_x
+            player.world_y = player_world_y
+
             visible_mob_set = set(visible_mobs)
             for mob in nearby_mobs:
                 mob.is_visible = mob in visible_mob_set
@@ -3835,7 +3839,9 @@ while running:
 
                     
             
-                mob.update(time_dt, None, mob_nearby_objects, mob_nearby_mobs, sleeping_in_tent or tent_hide_active)
+                # Pass the real player object so pets (like tamed cats)
+                # can follow and assist the player correctly.
+                mob.update(time_dt, player, mob_nearby_objects, mob_nearby_mobs, sleeping_in_tent or tent_hide_active)
                 mob.keep_in_screen(height)
             if sleeping_in_tent or tent_hide_active:
                 player_world_x = sleeping_tent_x
