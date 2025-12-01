@@ -18,11 +18,22 @@ Catrun is a 2D game developed with Pygame where the player controls a character 
 - **world.py**: Environment objects and resource management
 - **inventory.py**: Item and inventory system
 - **buttons.py**: UI button implementation
+- **arcane_crafter.py**: Arcane crafting station and mechanics
+- **campfire.py**: Campfire station for cooking and crafting
+- **crafting_bench.py**: General crafting bench station
+- **smelter.py**: Smelting station for ore processing
+- **mortar_pestle.py**: Mortar and pestle station for grinding
+- **mob_placement.py**: Mob spawning and placement logic
+- **sounds.py**: Sound effect management and playback
+- **debug.py**: Debug utilities and helpers
+- **printpicturenames.py**: Utility script for printing sprite names
 
 ## Language & Runtime
 **Language**: Python
 **Version**: Python 3.12.0
 **Framework**: Pygame 2.6.1
+**Operating System**: Windows 10 (OS Version 10.0.26200)
+
 
 ## Dependencies
 **Main Dependencies**:
@@ -33,8 +44,8 @@ Catrun is a 2D game developed with Pygame where the player controls a character 
 ## Build & Installation
 No formal build process is required. The game can be run directly with Python:
 
-```bash
-python3 main.py
+```cmd
+python main.py
 ```
 
 ## Main Components

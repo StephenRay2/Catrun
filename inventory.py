@@ -5,6 +5,7 @@ import re
 import math
 import copy
 import mob_placement
+from debug import font_path, font
 
 HARVEST_TOOL_MULTS = {
     "wood": {"normal": 2, "special": 2},
@@ -6035,10 +6036,10 @@ class Inventory():
         self.inventory_full_message_timer = 0
         self.hotbar_name_display_until = 0
         self.hotbar_name_display_text = ""
-        self.hotbar_name_font = pygame.font.SysFont(None, 18)
-        self.tooltip_title_font = pygame.font.SysFont(None, 22)
-        self.tooltip_body_font = pygame.font.SysFont(None, 18)
-        self.tooltip_small_font = pygame.font.SysFont(None, 16)
+        self.hotbar_name_font = pygame.font.Font(font_path, 10)
+        self.tooltip_title_font = pygame.font.Font(font_path, 18)
+        self.tooltip_body_font = pygame.font.Font(font_path, 14)
+        self.tooltip_small_font = pygame.font.Font(font_path, 12)
         self.tooltip_delay_ms = 1000
         self.tooltip_mode_active = False
         self._hover_candidate = None
@@ -6071,13 +6072,13 @@ class Inventory():
         self.cat_card_columns = 3
         self.cat_card_column_padding = 14
         self.cat_card_row_padding = 30
-        self.cat_card_title_font = pygame.font.SysFont(None, 22)
-        self.cat_card_stat_font = pygame.font.SysFont(None, 16)
+        self.cat_card_title_font = pygame.font.Font(font_path, 16)
+        self.cat_card_stat_font = pygame.font.Font(font_path, 10)
         self.level_up_skill_image = pygame.image.load("assets/sprites/buttons/level_up_skill_button.png").convert_alpha()
         self.level_up_skill_flash_image = pygame.image.load("assets/sprites/buttons/level_up_skill_button_flash.png").convert_alpha()
         self.level_up_button_rects = []
-        self.level_up_font = pygame.font.SysFont(None, 28)
-        self.level_up_value_font = pygame.font.SysFont(None, 22)
+        self.level_up_font = pygame.font.Font(font_path, 22)
+        self.level_up_value_font = pygame.font.Font(font_path, 18)
         self.last_level_up_click_time = 0
         
         self.selected_crafting_item = None
@@ -6087,7 +6088,14 @@ class Inventory():
         self.crafting_completion_flash = False
         self.crafting_completion_slot = None
         self.crafting_completion_time = 0
-        self.crafting_flash_duration = 0.3  # 0.3 second flash
+        self.crafting_flash_duration = 0.3
+        
+        self.selected_cat_id = None
+        self.cat_card_rects = []
+        self.cat_hover_scale = {}
+        self.cat_card_entries = []
+        self.last_cat_click_time = 0
+        self.cat_upgrade_button_rects = []
 
     def recalc_weight(self):
         """Recompute total carried weight and sync it to the player immediately."""
@@ -6151,6 +6159,8 @@ class Inventory():
             screen.blit(inventory_surface, (0, 0))
             screen.blit(self.cat_screen_image, (x_pos, y_pos - 20))
             self.draw_cats_tab(screen, x_pos, y_pos - 20)
+            if self.selected_cat_id:
+                self.draw_selected_cat_info(screen, x_pos, y_pos - 20)
 
             inventory_tab_unused.draw(screen)
             crafting_tab_unused.draw(screen)
@@ -6162,10 +6172,10 @@ class Inventory():
 
     def draw_player_info(self, screen):
         """Render basic player info shared across inventory tabs."""
-        font = pygame.font.SysFont(None, 20)
+        font = pygame.font.Font(font_path, 14)
         self.recalc_weight()
         player.weight = self.total_inventory_weight
-        total_weight_pos_x = screen.get_width()/2 + 20
+        total_weight_pos_x = screen.get_width()/2 + 15
         info_y = 70
 
         level_text = font.render(f"Level: {player.level}", True, (200, 220, 255))
@@ -6200,6 +6210,7 @@ class Inventory():
 
         cat_surface = pygame.Surface((area_width, area_height), pygame.SRCALPHA)
         entries = self._gather_tamed_cat_entries()
+        self.cat_card_entries = entries
         card_width = self.cat_card_image.get_width()
         card_height = self.cat_card_image.get_height()
         columns = max(1, self.cat_card_columns)
@@ -6219,9 +6230,11 @@ class Inventory():
             self.cat_card_scroll = 0
 
         y_offset = -self.cat_card_scroll
+        mouse_pos = pygame.mouse.get_pos()
+        self.cat_card_rects = []
 
         if not entries:
-            info_font = pygame.font.SysFont(None, 26)
+            info_font = pygame.font.Font(font_path, 20)
             info_text = info_font.render("No tamed cats yet. Feed a cat to tame one!", True, (230, 220, 200))
             info_rect = info_text.get_rect(center=(area_width // 4, area_height // 3))
             cat_surface.blit(info_text, info_rect)
@@ -6233,7 +6246,27 @@ class Inventory():
                 draw_y = y_offset + row * (card_height + self.cat_card_row_padding)
                 if draw_y > area_height or draw_y + card_height < -card_height:
                     continue
+
+                card_rect_local = pygame.Rect(draw_x, draw_y, card_width, card_height)
+                card_rect_screen = pygame.Rect(draw_x + area_x, draw_y + area_y, card_width, card_height)
+                self.cat_card_rects.append((card_rect_screen, entry["id"], idx))
+
+                is_hovered = card_rect_screen.collidepoint(mouse_pos)
+                is_selected = entry["id"] == self.selected_cat_id
+
+                scale = self.cat_hover_scale.get(entry["id"], 1.0)
+                if is_hovered and scale < 1.02:
+                    scale = min(1.02, scale + 0.002)
+                elif not is_hovered and scale > 1.0:
+                    scale = max(1.0, scale - 0.002)
+                self.cat_hover_scale[entry["id"]] = scale
+
                 card_surface = self.cat_card_image.copy()
+
+                if is_hovered:
+                    shadow_surface = pygame.Surface((card_width, card_height), pygame.SRCALPHA)
+                    pygame.draw.rect(shadow_surface, (0, 0, 0, 30), shadow_surface.get_rect(), border_radius=5)
+                    card_surface.blit(shadow_surface, (0, 0))
 
                 portrait = self._load_cat_portrait(entry.get("icon"), portrait_size)
                 portrait_target = pygame.Rect(0, 0, portrait_size[0], portrait_size[1])
@@ -6248,7 +6281,7 @@ class Inventory():
 
                 text_color = (0, 0, 0)
                 text_x = 8
-                text_y = 8
+                text_y = 5
 
                 self._draw_text(
                     card_surface,
@@ -6257,30 +6290,176 @@ class Inventory():
                     (text_x, text_y),
                     text_color
                 )
-                stats_lines = [
-                    f"Lvl {entry['level']}  EXP {entry['experience'][0]}/{entry['experience'][1]}",
-                    f"HP {entry['health'][0]}/{entry['health'][1]}  Hunger {entry['hunger'][0]}/{entry['hunger'][1]}",
-                    f"ATK {entry['attack']}  SPD {entry['speed']}  DEF {entry['defense']}",
-                ]
-                stat_line_height = self.cat_card_stat_font.get_height() + 2
-                stats_height = stat_line_height * len(stats_lines)
-                text_y = max(portrait_height + 8, card_height - stats_height - 8)
-                max_bottom_y = card_height - 12 - stats_height
-                if text_y > max_bottom_y:
-                    text_y = max_bottom_y
-                for line in stats_lines:
-                    self._draw_text(
-                        card_surface,
-                        self.cat_card_stat_font,
-                        line,
-                        (text_x, text_y),
-                        text_color
-                    )
-                    text_y += self.cat_card_stat_font.get_height() + 2
 
-                cat_surface.blit(card_surface, (draw_x, draw_y))
+                bar_width = card_width - 16
+                bar_height = 10
+                bar_x = 8
+                bar_y = card_height - 40
+
+                health_current, health_max = entry['health']
+                hunger_current, hunger_max = entry['hunger']
+
+                pygame.draw.rect(card_surface, (60, 60, 60), pygame.Rect(bar_x, bar_y, bar_width, bar_height), border_radius=3)
+                health_ratio = max(0, min(1, health_current / health_max)) if health_max > 0 else 0
+                health_width = int(bar_width * health_ratio)
+                health_color = (100, 200, 100) if health_ratio > 0.5 else (255, 200, 100) if health_ratio > 0.25 else (255, 100, 100)
+                pygame.draw.rect(card_surface, health_color, pygame.Rect(bar_x, bar_y, health_width, bar_height), border_radius=3)
+                pygame.draw.rect(card_surface, (200, 200, 200), pygame.Rect(bar_x, bar_y, bar_width, bar_height), width=1, border_radius=3)
+
+                health_text = self.cat_card_stat_font.render(f"HP: {health_current}/{health_max}", True, (0, 0, 0))
+                card_surface.blit(health_text, (bar_x, bar_y - 10))
+
+                bar_y += 20
+                pygame.draw.rect(card_surface, (60, 60, 60), pygame.Rect(bar_x, bar_y, bar_width, bar_height), border_radius=3)
+                hunger_ratio = max(0, min(1, hunger_current / hunger_max)) if hunger_max > 0 else 0
+                hunger_width = int(bar_width * hunger_ratio)
+                hunger_color = (150, 100, 200)
+                pygame.draw.rect(card_surface, hunger_color, pygame.Rect(bar_x, bar_y, hunger_width, bar_height), border_radius=3)
+                pygame.draw.rect(card_surface, (200, 200, 200), pygame.Rect(bar_x, bar_y, bar_width, bar_height), width=1, border_radius=3)
+
+                hunger_text = self.cat_card_stat_font.render(f"Hunger: {hunger_current}/{hunger_max}", True, (0, 0, 0))
+                card_surface.blit(hunger_text, (bar_x, bar_y - 10))
+
+                if scale != 1.0:
+                    new_size = (int(card_width * scale), int(card_height * scale))
+                    card_surface = pygame.transform.scale(card_surface, new_size)
+                    offset_x = int((card_width - new_size[0]) / 2)
+                    offset_y = int((card_height - new_size[1]) / 2)
+                    temp_rect = pygame.Rect(draw_x + offset_x, draw_y + offset_y, new_size[0], new_size[1])
+                    cat_surface.blit(card_surface, temp_rect)
+                else:
+                    cat_surface.blit(card_surface, card_rect_local)
+
+                if is_selected:
+                    border_width = 3
+                    pygame.draw.rect(cat_surface, (255, 255, 0), pygame.Rect(draw_x, draw_y, card_width, card_height), width=border_width, border_radius=5)
 
         screen.blit(cat_surface, (area_x, area_y))
+
+    def draw_selected_cat_info(self, screen, x_pos, y_pos):
+        """Draw the selected cat's information in the upper right and stats in bottom right."""
+        cat_obj = self._get_cat_by_id(self.selected_cat_id)
+        if not cat_obj:
+            return
+
+        panel_width = 380
+        panel_height = 380
+        panel_x = screen.get_width() - panel_width - 170
+        panel_y = 0
+
+        panel_surface = pygame.Surface((panel_width, panel_height), pygame.SRCALPHA)
+
+        image_size = 300
+        cat_image = None
+        if hasattr(cat_obj, 'stand_right_image'):
+            try:
+                cat_image = pygame.transform.scale(cat_obj.stand_right_image, (image_size, image_size))
+            except:
+                pass
+
+        image_y = 20
+        if cat_image:
+            image_x = (panel_width - image_size) // 2
+            panel_surface.blit(cat_image, (image_x, image_y))
+
+        text_x = 10
+        text_y = 75
+        name_font = pygame.font.Font(font_path, 22)
+        stat_font = pygame.font.Font(font_path, 16)
+
+        cat_name = getattr(cat_obj, 'cat_name', 'Unnamed Cat') or 'Unnamed Cat'
+        name_text = name_font.render(str(cat_name), True, (255, 200, 100))
+        panel_surface.blit(name_text, (text_x, text_y))
+        text_y += 30
+
+        level = int(getattr(cat_obj, 'level', 1))
+        experience = int(getattr(cat_obj, 'experience', 0))
+        next_level_exp = int(getattr(cat_obj, 'next_level_exp', 100))
+        unspent_points = int(getattr(cat_obj, 'unspent_stat_points', 0))
+
+        level_text = stat_font.render(f"Level: {level}", True, (200, 220, 255))
+        panel_surface.blit(level_text, (text_x, text_y))
+        text_y += 25
+
+        exp_text = stat_font.render(f"EXP: {experience}/{next_level_exp}", True, (200, 220, 200))
+        panel_surface.blit(exp_text, (text_x, text_y))
+        text_y += 25
+
+        if unspent_points > 0:
+            points_text = stat_font.render(f"Points: {unspent_points}", True, (255, 220, 80))
+            panel_surface.blit(points_text, (text_x, text_y))
+
+        screen.blit(panel_surface, (panel_x, panel_y))
+
+        stats_panel_x = screen.get_width() - panel_width - 170
+        stats_panel_y = screen.get_height() - 380
+        stats_panel_width = 380
+        stats_panel_height = 360
+
+        stats_surface = pygame.Surface((stats_panel_width, stats_panel_height), pygame.SRCALPHA)
+
+        stats_text_x = 10
+        stats_text_y = 10
+        title_font = pygame.font.Font(font_path, 16)
+
+        title = title_font.render("Stats", True, (0, 0, 0))
+        stats_surface.blit(title, (stats_text_x, stats_text_y))
+        stats_text_y += 25
+
+        health = int(getattr(cat_obj, 'health', 100))
+        max_health = int(getattr(cat_obj, 'max_health', 100))
+        hunger = int(getattr(cat_obj, 'hunger', 100))
+        max_hunger = int(getattr(cat_obj, 'max_hunger', 100))
+        attack = int(getattr(cat_obj, 'attack', 10))
+        # Speed is displayed as a percentage-like stat (100 = default).
+        raw_speed = float(getattr(cat_obj, 'speed', 1))
+        speed = int(getattr(cat_obj, 'speed_stat', raw_speed * 100))
+        defense = int(getattr(cat_obj, 'defense', 5))
+
+        # Bottom stats: larger font and more spacing than the top-right text.
+        bottom_stat_font = pygame.font.Font(font_path, 18)
+        stat_line_height = 35
+        self.cat_upgrade_button_rects = []
+
+        # Match player level-up button behavior (flash + hover) for cats.
+        flash_cycle = unspent_points > 0 and (pygame.time.get_ticks() // 400) % 2 == 0
+        mouse_pos = pygame.mouse.get_pos()
+
+        # Layout order: Health, Hunger, Attack, Defense, Speed
+        stats_list = [
+            ("Health", health, max_health, "health"),
+            ("Hunger", hunger, max_hunger, "hunger"),
+            ("Attack", attack, None, "attack"),
+            ("Defense", defense, None, "defense"),
+            ("Speed", int(speed), None, "speed"),
+        ]
+
+        for label, value, max_val, key in stats_list:
+            if max_val:
+                stat_text = bottom_stat_font.render(f"{label}: {value}/{max_val}", True, (0, 0, 0))
+            else:
+                stat_text = bottom_stat_font.render(f"{label}: {value}", True, (0, 0, 0))
+
+            stats_surface.blit(stat_text, (stats_text_x, stats_text_y))
+
+            # Use the same level-up button sprites as the player.
+            button_x = stats_panel_width - self.level_up_skill_image.get_width() - 20
+            button_y = stats_text_y - 5
+
+            # Local rect (panel space) for drawing.
+            button_local_rect = self.level_up_skill_image.get_rect(topleft=(button_x, button_y))
+            # Screen-space rect for hover/click detection.
+            button_screen_rect = button_local_rect.move(stats_panel_x, stats_panel_y)
+
+            hover = button_screen_rect.collidepoint(mouse_pos)
+            button_image = self.level_up_skill_flash_image if (hover or flash_cycle) else self.level_up_skill_image
+            stats_surface.blit(button_image, button_local_rect)
+
+            self.cat_upgrade_button_rects.append((button_screen_rect, self.selected_cat_id, key))
+
+            stats_text_y += stat_line_height
+
+        screen.blit(stats_surface, (stats_panel_x, stats_panel_y))
 
     def _gather_tamed_cat_entries(self):
         entries = []
@@ -6345,6 +6524,7 @@ class Inventory():
             "speed": max(0, speed_value),
             "defense": defense_value,
             "icon": icon_path,
+            "cat_object": cat_obj,
         }
         return entry
 
@@ -6535,6 +6715,42 @@ class Inventory():
                 if player.apply_stat_upgrade(stat_key):
                     self.last_level_up_click_time = now
                 break
+
+    def handle_cats_event(self, event):
+        if self.state != "cats":
+            return
+        if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
+            return
+        now = pygame.time.get_ticks()
+        if now - self.last_cat_click_time < 200:
+            return
+
+        for button_rect, cat_id, stat_key in self.cat_upgrade_button_rects:
+            if button_rect.collidepoint(event.pos):
+                cat_obj = self._get_cat_by_id(cat_id)
+                if cat_obj and hasattr(cat_obj, 'apply_stat_upgrade'):
+                    if cat_obj.apply_stat_upgrade(stat_key):
+                        self.last_cat_click_time = now
+                return
+
+        for card_rect, cat_id, idx in self.cat_card_rects:
+            if card_rect.collidepoint(event.pos):
+                if self.selected_cat_id == cat_id:
+                    self.selected_cat_id = None
+                else:
+                    self.selected_cat_id = cat_id
+                self.last_cat_click_time = now
+                break
+
+    def _get_cat_by_id(self, cat_id):
+        if not self.cat_card_entries:
+            return None
+        for entry in self.cat_card_entries:
+            if entry.get("id") == cat_id:
+                cat_obj = entry.get("cat_object")
+                if cat_obj:
+                    return cat_obj
+        return None
 
     def begin_hover_pass(self):
         self.tooltip_mode_active = True
@@ -6777,7 +6993,7 @@ class Inventory():
             tooltip_y = max(10, screen.get_height() - box_height - 10)
 
         bg_surface = pygame.Surface((box_width, box_height), pygame.SRCALPHA)
-        bg_surface.fill((0, 0, 0, 170))
+        bg_surface.fill((0, 0, 0, 230))
         pygame.draw.rect(bg_surface, (255, 255, 255, 200), (0, 0, box_width, box_height), 1, border_radius=6)
 
         current_y = padding // 2
@@ -6805,7 +7021,7 @@ class Inventory():
         hotbar_y = screen.get_height() - 70
         screen.blit(hotbar_image, (hotbar_x, hotbar_y))
         slot_size = self.slot_size * .75
-        hotbar_font = pygame.font.SysFont(None, 15)
+        hotbar_font = pygame.font.Font(font_path, 10)
         first_slot_x = hotbar_x + 4.5
         slot_y = hotbar_y + 4.5
         slot_spacing = 51
@@ -6928,8 +7144,8 @@ class Inventory():
         pygame.draw.rect(bg_surface, (220, 220, 220), bg_surface.get_rect(), 2, border_radius=8)
         screen.blit(bg_surface, (menu_x, menu_y))
 
-        option_font = pygame.font.SysFont(None, 20)
-        title_font = pygame.font.SysFont(None, 18)
+        option_font = pygame.font.Font(font_path, 16)
+        title_font = pygame.font.Font(font_path, 14)
 
         title_text = title_font.render(slot.get("item_name", "Item"), True, (255, 255, 255))
         screen.blit(title_text, (menu_x + padding, menu_y + padding))
@@ -6956,7 +7172,7 @@ class Inventory():
     def draw_items(self, screen):
         start_x = (screen.get_width() / 2 - self.inventory_image.get_width() / 2) + 18
         start_y = (screen.get_height() / 2 - self.inventory_image.get_height() / 2) + 44
-        font = pygame.font.SysFont(None, 20)
+        font = pygame.font.Font(font_path, 14)
         self.recalc_weight()
         mouse_pos = pygame.mouse.get_pos()
 
@@ -7172,9 +7388,9 @@ class Inventory():
         start_x = (screen.get_width() / 2 - self.inventory_image.get_width() / 2) + 18
         start_y = (screen.get_height() / 2 - self.inventory_image.get_height() / 2) + 44
 
-        font_small = pygame.font.SysFont(None, 30)
-        font_medium = pygame.font.SysFont(None, 40)
-        font_large = pygame.font.SysFont(None, 50)
+        font_small = pygame.font.Font(font_path, 14)
+        font_medium = pygame.font.Font(font_path, 18)
+        font_large = pygame.font.Font(font_path, 22)
         mouse_pos = pygame.mouse.get_pos()
 
         self.crafting_slot_positions = {}
@@ -7554,7 +7770,7 @@ class Inventory():
                 screen.blit(temp_surface, (mouse_x - self.slot_size // 2, mouse_y - self.slot_size // 2))
                 
                 if self.dragged_item["quantity"] > 1:
-                    font = pygame.font.SysFont(None, 20)
+                    font = pygame.font.Font(font_path, 16)
                     quantity = self.dragged_item["quantity"]
                     stack_text = font.render(str(quantity), True, (255, 255, 255))
                     
@@ -8365,4 +8581,3 @@ class Inventory():
         self.drop_menu_rect = None
 
 inventory = Inventory(64)
-

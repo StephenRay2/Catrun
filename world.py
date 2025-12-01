@@ -3,6 +3,7 @@ import random
 import time
 import math
 import copy
+from debug import font_path, font
 
 screen = pygame.display.set_mode((1280, 720), pygame.FULLSCREEN)
 width = screen.get_width()
@@ -904,7 +905,7 @@ class DroppedItem(Collectible):
     @classmethod
     def get_drop_font(cls):
         if not hasattr(cls, '_drop_font'):
-            cls._drop_font = pygame.font.SysFont(None, 18)
+            cls._drop_font = pygame.font.Font(font_path, 14)
         return cls._drop_font
 
     def __init__(self, x, y, resource, icon_path, amount=1, item_instance=None):

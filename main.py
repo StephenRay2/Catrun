@@ -11,6 +11,8 @@ from smelter import Smelter
 from campfire import Campfire
 from mortar_pestle import MortarPestle
 from world import DroppedItem, dropped_items, Bank, banks
+from debug import font_path, font
+from mobs import hud_font
 
 clock = pygame.time.Clock()
 from inventory import *
@@ -24,7 +26,6 @@ floor_y = 0
 shift_multiplier = 1
 dungeon_depth = absolute_cam_x
 dungeon_depth_high = 0
-font = pygame.font.SysFont(None, 24)
 scroll = 0
 dungeon_traversal_speed = .1
 time_of_day = 7.00
@@ -1087,7 +1088,8 @@ def group_resources_by_type(resource_list):
     return resource_counts
 
 def add_collection_message(resource_name, count):
-    text_surface = font.render(f"Collected {count} {resource_name}", True, (20, 255, 20))
+    message_font = pygame.font.Font(font_path, 13)
+    text_surface = message_font.render(f"Collected {count} {resource_name}", True, (20, 255, 20))
     bg_surface = pygame.Surface((text_surface.get_width() + 10, text_surface.get_height() + 10), pygame.SRCALPHA)
     bg_surface.fill((0, 0, 0, 100))
     rect = pygame.Rect(20, 20, text_surface.get_width(), text_surface.get_height())
@@ -1741,7 +1743,8 @@ while running:
             ]
             # Add 20 torches (will stack) plus other starter items
             torch_stack = ["Torch"] * 20
-            inventory.add(torch_stack + starter_items)
+            beef_stack = ["Raw Beef"] * 20
+            inventory.add(torch_stack + starter_items + beef_stack)
             
             from world import gemstone_rocks, GemstoneRock
             gemstone_rocks.append(GemstoneRock(int(player_pos.x + cam_x + 100), int(player_pos.y + 50)))
@@ -1875,8 +1878,8 @@ while running:
                         tab_clicked = True
                 if tab_clicked:
                     continue
-                # Handle clicks on level-up buttons while the tab is open
                 inventory.handle_level_up_event(event)
+                inventory.handle_cats_event(event)
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_f and not inventory_in_use and not crafting_bench_in_use and not mortar_pestle_in_use and player.is_alive:
                 consumed_item = False
@@ -1893,7 +1896,7 @@ while running:
                         player.thirst_full_timer = getattr(player, "thirst_full_timer", 60)
                         sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
 
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_q and not crafting_bench_in_use and not smelter_in_use and not campfire_in_use and not mortar_pestle_in_use:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_q and not crafting_bench_in_use and not smelter_in_use and not campfire_in_use and not mortar_pestle_in_use and not arcane_crafter_in_use:
                 inventory_in_use = not inventory_in_use
                 inventory.ui_open = inventory_in_use
                 if not inventory_in_use:
@@ -3322,7 +3325,7 @@ while running:
                         screen.blit(tent_hover_highlight_surface, cell_rect.topleft)
                         if option in tent_hover_timers:
                             tent_hover_timers[option] += dt_local
-                    text_surface = pygame.font.SysFont(None, 24).render(labels[option], True, (255, 255, 255))
+                    text_surface = pygame.font.Font(font_path, 18).render(labels[option], True, (255, 255, 255))
                     text_rect = text_surface.get_rect(center=cell_rect.center)
                     screen.blit(text_surface, text_rect)
                     if option in ("pickup", "demolish"):
@@ -3346,12 +3349,12 @@ while running:
             box_rect = pygame.Rect(box_x, box_y, box_w, box_h)
             pygame.draw.rect(screen, (30, 40, 60), box_rect, border_radius=10)
             pygame.draw.rect(screen, (200, 200, 220), box_rect, 2, border_radius=10)
-            title = pygame.font.SysFont(None, 28).render("Fast Travel (Coming Soon)", True, (255, 255, 255))
-            body = pygame.font.SysFont(None, 22).render("Fast travel destinations will appear here.", True, (220, 220, 220))
+            title = pygame.font.Font(font_path, 22).render("Fast Travel (Coming Soon)", True, (255, 255, 255))
+            body = pygame.font.Font(font_path, 18).render("Fast travel destinations will appear here.", True, (220, 220, 220))
             button_rect = pygame.Rect(box_x + box_w//2 - 60, box_y + box_h - 60, 120, 34)
             pygame.draw.rect(screen, (80, 120, 180), button_rect, border_radius=6)
             pygame.draw.rect(screen, (220, 220, 240), button_rect, 1, border_radius=6)
-            button_text = pygame.font.SysFont(None, 22).render("Close", True, (255, 255, 255))
+            button_text = pygame.font.Font(font_path, 18).render("Close", True, (255, 255, 255))
             screen.blit(title, title.get_rect(center=(box_rect.centerx, box_y + 50)))
             screen.blit(body, body.get_rect(center=(box_rect.centerx, box_y + 95)))
             screen.blit(button_text, button_text.get_rect(center=button_rect.center))
@@ -4295,8 +4298,8 @@ while running:
         screen.blit(temp_surface, (depth_rect.x, depth_rect.y))
         screen.blit(depth_text, (depth_rect.x + 5, depth_rect.y + 5))
 
-        time_text = font.render(f"Time: {time_of_day:.0f}", True, (255, 255, 255))
-        time_rect = pygame.Rect(width - time_text.get_width() - 30, 20, time_text.get_width(), time_text.get_height())
+        time_text = hud_font.render(f"Time: {time_of_day:.0f}", True, (255, 255, 255))
+        time_rect = pygame.Rect(width - time_text.get_width() - 33, 31, time_text.get_width(), time_text.get_height())
         time_surface = pygame.Surface((time_rect.width + 10, time_rect.height + 10), pygame.SRCALPHA)
         time_surface.fill((0, 0, 0, 100))
         screen.blit(time_surface, (time_rect.x + 8, time_rect.y + 22))
@@ -4397,8 +4400,8 @@ while running:
             pygame.draw.rect(screen, (200, 150, 100), pygame.Rect(box_x, box_y, box_width, box_height), width=3, border_radius=10)
             
             # Draw text
-            title_font = pygame.font.SysFont(None, 28)
-            input_font = pygame.font.SysFont(None, 24)
+            title_font = pygame.font.Font(font_path, 22)
+            input_font = pygame.font.Font(font_path, 18)
             
             title_text = title_font.render("Enter Cat's Name:", True, (255, 255, 200))
             title_rect = title_text.get_rect(center=(width // 2, box_y + 30))
@@ -4411,7 +4414,7 @@ while running:
             screen.blit(input_text, input_rect)
             
             # Draw instruction text
-            instruction_font = pygame.font.SysFont(None, 20)
+            instruction_font = pygame.font.Font(font_path, 16)
             instruction_text = instruction_font.render("Press ENTER to confirm or BACKSPACE to delete", True, (200, 200, 200))
             instruction_rect = instruction_text.get_rect(center=(width // 2, box_y + 120))
             screen.blit(instruction_text, instruction_rect)

@@ -1,6 +1,7 @@
 import pygame
 from inventory import items_list, hotbar_image
 from buttons import inventory_tab
+from debug import font_path, font
 
 class MortarPestle:
     def __init__(self, inventory_obj):
@@ -39,9 +40,9 @@ class MortarPestle:
         self.dragged_from_slot = None
         self.dragged_from_hotbar = False
         
-        self.font_small = pygame.font.SysFont(None, 18)
-        self.font_medium = pygame.font.SysFont(None, 22)
-        self.font_large = pygame.font.SysFont(None, 28)
+        self.font_small = pygame.font.Font(font_path, 14)
+        self.font_medium = pygame.font.Font(font_path, 18)
+        self.font_large = pygame.font.Font(font_path, 22)
     
     def _load_mortar_pestle_recipes(self):
         recipes = []
@@ -510,7 +511,7 @@ class MortarPestle:
         slot_size = 64
         gap_size = 4
         columns = 8
-        font = pygame.font.SysFont(None, 20)
+        font = pygame.font.Font(font_path, 16)
         mouse_pos = pygame.mouse.get_pos()
 
         for slot_index in range(self.inventory.capacity):
@@ -565,7 +566,7 @@ class MortarPestle:
         first_slot_x = hotbar_x + 4.5
         slot_y = hotbar_y + 4.5
         slot_spacing = 51
-        font = pygame.font.SysFont(None, 18)
+        font = pygame.font.Font(font_path, 14)
         mouse_pos = pygame.mouse.get_pos()
 
         for slot_index in range(self.inventory.hotbar_size):
@@ -706,7 +707,7 @@ class MortarPestle:
         desc_x = bg_x + 18 + (8 * (64 + 4)) + 200
         desc_y = bg_y + 44
         
-        name_text = self.font_large.render(recipe["item_name"], True, (20, 20, 50))
+        name_text = self.font_large.render(recipe["item_name"], True, (245, 240, 255))
         screen.blit(name_text, (desc_x, desc_y))
         
         desc_y += 40
@@ -718,19 +719,19 @@ class MortarPestle:
             test_width = self.font_small.size(test_line)[0]
             if test_width > max_width:
                 if line:
-                    desc_text = self.font_small.render(line, True, (0, 0, 0))
+                    desc_text = self.font_small.render(line, True, (235, 235, 240))
                     screen.blit(desc_text, (desc_x, desc_y))
                     desc_y += 18
                 line = word + " "
             else:
                 line = test_line
         if line:
-            desc_text = self.font_small.render(line, True, (0, 0, 0))
+            desc_text = self.font_small.render(line, True, (235, 235, 240))
             screen.blit(desc_text, (desc_x, desc_y))
             desc_y += 18
         
         desc_y += 15
-        recipe_label = self.font_medium.render("Recipe:", True, (20, 20, 50))
+        recipe_label = self.font_medium.render("Recipe:", True, (255, 230, 180))
         screen.blit(recipe_label, (desc_x, desc_y))
         
         desc_y += 30
@@ -763,7 +764,7 @@ class MortarPestle:
                 screen.blit(item["image"], (mouse_x - 32, mouse_y - 32))
                 
                 if self.dragged_item["quantity"] > 1:
-                    font = pygame.font.SysFont(None, 20)
+                    font = pygame.font.Font(font_path, 16)
                     qty_text = font.render(str(self.dragged_item["quantity"]), True, (255, 255, 255))
                     screen.blit(qty_text, (mouse_x - 10, mouse_y - 5))
                 break

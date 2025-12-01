@@ -1,5 +1,6 @@
 import pygame
 from inventory import items_list, hotbar_image
+from debug import font_path, font
 
 class Smelter:
     def __init__(self, inventory_obj):
@@ -83,8 +84,8 @@ class Smelter:
         self.dragged_from_slot = None
         self.dragged_from_type = None
         
-        self.font_small = pygame.font.SysFont(None, 20)
-        self.font_medium = pygame.font.SysFont(None, 22)
+        self.font_small = pygame.font.Font(font_path, 16)
+        self.font_medium = pygame.font.Font(font_path, 18)
         
         self.slot_size = 64
         self.gap_size = 4
@@ -671,11 +672,11 @@ class Smelter:
         input_start_x = layout["input_start_x"]
         input_start_y = layout["input_start_y"]
         
-        label_font = pygame.font.SysFont(None, 16)
+        label_font = pygame.font.Font(font_path, 16)
         smelt_label = label_font.render("Smelt Input", True, (255, 200, 100))
-        screen.blit(smelt_label, (input_start_x + 10, input_start_y - 35))
+        screen.blit(smelt_label, (input_start_x + 10, input_start_y - 30))
         
-        font = pygame.font.SysFont(None, 20)
+        font = pygame.font.Font(font_path, 16)
         for i in range(self.input_slot_count):
             col = i % 3
             row = i // 3
@@ -719,7 +720,7 @@ class Smelter:
         output_start_x = layout["output_start_x"]
         
         output_label = label_font.render("Output", True, (100, 200, 255))
-        screen.blit(output_label, (output_start_x + 10, input_start_y - 35))
+        screen.blit(output_label, (output_start_x + 10, input_start_y - 30))
         
         for i in range(6):
             col = i % 3
@@ -776,7 +777,7 @@ class Smelter:
         fuel_start_y = layout["fuel_start_y"]
         
         fuel_label = label_font.render("Fuel", True, (255, 100, 100))
-        screen.blit(fuel_label, (fuel_start_x + 10, fuel_start_y - 35))
+        screen.blit(fuel_label, (fuel_start_x + 10, fuel_start_y - 30))
         
         for i in range(4):
             col = i % 2
@@ -834,7 +835,7 @@ class Smelter:
     
     def _render_inventory(self, screen, start_x, start_y):
         columns = self.inventory.columns
-        font = pygame.font.SysFont(None, 20)
+        font = pygame.font.Font(font_path, 16)
         mouse_pos = pygame.mouse.get_pos()
 
         for slot_index in range(self.inventory.capacity):

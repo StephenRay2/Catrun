@@ -1,5 +1,6 @@
 import pygame
 from inventory import items_list, hotbar_image
+from debug import font_path, font
 
 
 class Campfire:
@@ -89,8 +90,8 @@ class Campfire:
         self.dragged_from_slot = None
         self.dragged_from_type = None
 
-        self.font_small = pygame.font.SysFont(None, 20)
-        self.font_medium = pygame.font.SysFont(None, 22)
+        self.font_small = pygame.font.Font(font_path, 16)
+        self.font_medium = pygame.font.Font(font_path, 18)
 
         self.slot_size = 64
         self.gap_size = 4
@@ -661,11 +662,11 @@ class Campfire:
         input_start_x = layout["input_start_x"]
         input_start_y = layout["input_start_y"]
 
-        label_font = pygame.font.SysFont(None, 16)
+        label_font = pygame.font.Font(font_path, 12)
         input_label = label_font.render("Cook Input", True, (255, 200, 100))
         screen.blit(input_label, (input_start_x + 10, input_start_y - 30))
 
-        font = pygame.font.SysFont(None, 20)
+        font = pygame.font.Font(font_path, 16)
         for i in range(len(self.input_slots)):
             col = i % 2
             row = i // 2
@@ -816,7 +817,7 @@ class Campfire:
 
     def _render_inventory(self, screen, start_x, start_y):
         columns = self.inventory.columns
-        font = pygame.font.SysFont(None, 20)
+        font = pygame.font.Font(font_path, 16)
         mouse_pos = pygame.mouse.get_pos()
 
         for slot_index in range(self.inventory.capacity):

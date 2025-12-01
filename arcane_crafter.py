@@ -4,6 +4,7 @@ from crafting_bench import CraftingBench
 from inventory import hotbar_image, items_list
 from buttons import Button
 from world import width, height
+from debug import font_path, font
 
 
 class ArcaneCrafter(CraftingBench):
@@ -208,12 +209,40 @@ class ArcaneCrafter(CraftingBench):
         self._draw_recipe_grid(screen, x_pos, y_pos)
         self._draw_recipe_description(screen, x_pos, y_pos)
 
-        self._draw_hotbar_background(screen)
-        self._draw_hotbar_items(screen)
-        self._draw_arcane_tabs(screen)
+    def _draw_recipe_description(self, screen, bg_x, bg_y):
+        if self.selected_recipe is None or self.selected_recipe >= len(self.recipes):
+            return
 
-        if self.dragging and self.dragged_item:
-            self._draw_dragged_item(screen)
+        recipe = self.recipes[self.selected_recipe]
+        desc_x = bg_x + 18 + (8 * (64 + 4)) + 200
+        desc_y = bg_y + 44
+
+        name_text = self.font_large.render(recipe["item_name"], True, (245, 240, 255))
+        screen.blit(name_text, (desc_x, desc_y))
+
+        desc_y += 40
+        max_width = 200
+        words = recipe.get("description", "").split()
+        line = ""
+        for word in words:
+            test_line = line + word + " "
+            test_width = self.font_small.size(test_line)[0]
+            if test_width > max_width:
+                if line:
+                    desc_text = self.font_small.render(line, True, (235, 235, 240))
+                    screen.blit(desc_text, (desc_x, desc_y))
+                    desc_y += 18
+                line = word + " "
+            else:
+                line = test_line
+        if line:
+            desc_text = self.font_small.render(line, True, (235, 235, 240))
+            screen.blit(desc_text, (desc_x, desc_y))
+            desc_y += 18
+
+        desc_y += 15
+        recipe_label = self.font_medium.render("Recipe:", True, (255, 230, 180))
+        screen.blit(recipe_label, (desc_x, desc_y))
 
     def get_slot_at_mouse(self, mouse_pos, screen):
         mouse_x, mouse_y = mouse_pos
@@ -552,7 +581,7 @@ class ArcaneCrafter(CraftingBench):
         # Move grid down by 7px
         start_y = bg_rect.bottom - (rows * slot_size + (rows - 1) * gap_size) - 30
 
-        font = pygame.font.SysFont(None, 20)
+        font = pygame.font.Font(font_path, 14)
         mouse_pos = pygame.mouse.get_pos()
 
         for slot_index in range(self.inventory.capacity):
@@ -636,7 +665,7 @@ class ArcaneCrafter(CraftingBench):
             pygame.draw.rect(screen, (200, 200, 220), rect, 3)
 
         # Draw items in enchant slots (no mechanics yet)
-        font = pygame.font.SysFont(None, 20)
+        font = pygame.font.Font(font_path, 14)
         mouse_pos = pygame.mouse.get_pos()
 
         slot_mapping = [

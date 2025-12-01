@@ -3,9 +3,11 @@ import random
 import math
 from world import *
 from sounds import *
-font = pygame.font.Font(None, 24)
-large_font = pygame.font.Font(None, 40)
-xl_font = pygame.font.Font(None, 100)
+from debug import font_path, font
+hud_font = pygame.font.Font(font_path, 14)
+font = pygame.font.Font(font_path, 18)
+large_font = pygame.font.Font(font_path, 28)
+xl_font = pygame.font.Font(font_path, 72)
 size = 64
 
 def draw_text_with_background(screen, text_surface, x, y, padding=4):
@@ -396,9 +398,9 @@ class Player(pygame.sprite.Sprite):
         return int(self.exp_total / 100) + int(dungeon_depth)
 
     def print_score(self, screen, dungeon_depth):
-        score_text = font.render(f"Score: {self.determine_score(dungeon_depth)}", True, (255, 255, 255))
+        score_text = hud_font.render(f"Score: {self.determine_score(dungeon_depth)}", True, (255, 255, 255))
         x = screen.get_width() - score_text.get_width() - 20
-        y = 20
+        y = 30
         temp_surface = pygame.Surface((score_text.get_width() + 10, score_text.get_height() + 10), pygame.SRCALPHA)
         temp_surface.fill((0, 0, 0, 100))
         screen.blit(temp_surface, (x - 5, y - 5))
@@ -432,22 +434,29 @@ class Player(pygame.sprite.Sprite):
             self.level_up_timer -= dt
 
     def level_up(self, screen):
+        lvl = self.level
         self.level += 1
         self.exp_total += self.next_level_exp
         if self.level > 0:
             self.next_level_exp += (self.next_level_exp * self.req_multiplier)
-            if self.level <= 20:
-                self.req_multiplier -= .022
-            elif self.level <= 40:
-                self.req_multiplier -= .0018
-            elif self.level <= 60:
-                self.req_multiplier -= .0008
-            elif self.level <= 80:
-                self.req_multiplier -= .00008
-            elif self.level < 100:
-                self.req_multiplier -= .00003
-            if self.level >= 100:
-                self.req_multiplier += 1
+            if lvl <= 10:
+                self.req_multiplier -= 0.034
+            elif lvl <= 20:
+                self.req_multiplier -= 0.012
+            elif lvl <= 30:
+                self.req_multiplier -= 0.0005
+            elif lvl <= 40:
+                self.req_multiplier -= 0.0004
+            elif lvl <= 50:
+                self.req_multiplier -= 0.00019
+            elif lvl <= 60:
+                self.req_multiplier -= 0.00009
+            elif lvl <= 70:
+                self.req_multiplier -= 0.00008
+            elif lvl <= 80:
+                self.req_multiplier -= 0.00007
+            elif lvl < 100:
+                self.req_multiplier -= 0.00003
         self.level_up_timer = 10
         self.unspent_stat_points += 1
         sound_manager.play_sound("level_up")
@@ -695,7 +704,8 @@ class Player(pygame.sprite.Sprite):
         pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=2, border_radius=5)
 
         health_text = f"{int(health)} / {max_health}"
-        text_surface = font.render(health_text, True, (255, 255, 255))
+        small_font = pygame.font.Font(font_path, 11)
+        text_surface = small_font.render(health_text, True, (255, 255, 255))
         if bar_width < 100:
             text_x = x + bar_width + 8
         else:
@@ -726,7 +736,8 @@ class Player(pygame.sprite.Sprite):
         pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=2, border_radius=5)
 
         stamina_text = f"{int(stamina)} / {max_stamina}"
-        text_surface = font.render(stamina_text, True, (255, 255, 255))
+        small_font = pygame.font.Font(font_path, 11)
+        text_surface = small_font.render(stamina_text, True, (255, 255, 255))
         if bar_width < 100:
             text_x = x + bar_width + 8
         else:
@@ -757,7 +768,8 @@ class Player(pygame.sprite.Sprite):
         pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=2, border_radius=5)
 
         hunger_text = f"{int(hunger)} / {max_hunger}"
-        text_surface = font.render(hunger_text, True, (255, 255, 255))
+        small_font = pygame.font.Font(font_path, 11)
+        text_surface = small_font.render(hunger_text, True, (255, 255, 255))
         if bar_width < 100:
             text_x = x + bar_width + 8
         else:
@@ -788,7 +800,8 @@ class Player(pygame.sprite.Sprite):
         pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=2, border_radius=5)
 
         thirst_text = f"{int(thirst)} / {max_thirst}"
-        text_surface = font.render(thirst_text, True, (255, 255, 255))
+        small_font = pygame.font.Font(font_path, 11)
+        text_surface = small_font.render(thirst_text, True, (255, 255, 255))
         if bar_width < 100:
             text_x = x + bar_width + 8
         else:
@@ -1193,19 +1206,33 @@ class Cat(Mob):
         self.poison_strength = 0
         self.poison_damage_timer = 0
         self.poison_damage_rate = 1.5
-        self.death_experience = 200  * (1 + (self.level * self.death_experience * .0001))
+        self.death_experience = int(200  * (1 + (self.level * 0.05)))
         self.level = 1
+        self.experience = 0
+        self.next_level_exp = 100
+        self.unspent_stat_points = 0
         self.tamed_boost = 1.1
         self.meat_resource = "Raw Small Meat"
         self.special_drops = [{'item': 'Fur', 'chance': 0.1, 'min': 1, 'max': 2}]
 
-        self.full_health = 100 + (random.randint(5, 7) * self.level) * self.tamed_boost
+        self.health_leveler = 1.0
+        self.attack_leveler = 1.0
+        self.speed_leveler = 1.0
+        self.defense_leveler = 1.0
+        self.hunger_leveler = 1.0
+
+        self.full_health = 100 + (random.randint(3, 7) * self.level) * self.tamed_boost * self.health_leveler
         self.health = self.full_health
         self.max_health = self.full_health
-        self.max_hunger = 100
-        self.hunger = 100
+        self.max_hunger = int(100 * self.hunger_leveler)
+        self.hunger = self.max_hunger
         self.base_speed = 160
-        self.speed = 1
+        # Speed is stored as a percentage-like stat for UI (100 = default),
+        # and converted to a movement multiplier for actual speed.
+        self.speed_stat = 100
+        self.speed = self.speed_stat / 100.0
+        self.attack = max(5, int(self.level * 4 * self.attack_leveler))
+        self.defense = max(5, int(self.level * 5 * self.defense_leveler))
 
         self.dead_cat_right_image = pygame.image.load(self.cat_type["dead_image"]).convert_alpha()
         self.dead_cat_left_image = pygame.transform.flip(self.dead_cat_right_image, True, False)
@@ -1309,8 +1336,8 @@ class Cat(Mob):
             health_increase = 15
         # Cooked meats - +10 tame, +20 health
         elif item_name in ["Cooked Fish", "Cooked Venison", "Cooked Lizard Meat", "Cooked Beef", "Cooked Chicken", "Cooked Small Meat", "Cooked Bear Meat"]:
-            tame_increase = 5
-            health_increase = 20
+            tame_increase = 15
+            health_increase = 15
         # Milk - +30 tame, +25 health
         elif item_name =="Small Milk":
             tame_increase = 30
@@ -1375,10 +1402,10 @@ class Cat(Mob):
     def draw_cat_name(self, screen, cam_x):
         """Draw the cat's name above its head if it has one."""
         if self.cat_name:
-            font = pygame.font.SysFont(None, 20)
+            font = pygame.font.Font(font_path, 12)
             name_text = font.render(str(self.cat_name) + " Lvl " + str(self.level), True, (255, 255, 200))
             text_x = self.rect.centerx - cam_x - name_text.get_width() // 2
-            text_y = self.rect.top + 5
+            text_y = self.rect.top - 10
             draw_text_with_background(screen, name_text, text_x, text_y)
         
     def draw(self, screen, cam_x):
@@ -1418,6 +1445,56 @@ class Cat(Mob):
             "cat_name": self.cat_name
         }
 
+    def level_up(self):
+        self.level += 1
+        self.unspent_stat_points += 1
+        self.next_level_exp = int(100 + (self.level * 120))
+        self.experience = 0
+
+    def apply_stat_upgrade(self, stat_key):
+        if self.unspent_stat_points <= 0:
+            return False
+
+        upgraded = False
+
+        if stat_key == "health":
+            # Flat +10 to max health per upgrade.
+            self.max_health += 10
+            self.health = min(self.health + 10, self.max_health)
+            upgraded = True
+        elif stat_key == "attack":
+            # Attack starts at 5 and gains +2 per upgrade.
+            if self.attack < 5:
+                self.attack = 5
+            self.attack += 2
+            upgraded = True
+        elif stat_key == "speed":
+            # Speed is shown as 100 by default in UI and
+            # increases by +5 per upgrade. Actual movement
+            # speed scales linearly from this stat.
+            if not hasattr(self, "speed_stat"):
+                self.speed_stat = int(self.speed * 100)
+            self.speed_stat += 5
+            self.speed = self.speed_stat / 100.0
+            upgraded = True
+        elif stat_key == "defense":
+            # Defense starts at 5 and gains +2 per upgrade.
+            if self.defense < 5:
+                self.defense = 5
+            self.defense += 2
+            upgraded = True
+        elif stat_key == "hunger":
+            # Hunger starts at 100 and gains +10 max per upgrade.
+            self.max_hunger += 10
+            self.hunger = min(self.hunger + 10, self.max_hunger)
+            upgraded = True
+
+        if not upgraded:
+            return False
+
+        self.unspent_stat_points -= 1
+        return True
+
 
 class Squirrel(Mob):
     def __init__(self, x, y, name):
@@ -1436,7 +1513,7 @@ class Squirrel(Mob):
         self.full_health = 50 + (random.randint(5, 7) * self.level)
         self.health = self.full_health
         self.level = 1
-        self.death_experience = 75 * (1 + (self.level * self.death_experience * .0001))
+        self.death_experience = int(75 * (1 + (self.level  * .001)))
         self.resource = "Hide"
         self.meat_resource = "Raw Small Meat"
         self.special_drops = [{'item': 'Fur', 'chance': 0.1, 'min': 1, 'max': 2}]
@@ -1491,7 +1568,7 @@ class Cow(Mob):
         self.resource = "Hide"
         self.resource_amount = 5
         self.cow = "moo"
-        self.death_experience = 100  * (1 + (self.level * self.death_experience * .0001))
+        self.death_experience = int(100  * (1 + (self.level * .001)))
         self.level = 1
 
         self.dead_cow_right_image = pygame.transform.scale(pygame.image.load(self.cow_type["dead_image"]).convert_alpha(), (size, size))
@@ -1527,7 +1604,7 @@ class Chicken(Mob):
         self.resource_amount = random.randint(3, 6)
         self.full_health = 80 + (random.randint(5, 7) * self.level)
         self.health = self.full_health
-        self.death_experience = 70  * (1 + (self.level * self.death_experience * .0001))
+        self.death_experience = int(70  * (1 + (self.level * .001)))
         self.level = 1
 
         self.frame_index = 0
@@ -1556,7 +1633,7 @@ class Enemy(Mob):
         self.special_drops = [{'item': 'Bone', 'chance': 0.3, 'min': 1, 'max': 3}]
         self.enemy = True
         self.attacking = False
-        self.death_experience = 500  * (1 + (self.level * self.death_experience * .0001))
+        self.death_experience = int(500  * (1 + (self.level * .0001)))
         self.level = 1
 
     def handle_player_proximity(self, dt, player_world_x, player_world_y, player=None, nearby_objects=None, nearby_mobs=None):
@@ -1665,7 +1742,7 @@ class Crawler(Enemy):
         self.health = self.full_health
         self.resource = "Hide"
         self.resource_amount = random.randint(4, 9)
-        self.death_experience = 500  * (1 + (self.level * self.death_experience * .0001))
+        self.death_experience = int(500  * (1 + (self.level * 0.05)))
         self.level = 1
 
     def attack(self, player_world_x, player_world_y, player):
@@ -1745,7 +1822,7 @@ class Duskwretch(Enemy):
         self.animation_speed = 0.1
         self.direction = pygame.Vector2(0, 0)
         self.move_timer = 0
-        self.death_experience = 1200  * (1 + (self.level * self.death_experience * .0001))
+        self.death_experience = int(1000  * (1 + (self.level * 0.05)))
         self.level = 1
 
         self.last_direction = "right" 
@@ -2013,7 +2090,7 @@ class Pock(Enemy):
         self.health = self.full_health
         self.resource = "Hide"
         self.resource_amount = random.randint(2, 5)
-        self.death_experience = 500  * (1 + (self.level * self.death_experience * .0001))
+        self.death_experience = int(500  * (1 + (self.level * 0.05)))
         self.level = 1
 
     def attack(self, player_world_x, player_world_y, player):
@@ -2104,12 +2181,12 @@ class Deer(AggressiveMob):
 
         if self.is_buck:
 
-            self.death_experience = 300  * (1 + (self.level * self.death_experience * .0001))
+            self.death_experience = int(300  * (1 + (self.level * 0.04)))
             self.aggressive = False
             self.enemy = False
         else:
 
-            self.death_experience = 150  * (1 + (self.level * self.death_experience * .0001))
+            self.death_experience = int(150  * (1 + (self.level * 0.001)))
             self.aggressive = False
             self.enemy = False
 
@@ -2278,7 +2355,7 @@ class BlackBear(AggressiveMob):
         self.meat_resource = "Raw Bear Meat"
         self.special_drops = [{'item': 'Fur', 'chance': 0.6, 'min': 2, 'max': 4}]
         self.resource_amount = 8
-        self.death_experience = 600  * (1 + (self.level * self.death_experience * .0001))
+        self.death_experience = int(600  * (1 + (self.level * 0.05)))
         self.level = 1
         
         self.frame_index = 0
@@ -2495,7 +2572,7 @@ class BrownBear(AggressiveMob):
         self.attack_timer = 0
         self.attack_duration = 30
         self.attack_damage = 15
-        self.death_experience = 800 * (1 + (self.level * self.death_experience * .0001))
+        self.death_experience = int(800 * (1 + (self.level * 0.05)))
         self.level = 1
         
         self.aggressive = False
@@ -2638,7 +2715,7 @@ class Gila(AggressiveMob):
         self.resource = "Gila Meat"
         self.special_drops = [{'item': 'Venom Sac', 'chance': 0.1, 'min': 1, 'max': 2}]
         self.resource_amount = 2
-        self.death_experience = 500  * (1 + (self.level * self.death_experience * .0001))
+        self.death_experience = int(200  * (1 + (self.level * 0.03)))
         self.level = 1
         
         self.frame_index = 0
@@ -2772,7 +2849,7 @@ class Crow(Mob):
         self.resource = "Feathers"
         self.special_drops = [{'item': 'Raw Small Meat', 'chance': 0.6, 'min': 2, 'max': 4}]
         self.resource_amount = 4
-        self.death_experience = 400 * (1 + (self.level * self.death_experience * .0001))
+        self.death_experience = int(100 * (1 + (self.level * 0.01)))
         self.level = 1
         
         self.frame_index = 0
@@ -2941,8 +3018,8 @@ class Dragon(Enemy):
         self.speed = 1
         self.full_health = 500 + (random.randint(20, 40) * self.level)
         self.health = self.full_health
-        self.resource = "Dragon Meat"
-        self.meat_resource = "Dragon Meat"
+        self.resource = "Monster Meat"
+        self.meat_resource = "Monster Meat"
         self.resource_amount = 5
         
         special_drops = [{'item': 'Dragon Scales', 'chance': 0.8, 'min': 2, 'max': 5}]
@@ -2951,8 +3028,7 @@ class Dragon(Enemy):
                 special_drops.append({'item': gem_data["gem"], 'chance': gem_data["chance"], 'min': 1, 'max': 2})
         self.special_drops = special_drops
         
-        self.death_experience = 2000 * (1 + (self.level * self.death_experience * .0001))
-        
+        self.death_experience = int(2000 * (1 + (self.level * 0.07)))
         self.frame_index = 0
         self.animation_speed = 0.2
         self.direction = pygame.Vector2(0, 0)
@@ -3032,7 +3108,7 @@ class Dragon(Enemy):
             pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=1, border_radius=2)
             self.bar_timer -= dt
         
-        level_font = pygame.font.SysFont(None, 16)
+        level_font = pygame.font.Font(font_path, 12)
         level_text = level_font.render(f"Lv{self.level}", True, (255, 255, 255))
         level_rect = level_text.get_rect(center=(int(self.rect.centerx - cam_x), int(y + 15)))
         draw_text_with_background(screen, level_text, level_rect.topleft[0], level_rect.topleft[1])
