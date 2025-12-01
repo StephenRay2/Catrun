@@ -730,7 +730,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["material", "animal_parts"],
+        "tags": ["material", "animal_parts", "Arcane Material"],
         "output_amount": 1
     },
     {
@@ -746,7 +746,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["material", "animal_parts"],
+        "tags": ["material", "animal_parts", "Arcane Material"],
         "output_amount": 1
     },
     {
@@ -874,7 +874,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["material", "animal_parts"],
+        "tags": ["material", "animal_parts", "Arcane Material"],
         "output_amount": 1
     },
     {
@@ -890,7 +890,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["gemstone"],
+        "tags": ["gemstone", "Arcane Material"],
         "output_amount": 1
     },
     {
@@ -906,7 +906,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["gemstone"],
+        "tags": ["gemstone", "Arcane Material"],
         "output_amount": 1
     },
     {
@@ -922,7 +922,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["gemstone"],
+        "tags": ["gemstone", "Arcane Material"],
         "output_amount": 1
     },
     {
@@ -938,7 +938,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["gemstone"],
+        "tags": ["gemstone", "Arcane Material"],
         "output_amount": 1
     },
     {
@@ -954,7 +954,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["gemstone"],
+        "tags": ["gemstone", "Arcane Material"],
         "output_amount": 1
     },
     {
@@ -970,7 +970,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["gemstone"],
+        "tags": ["gemstone", "Arcane Material"],
         "output_amount": 1
     },
     {
@@ -986,7 +986,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["gemstone"],
+        "tags": ["gemstone", "Arcane Material"],
         "output_amount": 1
     },
     {
@@ -1002,7 +1002,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["gemstone"],
+        "tags": ["gemstone", "Arcane Material"],
         "output_amount": 1
     },
     {
@@ -1018,7 +1018,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["gemstone"],
+        "tags": ["gemstone", "Arcane Material"],
         "output_amount": 1
     },
     {
@@ -1034,7 +1034,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["gemstone"],
+        "tags": ["gemstone", "Arcane Material"],
         "output_amount": 1
     },
     {
@@ -1130,7 +1130,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["herb", "potion_ingredient", "Fire Material"],
+        "tags": ["herb", "potion_ingredient", "Fire Material", "Arcane Material"],
         "output_amount": 1
     },
     {
@@ -1146,7 +1146,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["herb", "potion_ingredient"],
+        "tags": ["herb", "potion_ingredient", "Arcane Material"],
         "output_amount": 1
     },
 
@@ -1517,7 +1517,7 @@ items_list = [
         "placeable": True,
         "consumable": False,
         "durability": None,
-        "recipe": [{"item_tag": "Stone", "amount": 25}, {"item": "Fiber", "amount": 40}, {"item": "Hide", "amount": 10}, {"item": "Metal Ingot", "amount": 10}, {"item": "Gold Ingot", "amount": 10}],
+        "recipe": [{"item_tag": "Stone", "amount": 25}, {"item": "Fiber", "amount": 40}, {"item": "Hide", "amount": 10}, {"item": "Metal Ingot", "amount": 10}, {"item": "Gold Ingot", "amount": 10}, {"item_tag": "Arcane Material", "amount": 5}],
         "crafting_medium": "workbench",
         "tags": ["item"],
         "output_amount": 1
@@ -5032,7 +5032,7 @@ items_list = [
         "consumable": False,
         "durability": None,
         "recipe": [{"item_tag": "Fire Material", "amount": 2}, {"item": "Sealing Paste", "amount": 2}, {"item": "Twine", "amount": 1}, {"item": "Ceramic Pot", "amount": 1}],
-        "crafting_medium": "workbench",
+        "crafting_medium": "arcane_crafter",
         "tags": ["weapon", "explosive"],
         "output_amount": 1
     },
@@ -5048,7 +5048,7 @@ items_list = [
         "consumable": False,
         "durability": None,
         "recipe": [{"item_tag": "Ice Material", "amount": 2}, {"item": "Sealing Paste", "amount": 2}, {"item": "Twine", "amount": 1}, {"item": "Ceramic Pot", "amount": 1}],
-        "crafting_medium": "workbench",
+        "crafting_medium": "arcane_crafter",
         "tags": ["weapon", "explosive"],
         "output_amount": 1
     },
@@ -5065,7 +5065,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["egg", "dragon"],
+        "tags": ["egg", "dragon", "Arcane Material", "Fire Material"],
         "output_amount": 1
     },
     {
@@ -5081,7 +5081,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["dragon", "material", "scale", "Fire Material"],
+        "tags": ["dragon", "material", "scale", "Fire Material", "Arcane Material"],
         "output_amount": 1
     },
     {
@@ -5113,7 +5113,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["dragon", "material", "scale", "Ice Material"],
+        "tags": ["dragon", "material", "scale", "Ice Material", "Arcane Material"],
         "output_amount": 1
     },
     {
@@ -5129,7 +5129,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["material", "horn", "Fire Material"],
+        "tags": ["material", "horn", "Fire Material", "Arcane Material"],
         "output_amount": 1
     },
     {
@@ -5543,7 +5543,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["material", "feather", "Fire Material"],
+        "tags": ["material", "feather", "Fire Material", "Arcane Material"],
         "output_amount": 1
     },
     {
@@ -5559,7 +5559,7 @@ items_list = [
         "durability": None,
         "recipe": None,
         "crafting_medium": None,
-        "tags": ["dragon", "material", "scale"],
+        "tags": ["dragon", "material", "scale", "Arcane Material"],
         "output_amount": 1
     },
     {

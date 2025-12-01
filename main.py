@@ -6,6 +6,7 @@ from buttons import *
 from mob_placement import *
 from sounds import *
 from crafting_bench import CraftingBench
+from arcane_crafter import ArcaneCrafter
 from smelter import Smelter
 from campfire import Campfire
 from world import DroppedItem, dropped_items, Bank, banks
@@ -141,6 +142,8 @@ def place_player_below_tent():
 # Crafting bench variables
 crafting_bench = None
 crafting_bench_in_use = False
+arcane_crafter = None
+arcane_crafter_in_use = False
 smelter = None
 smelter_in_use = False
 campfire = None
@@ -1711,6 +1714,7 @@ while running:
             inventory.hotbar_slots = [None] * inventory.hotbar_size
 
             globals()['crafting_bench'] = CraftingBench(inventory)
+            globals()['arcane_crafter'] = ArcaneCrafter(inventory)
             globals()['smelter'] = Smelter(inventory)
             globals()['campfire'] = Campfire(inventory)
 
@@ -1720,6 +1724,7 @@ while running:
 
             inventory.state = "inventory"
             starter_items = [
+                "Arcane Crafter",
                 "Smelter",
                 "Workbench",
                 "Campfire",
@@ -1731,10 +1736,7 @@ while running:
             ]
             # Add 20 torches (will stack) plus other starter items
             torch_stack = ["Torch"] * 20
-            beef_stack = ["Raw Beef"] * 20
-            star_stack = ["Throwing Star"] * 20
-            knife_stack = ["Throwing Knife"] * 20
-            inventory.add(torch_stack + starter_items + beef_stack + star_stack + knife_stack)
+            inventory.add(torch_stack + starter_items)
             
             from world import gemstone_rocks, GemstoneRock
             gemstone_rocks.append(GemstoneRock(int(player_pos.x + cam_x + 100), int(player_pos.y + 50)))
@@ -1813,6 +1815,9 @@ while running:
                     if crafting_bench_in_use:
                         crafting_bench.close()
                         crafting_bench_in_use = False
+                    elif arcane_crafter_in_use:
+                        arcane_crafter.close()
+                        arcane_crafter_in_use = False
                     elif campfire_in_use:
                         campfire.close()
                         campfire_in_use = False
@@ -1963,7 +1968,13 @@ while running:
                     continue
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
-                ui_context_open = inventory_in_use or campfire_in_use or smelter_in_use or crafting_bench_in_use
+                ui_context_open = (
+                    inventory_in_use
+                    or campfire_in_use
+                    or smelter_in_use
+                    or crafting_bench_in_use
+                    or arcane_crafter_in_use
+                )
                 if ui_context_open:
                     mouse_pos = pygame.mouse.get_pos()
                     
@@ -1996,12 +2007,30 @@ while running:
                         if slot_index is not None:
                             if crafting_bench.open_drop_menu(slot_index, is_hotbar, mouse_pos):
                                 continue
+                    elif arcane_crafter_in_use:
+                        slot_index, slot_type = arcane_crafter.get_slot_at_mouse(mouse_pos, screen)
+                        if slot_index is not None:
+                            if slot_type in ["inventory", "hotbar"]:
+                                is_hotbar = (slot_type == "hotbar")
+                                if inventory.open_drop_menu(slot_index, is_hotbar, mouse_pos):
+                                    continue
+                            elif arcane_crafter.open_drop_menu(slot_index, slot_type, mouse_pos):
+                                continue
                     
                     inventory.close_drop_menu()
                     continue
 
             # Placement system - toggle placement mode with right-click
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3 and player.is_alive and not crafting_bench_in_use and not smelter_in_use and not campfire_in_use and not inventory_in_use:
+            if (
+                event.type == pygame.MOUSEBUTTONDOWN
+                and event.button == 3
+                and player.is_alive
+                and not crafting_bench_in_use
+                and not arcane_crafter_in_use
+                and not smelter_in_use
+                and not campfire_in_use
+                and not inventory_in_use
+            ):
                 if placement_mode:
                     # Cancel placement mode
                     cancel_placement()
@@ -2273,7 +2302,28 @@ while running:
                         else:
                             crafting_bench.cancel_drag()
 
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use:
+            # Arcane crafter drag handling (same as workbench for now)
+            if arcane_crafter_in_use:
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    mouse_pos = pygame.mouse.get_pos()
+                    slot_info = arcane_crafter.get_slot_at_mouse(mouse_pos, screen)
+                    slot_index, slot_type = slot_info
+                    if slot_index is not None:
+                        if arcane_crafter.dragging:
+                            arcane_crafter.end_drag(slot_info)
+                        else:
+                            arcane_crafter.start_drag(slot_info)
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    if arcane_crafter.dragging:
+                        mouse_pos = pygame.mouse.get_pos()
+                        slot_info = arcane_crafter.get_slot_at_mouse(mouse_pos, screen)
+                        slot_index, slot_type = slot_info
+                        if slot_index is not None:
+                            arcane_crafter.end_drag(slot_info)
+                        else:
+                            arcane_crafter.cancel_drag()
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not arcane_crafter_in_use:
                 mouse_pos = pygame.mouse.get_pos()
 
                 slot_index, is_hotbar = inventory.get_slot_at_mouse(mouse_pos, screen)
@@ -2319,12 +2369,17 @@ while running:
 
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+                scroll_target = None
                 if crafting_bench_in_use:
-                    mouse_pos = pygame.mouse.get_pos()
+                    scroll_target = crafting_bench
+                elif arcane_crafter_in_use:
+                    scroll_target = arcane_crafter
+
+                if scroll_target is not None:
                     if event.button == 4:
-                        crafting_bench.handle_mouse_scroll(1)
+                        scroll_target.handle_mouse_scroll(1)
                     else:
-                        crafting_bench.handle_mouse_scroll(-1)
+                        scroll_target.handle_mouse_scroll(-1)
                 else:
                     if event.button == 4:
                         inventory.selected_hotbar_slot = (inventory.selected_hotbar_slot - 1) % inventory.hotbar_size
@@ -2393,11 +2448,17 @@ while running:
                 if crafting_bench_in_use:
                     mouse_pos = pygame.mouse.get_pos()
                     crafting_bench.handle_mouse_click(mouse_pos, event.button, screen)
+                elif arcane_crafter_in_use:
+                    mouse_pos = pygame.mouse.get_pos()
+                    arcane_crafter.handle_mouse_click(mouse_pos, event.button, screen)
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
                 if crafting_bench_in_use:
                     crafting_bench.close()
                     crafting_bench_in_use = False
+                elif arcane_crafter_in_use:
+                    arcane_crafter.close()
+                    arcane_crafter_in_use = False
                 elif campfire_in_use:
                     campfire.close()
                     campfire_in_use = False
@@ -2434,7 +2495,32 @@ while running:
                                 crafting_bench_in_use = True
                                 break
                     
-                    if not crafting_bench_in_use:
+                    if not crafting_bench_in_use and not arcane_crafter_in_use:
+                        for structure in nearby_structures:
+                            if structure['item_name'] == 'Arcane Crafter':
+                                struct_collision = structure['rect']
+                                horizontal_dist = abs(struct_collision.centerx - player_world_x)
+                                vertical_dist = abs(struct_collision.centery - player_world_y)
+                                reach = 20
+                                horizontal_range = (struct_collision.width / 2) + reach
+                                vertical_range = (struct_collision.height / 2) + reach
+                                
+                                facing_object = False
+                                if player.last_direction == "right" and struct_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                    facing_object = True
+                                elif player.last_direction == "left" and struct_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                    facing_object = True
+                                elif player.last_direction == "up" and struct_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                    facing_object = True
+                                elif player.last_direction == "down" and struct_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                    facing_object = True
+                                
+                                if facing_object:
+                                    arcane_crafter.open((structure['x'], structure['y']))
+                                    arcane_crafter_in_use = True
+                                    break
+                    
+                    if not crafting_bench_in_use and not arcane_crafter_in_use:
                         for structure in nearby_structures:
                             if structure['item_name'] == 'Smelter':
                                 struct_collision = structure['rect']
@@ -4109,7 +4195,7 @@ while running:
             screen.blit(full_text, (x, y))
             inventory.inventory_full_message_timer -= dt
 
-        if inventory_in_use or campfire_in_use or smelter_in_use or crafting_bench_in_use:
+        if inventory_in_use or campfire_in_use or smelter_in_use or crafting_bench_in_use or arcane_crafter_in_use:
             inventory.begin_hover_pass()
         else:
             inventory.clear_hover_state()
@@ -4204,9 +4290,15 @@ while running:
                 inventory.draw_drop_menu(screen)
                 inventory.draw_dragged_item(screen)
 
+        if arcane_crafter_in_use:
+            arcane_crafter.draw(screen)
+            if inventory.drop_menu_active:
+                inventory.draw_drop_menu(screen)
+                inventory.draw_dragged_item(screen)
+
         inventory.draw_hover_tooltip(screen)
 
-        if not paused and not inventory_in_use and naming_cat is None and not crafting_bench_in_use:
+        if not paused and not inventory_in_use and naming_cat is None and not crafting_bench_in_use and not arcane_crafter_in_use:
             if keys[pygame.K_o]:
                 dungeon_depth -= 500
                 absolute_cam_x -= 500

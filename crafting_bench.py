@@ -623,7 +623,7 @@ class CraftingBench:
         recipe_start_y = bg_y + 290
         slot_size = 64
         gap_size = 4
-        columns = 6
+        columns = self.recipe_columns
         mouse_pos = pygame.mouse.get_pos()
 
         for i, recipe in enumerate(self.recipes[self.scroll_offset * columns:]):
@@ -659,6 +659,39 @@ class CraftingBench:
                     (x, y, slot_size, slot_size),
                     recipe=recipe.get("recipe")
                 )
+
+        # Draw a scrollbar to indicate that the list is scrollable when needed
+        total_rows = (len(self.recipes) + columns - 1) // columns
+        max_scroll = max(0, total_rows - self.recipe_rows_visible)
+        if total_rows > self.recipe_rows_visible:
+            track_x = recipe_start_x + columns * (slot_size + gap_size) + 10
+            track_y = recipe_start_y
+            track_width = 10
+            track_height = self.recipe_rows_visible * (slot_size + gap_size - 3)
+
+            pygame.draw.rect(
+                screen,
+                (50, 50, 70),
+                (track_x, track_y, track_width, track_height),
+                border_radius=3,
+            )
+
+            visible_ratio = self.recipe_rows_visible / float(total_rows)
+            thumb_height = max(20, int(track_height * visible_ratio))
+
+            if max_scroll > 0:
+                scroll_ratio = self.scroll_offset / float(max_scroll)
+            else:
+                scroll_ratio = 0.0
+
+            thumb_y = track_y + int((track_height - thumb_height) * scroll_ratio)
+
+            pygame.draw.rect(
+                screen,
+                (180, 180, 210),
+                (track_x + 1, thumb_y, track_width - 2, thumb_height),
+                border_radius=3,
+            )
     
     def _draw_recipe_description(self, screen, bg_x, bg_y):
         if self.selected_recipe is None or self.selected_recipe >= len(self.recipes):
