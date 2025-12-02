@@ -186,6 +186,32 @@ ashhound_move_attack_left_images = ["assets/sprites/mobs/AshhoundLeftMoveAttack1
 ashhound_dead_image_left = pygame.image.load("assets/sprites/mobs/AshhoundLeftDead.png").convert_alpha()
 ashhound_dead_image_right = pygame.transform.flip(ashhound_dead_image_left, True, False)
 
+# Wastedog variants (left-facing source frames only; we flip to get right-facing)
+wastedog_variant_prefixes = {
+    "black": "BlackWastedogLeft",
+    "red": "RedWastedogLeft",
+    "yellow": "YellowWastedogLeft",
+}
+
+def _build_wastedog_variant(prefix):
+    def paths(kind, count):
+        return [f"assets/sprites/mobs/{prefix}{kind}{i}.png" for i in range(1, count + 1)]
+    return {
+        "idle": paths("Idle", 3),
+        "move": paths("Move", 4),
+        "move_attack": paths("MoveAttack", 4),
+        "attack": paths("Attack", 3),
+    }
+
+wastedog_variant_frames = {k: _build_wastedog_variant(v) for k, v in wastedog_variant_prefixes.items()}
+
+wolf_idle_left_images = [f"assets/sprites/mobs/WolfLeftIdle{i}.png" for i in range(1, 4)]
+wolf_walk_left_images = [f"assets/sprites/mobs/WolfLeftWalk{i}.png" for i in range(1, 5)]
+wolf_run_left_images = [f"assets/sprites/mobs/WolfLeftRun{i}.png" for i in range(1, 5)]
+wolf_run_attack_left_images = [f"assets/sprites/mobs/WolfLeftRunAttack{i}.png" for i in range(1, 5)]
+wolf_attack_left_images = [f"assets/sprites/mobs/WolfLeftAttack{i}.png" for i in range(1, 4)]
+wolf_dead_left_image = "assets/sprites/mobs/WolfLeftDead.png"
+
 glowbird_walk_left_images = ["assets/sprites/mobs/GlowbirdWalkLeft1.png", "assets/sprites/mobs/GlowbirdWalkLeft2.png", "assets/sprites/mobs/GlowbirdWalkLeft3.png", "assets/sprites/mobs/GlowbirdWalkLeft4.png", "assets/sprites/mobs/GlowbirdWalkLeft5.png"]
 glowbird_fly_left_images = ["assets/sprites/mobs/GlowbirdFlyLeft1.png", "assets/sprites/mobs/GlowbirdFlyLeft2.png", "assets/sprites/mobs/GlowbirdFlyLeft3.png", "assets/sprites/mobs/GlowbirdFlyLeft4.png"]
 glowbird_start_fly_left_images = ["assets/sprites/mobs/GlowbirdStartFlyLeft1.png", "assets/sprites/mobs/GlowbirdStartFlyLeft2.png", "assets/sprites/mobs/GlowbirdStartFlyLeft3.png", "assets/sprites/mobs/GlowbirdStartFlyLeft4.png", "assets/sprites/mobs/GlowbirdStartFlyLeft5.png", "assets/sprites/mobs/GlowbirdStartFlyLeft6.png"]
@@ -2106,6 +2132,340 @@ class Ashhound(Enemy):
         if not self.is_alive:
             self.direction.xy = (0, 0)
             self.image = ashhound_dead_image_right if self.last_direction == "right" else ashhound_dead_image_left
+
+
+class Wastedog(Enemy):
+    def __init__(self, x, y, name):
+        super().__init__(x, y, name)
+        self.name = name
+        variant_key, variant_frames = random.choice(list(wastedog_variant_frames.items()))
+        self.walk_left_images = [pygame.image.load(p).convert_alpha() for p in variant_frames["move"]]
+        self.stand_left_images = [pygame.image.load(p).convert_alpha() for p in variant_frames["idle"]]
+        # Prefer dedicated standing attack frames; fall back to move_attack if missing.
+        attack_source = variant_frames.get("attack") or variant_frames["move_attack"]
+        self.attack_left_images = [pygame.image.load(p).convert_alpha() for p in attack_source]
+        self.move_attack_left_images = [pygame.image.load(p).convert_alpha() for p in variant_frames["move_attack"]]
+
+        self.walk_right_images = [pygame.transform.flip(img, True, False) for img in self.walk_left_images]
+        self.stand_right_images = [pygame.transform.flip(img, True, False) for img in self.stand_left_images]
+        self.attack_right_images = [pygame.transform.flip(img, True, False) for img in self.attack_left_images]
+        self.move_attack_right_images = [pygame.transform.flip(img, True, False) for img in self.move_attack_left_images]
+
+        self.image = self.stand_right_images[0]
+        self.rect = self.image.get_rect(center=(x, y))
+
+        self.frame_index = 0
+        self.animation_speed = 0.2
+        self.direction = pygame.Vector2(0, 0)
+        self.move_timer = 0
+
+        self.last_direction = "right"
+        self.attacking = False
+        self.attack_timer = 0
+        self.attack_duration = 22
+
+        self.attack_damage = 6
+        self.base_speed = 170
+        self.speed = 1
+        self.full_health = 220 + (random.randint(10, 16) * self.level)
+        self.health = self.full_health
+        self.resource = "Monster Meat"
+        self.resource_amount = random.randint(3, 6)
+        self.death_experience = int(700 * (1 + (self.level * 0.04)))
+        self.level = 1
+
+    def get_collision_rect(self, cam_x):
+        rect = self.rect
+        return pygame.Rect(rect.x - cam_x + 8, rect.y + 32, rect.width - 16, rect.height - 40)
+
+    def attack(self, player_world_x, player_world_y, player):
+        dx = player_world_x - self.rect.centerx
+        dy = player_world_y - self.rect.centery
+        distance_sq = dx * dx + dy * dy
+        if self.chasing:
+            self.speed = 2.2
+        else:
+            self.speed = 1
+
+        if self.is_alive and (self.health / self.full_health) < 0.15:
+            if not self.fleeing:
+                self.fleeing = True
+                self.flee_timer = 8
+            self.attacking = False
+            return
+
+        if self.fleeing:
+            self.attacking = False
+            return
+
+        if self.is_alive and distance_sq < (60 * 60):
+            if not self.attacking:
+                self.attacking = True
+                self.attack_timer = self.attack_duration
+                self.frame_index = 0.0
+
+        if self.attacking:
+            frames = self.attack_right_images if self.last_direction == "right" else self.attack_left_images
+            self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+            self.image = frames[int(self.frame_index)]
+
+            self.attack_timer -= 1
+
+            if self.attack_timer == self.attack_duration // 2 and distance_sq < (60 * 60):
+                player.health -= self.attack_damage
+                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+
+            if self.attack_timer <= 0:
+                self.attacking = False
+                self.frame_index = 0.0
+                self.image = (self.stand_right_images[0] if self.last_direction == "right"
+                            else self.stand_left_images[0])
+
+    def animate_walk(self, animation_speed_multiplier=1.0):
+        if self.direction.x > 0:
+            self.last_direction = "right"
+        elif self.direction.x < 0:
+            self.last_direction = "left"
+        if getattr(self, "chasing", False):
+            frames = self.move_attack_right_images if self.last_direction == "right" else self.move_attack_left_images
+        else:
+            frames = self.walk_right_images if self.last_direction == "right" else self.walk_left_images
+        effective_animation_speed = self.animation_speed * animation_speed_multiplier
+        self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
+        self.image = frames[int(self.frame_index)]
+
+    def animate_stand(self, animation_speed_multiplier=1.0):
+        frames = self.stand_right_images if self.last_direction == "right" else self.stand_left_images
+        effective_animation_speed = self.animation_speed * animation_speed_multiplier * 0.5
+        self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
+        self.image = frames[int(self.frame_index)]
+
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
+        super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
+
+        if not self.is_alive:
+            self.direction.xy = (0, 0)
+            self.image = self.stand_right_images[0] if self.last_direction == "right" else self.stand_left_images[0]
+
+
+class Wolf(Enemy):
+    pack_targets = {}
+
+    def __init__(self, x, y, name, pack_id=None):
+        super().__init__(x, y, name)
+        self.name = name
+        self.walk_left_images = [pygame.image.load(p).convert_alpha() for p in wolf_walk_left_images]
+        self.run_left_images = [pygame.image.load(p).convert_alpha() for p in wolf_run_left_images]
+        self.attack_left_images = [pygame.image.load(p).convert_alpha() for p in wolf_attack_left_images]
+        self.run_attack_left_images = [pygame.image.load(p).convert_alpha() for p in wolf_run_attack_left_images]
+        self.stand_left_images = [pygame.image.load(p).convert_alpha() for p in wolf_idle_left_images]
+        self.dead_image_left = pygame.image.load(wolf_dead_left_image).convert_alpha()
+
+        self.walk_right_images = [pygame.transform.flip(img, True, False) for img in self.walk_left_images]
+        self.run_right_images = [pygame.transform.flip(img, True, False) for img in self.run_left_images]
+        self.attack_right_images = [pygame.transform.flip(img, True, False) for img in self.attack_left_images]
+        self.run_attack_right_images = [pygame.transform.flip(img, True, False) for img in self.run_attack_left_images]
+        self.stand_right_images = [pygame.transform.flip(img, True, False) for img in self.stand_left_images]
+        self.dead_image_right = pygame.transform.flip(self.dead_image_left, True, False)
+
+        self.image = self.stand_right_images[0]
+        self.rect = self.image.get_rect(center=(x, y))
+
+        self.frame_index = 0
+        self.animation_speed = 0.25
+        self.direction = pygame.Vector2(0, 0)
+        self.move_timer = 0
+
+        self.last_direction = "right"
+        self.attacking = False
+        self.attack_timer = 0
+        self.attack_duration = 22
+
+        self.attack_damage = 7
+        self.base_speed = 180
+        self.speed = 1
+        self.full_health = 180 + (random.randint(8, 14) * self.level)
+        self.health = self.full_health
+        self.resource = "Raw Small Meat"
+        self.resource_amount = random.randint(2, 4)
+        self.death_experience = int(600 * (1 + (self.level * 0.04)))
+        self.level = 1
+        self.pack_id = pack_id if pack_id is not None else random.randint(1, 10_000_000)
+        self.prey_target = None
+
+    def get_collision_rect(self, cam_x):
+        rect = self.rect
+        return pygame.Rect(rect.x - cam_x + 6, rect.y + 30, rect.width - 12, rect.height - 36)
+
+    def _valid_target(self, target):
+        if target is None:
+            return False
+        if getattr(target, "destroyed", False):
+            return False
+        if hasattr(target, "is_alive") and not getattr(target, "is_alive", True):
+            return False
+        return True
+
+    def _is_enemy(self, obj):
+        return getattr(obj, "enemy", False)
+
+    def _choose_target(self, player_world_x, player_world_y, player, nearby_mobs):
+        # Wolves prefer nearby non-enemy mobs; fall back to player.
+        candidates = []
+        for mob in nearby_mobs or []:
+            if mob is self or isinstance(mob, Wolf):
+                continue
+            if getattr(mob, "destroyed", False):
+                continue
+            if self._is_enemy(mob):
+                continue
+            dx = mob.rect.centerx - self.rect.centerx
+            dy = mob.rect.centery - self.rect.centery
+            dist_sq = dx * dx + dy * dy
+            candidates.append((mob.rect.centerx, mob.rect.centery, mob, dist_sq))
+
+        if candidates:
+            target = min(candidates, key=lambda c: c[3])
+            return target[0], target[1], target[2]
+
+        # Default to player
+        return player_world_x, player_world_y, player
+
+    def attack(self, target_x, target_y, target):
+        dx = target_x - self.rect.centerx
+        dy = target_y - self.rect.centery
+        distance_sq = dx * dx + dy * dy
+        if self.chasing:
+            self.speed = 2.2
+        else:
+            self.speed = 1
+
+        if self.is_alive and (self.health / self.full_health) < 0.15:
+            if not self.fleeing:
+                self.fleeing = True
+                self.flee_timer = 8
+            self.attacking = False
+            return
+
+        if self.fleeing:
+            self.attacking = False
+            return
+
+        if self.is_alive and distance_sq < (60 * 60):
+            if not self.attacking:
+                self.attacking = True
+                self.attack_timer = self.attack_duration
+                self.frame_index = 0.0
+
+        if self.attacking:
+            frames = self.run_attack_right_images if self.last_direction == "right" else self.run_attack_left_images
+            self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+            self.image = frames[int(self.frame_index)]
+
+            self.attack_timer -= 1
+
+            if self.attack_timer == self.attack_duration // 2 and distance_sq < (60 * 60):
+                if hasattr(target, "health"):
+                    target.health = max(0, target.health - self.attack_damage)
+                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+
+            if self.attack_timer <= 0:
+                self.attacking = False
+                self.frame_index = 0.0
+                self.image = (self.stand_right_images[0] if self.last_direction == "right"
+                            else self.stand_left_images[0])
+
+    def animate_walk(self, animation_speed_multiplier=1.0):
+        if self.direction.x > 0:
+            self.last_direction = "right"
+        elif self.direction.x < 0:
+            self.last_direction = "left"
+        frames = self.run_right_images if getattr(self, "chasing", False) else self.walk_right_images
+        frames = frames if self.last_direction == "right" else (self.run_left_images if getattr(self, "chasing", False) else self.walk_left_images)
+        effective_animation_speed = self.animation_speed * animation_speed_multiplier
+        self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
+        self.image = frames[int(self.frame_index)]
+
+    def animate_stand(self, animation_speed_multiplier=1.0):
+        frames = self.stand_right_images if self.last_direction == "right" else self.stand_left_images
+        effective_animation_speed = self.animation_speed * animation_speed_multiplier * 0.5
+        self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
+        self.image = frames[int(self.frame_index)]
+
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
+        # Acquire or share pack target
+        current_pack_target = Wolf.pack_targets.get(self.pack_id)
+        if not self._valid_target(current_pack_target):
+            Wolf.pack_targets.pop(self.pack_id, None)
+            current_pack_target = None
+
+        packmates = [m for m in (nearby_mobs or []) if isinstance(m, Wolf) and m.pack_id == self.pack_id and m is not self]
+
+        player_world_x = getattr(player, "world_x", player.rect.centerx if player else self.rect.centerx)
+        player_world_y = getattr(player, "world_y", player.rect.centery if player else self.rect.centery)
+
+        if current_pack_target and self._valid_target(current_pack_target):
+            target_obj = current_pack_target
+            target_x, target_y = target_obj.rect.centerx, target_obj.rect.centery
+        else:
+            target_x, target_y, target_obj = self._choose_target(
+                player_world_x,
+                player_world_y,
+                player,
+                nearby_mobs,
+            )
+            if self._valid_target(target_obj):
+                Wolf.pack_targets[self.pack_id] = target_obj
+
+        # Cohesion: stay near pack center
+        coh_vector = pygame.Vector2(0, 0)
+        if packmates:
+            center_x = sum(m.rect.centerx for m in packmates + [self]) / (len(packmates) + 1)
+            center_y = sum(m.rect.centery for m in packmates + [self]) / (len(packmates) + 1)
+            coh_vector = pygame.Vector2(center_x - self.rect.centerx, center_y - self.rect.centery)
+            if coh_vector.length_squared() > 0:
+                coh_vector = coh_vector.normalize()
+
+        # Set chasing based on target distance
+        dx = target_x - self.rect.centerx
+        dy = target_y - self.rect.centery
+        distance_sq = dx * dx + dy * dy
+        self.chasing = distance_sq < (500 * 500)
+        if self.chasing and not self.fleeing:
+            target_vec = pygame.Vector2(dx, dy)
+            if target_vec.length_squared() > 0:
+                target_vec = target_vec.normalize()
+            # Blend target pursuit with pack cohesion to keep wolves together
+            direction = (target_vec * 0.7) + (coh_vector * 0.3)
+            if direction.length_squared() > 0:
+                direction = direction.normalize()
+            self.direction = direction
+        else:
+            super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
+            return
+
+        # Move toward target
+        if self.direction.length_squared() > 0:
+            can_move_x, can_move_y = self.check_collision(self.direction, nearby_objects or [], nearby_mobs or [])
+            actual_speed = self.get_speed() * dt
+            movement = self.direction * actual_speed
+            new_x = self.rect.x + movement.x if can_move_x else self.rect.x
+            new_y = self.rect.y + movement.y if can_move_y else self.rect.y
+            self.rect.topleft = (new_x, new_y)
+            if movement.x > 0:
+                self.last_direction = "right"
+            elif movement.x < 0:
+                self.last_direction = "left"
+            self.animate_walk()
+        else:
+            self.animate_stand()
+
+        # Attack if close
+        self.attack(target_x, target_y, target_obj)
+
+        if not self.is_alive:
+            self.direction.xy = (0, 0)
+            self.image = self.dead_image_right if self.last_direction == "right" else self.dead_image_left
 
 class Duskwretch(Enemy):
     def __init__(self, x, y, name):
