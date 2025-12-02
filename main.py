@@ -1070,6 +1070,8 @@ def world_rect_collides(collision_rect):
         chickens,
         crawlers,
         ashhounds,
+        wastedogs,
+        wolves,
         pocks,
         deers,
         black_bears,
@@ -1092,6 +1094,8 @@ def world_rect_collides(collision_rect):
         + chickens
         + crawlers
         + ashhounds
+        + wastedogs
+        + wolves
         + pocks
         + deers
         + black_bears
@@ -1630,6 +1634,8 @@ while running:
             chickens.clear()
             crawlers.clear()
             ashhounds.clear()
+            wastedogs.clear()
+            wolves.clear()
             pocks.clear()
             deers.clear()
             black_bears.clear()
@@ -1680,6 +1686,20 @@ while running:
                     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                     y = random.randint(0, height - 64)
                     ashhounds.append(Ashhound(x, y, "Ashhound"))
+
+            for _ in range(num_wastedogs):
+                if weighted_wastedog_tiles:
+                    tile_x, tile_image = random.choice(weighted_wastedog_tiles)
+                    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    y = random.randint(0, height - 64)
+                    wastedogs.append(Wastedog(x, y, "Wastedog"))
+
+            for _ in range(num_wolves):
+                if weighted_wolf_tiles:
+                    tile_x, tile_image = random.choice(weighted_wolf_tiles)
+                    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    y = random.randint(0, height - 64)
+                    wolves.append(Wolf(x, y, "Wolf"))
 
             for _ in range(num_pocks):
                 tile_x, tile_image = random.choice(weighted_pock_tiles)
@@ -3150,7 +3170,7 @@ while running:
                 
                 collision_detected = False
                 collision_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants + ponds + lavas + banks
-                collision_mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + pocks + deers + black_bears + brown_bears + gilas + crows + glowbirds + duskwretches
+                collision_mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + wastedogs + wolves + pocks + deers + black_bears + brown_bears + gilas + crows + glowbirds + duskwretches
                 
                 for obj in collision_objects:
                     obj_rect = obj.get_collision_rect(0) if hasattr(obj, 'get_collision_rect') else obj.rect
@@ -3246,6 +3266,8 @@ while running:
         chickens[:] = [chicken for chicken in chickens if not chicken.destroyed]
         crawlers[:] = [crawler for crawler in crawlers if not crawler.destroyed]
         ashhounds[:] = [ashhound for ashhound in ashhounds if not ashhound.destroyed]
+        wastedogs[:] = [wastedog for wastedog in wastedogs if not wastedog.destroyed]
+        wolves[:] = [wolf for wolf in wolves if not wolf.destroyed]
         duskwretches[:] = [duskwretch for duskwretch in duskwretches if not duskwretch.destroyed]
         pocks[:] = [pock for pock in pocks if not pock.destroyed]
         deers[:] = [deer for deer in deers if not deer.destroyed]
@@ -3283,7 +3305,7 @@ while running:
         collectibles = sticks + stones + grasses + savannah_grasses + mushrooms + dropped_items + marsh_reeds
         all_objects_no_liquids = rocks + trees + boulders + gemstone_rocks + metal_ore_rocks + metal_vein_rocks + gold_ore_rocks + gold_vein_rocks + berry_bushes + dead_bushes + ferns + fruit_plants + banks
         all_objects = all_objects_no_liquids + ponds + lavas
-        mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + duskwretches + pocks + deers + black_bears + brown_bears + gilas + crows + glowbirds + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
+        mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + wastedogs + wolves + duskwretches + pocks + deers + black_bears + brown_bears + gilas + crows + glowbirds + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
         all_mobs = mobs
 
         visibility_cam_x = sleeping_tent_x if (sleeping_in_tent or tent_hide_active) else cam_x

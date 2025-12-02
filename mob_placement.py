@@ -9,6 +9,8 @@ num_cows = 50
 num_chickens = 50
 num_crows = 75
 num_ashhounds = 40
+num_wastedogs = 40
+num_wolves = 60
 num_glowbirds = 75
 num_gilas = 50
 num_black_bears = 50
@@ -220,6 +222,81 @@ for _ in range(num_ashhounds):
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
         ashhounds.append(Ashhound(x, y, "Ashhound"))
+
+
+allowed_wastedog_tiles = [bg_wasteland]
+
+wastedog_spawn_weights = {
+    bg_grass: 0,
+    bg_dirt: 0,
+    bg_compact: 0,
+    bg_sand: 0,
+    bg_savannah: 0,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 0,
+    bg_lavastone: 0,
+    bg_snow: 0,
+    bg_wasteland: 6,
+    bg_blackstone: 0,
+    bg_redrock: 0
+}
+
+weighted_wastedog_tiles = []
+for tile_x, tile_image in tiles:
+    weight = wastedog_spawn_weights.get(tile_image, 0)
+    weighted_wastedog_tiles.extend([(tile_x, tile_image)] * weight)
+
+wastedogs = []
+for _ in range(num_wastedogs):
+    if weighted_wastedog_tiles:
+        tile_x, tile_image = random.choice(weighted_wastedog_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        wastedogs.append(Wastedog(x, y, "Wastedog"))
+
+allowed_wolf_tiles = [bg_grass, bg_dirt]
+
+wolf_spawn_weights = {
+    bg_grass: 4,
+    bg_dirt: 4,
+    bg_compact: 0,
+    bg_sand: 0,
+    bg_savannah: 0,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 0,
+    bg_lavastone: 0,
+    bg_snow: 0,
+    bg_wasteland: 0,
+    bg_blackstone: 0,
+    bg_redrock: 0
+}
+
+weighted_wolf_tiles = []
+for tile_x, tile_image in tiles:
+    weight = wolf_spawn_weights.get(tile_image, 0)
+    weighted_wolf_tiles.extend([(tile_x, tile_image)] * weight)
+
+wolves = []
+# Spawn wolves in packs of 3–6
+pack_sizes = []
+remaining_wolves = num_wolves
+while remaining_wolves > 0:
+    pack_size = random.randint(3, 6)
+    if pack_size > remaining_wolves:
+        pack_size = remaining_wolves
+    pack_sizes.append(pack_size)
+    remaining_wolves -= pack_size
+
+for pack_id, size in enumerate(pack_sizes):
+    if not weighted_wolf_tiles:
+        break
+    tile_x, tile_image = random.choice(weighted_wolf_tiles)
+    for _ in range(size):
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        wolves.append(Wolf(x, y, "Wolf", pack_id=pack_id + 1))
 
 
 allowed_duskwretch_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_snow, bg_wasteland]
