@@ -679,6 +679,7 @@ def build_cat_from_item(cat_data, x, y):
     cat.cat_name = cat_data.get("cat_name")
     cat.tame = cat_data.get("cat_tame", cat.tame)
     cat.tamed = True
+    cat._apply_tame_speed()
     # Recreated cats are already tamed companions, so let them
     # use their custom follow/attack movement logic.
     cat.disable_autonomous_movement = True
@@ -1697,9 +1698,14 @@ while running:
             for _ in range(num_wolves):
                 if weighted_wolf_tiles:
                     tile_x, tile_image = random.choice(weighted_wolf_tiles)
-                    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-                    y = random.randint(0, height - 64)
-                    wolves.append(Wolf(x, y, "Wolf"))
+                    attempts = 0
+                    while attempts < 10:
+                        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                        y = random.randint(0, height - 64)
+                        if not is_in_spawn_protection(x, y):
+                            wolves.append(Wolf(x, y, "Wolf"))
+                            break
+                        attempts += 1
 
             for _ in range(num_pocks):
                 tile_x, tile_image = random.choice(weighted_pock_tiles)

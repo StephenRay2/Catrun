@@ -333,6 +333,10 @@ class Player(pygame.sprite.Sprite):
         self.is_attacking = False
         self.direction = pygame.Vector2(0, 0)
         self.step_sound = random.choice(grass_steps)
+        # Spawn protection: remember the starting location to avoid instant spawn kills.
+        self.spawn_protection_center = pygame.Vector2(x, y)
+        self.spawn_protection_radius = 900
+        self.spawn_protection_radius_sq = self.spawn_protection_radius * self.spawn_protection_radius
 
         self.exhausted = False
         self.dead = False
@@ -348,6 +352,11 @@ class Player(pygame.sprite.Sprite):
         self.lava_damage_rate = 40  # damage per second in lava
         self.lava_damage_timer = 0
         self.current_liquid = None
+
+    def is_in_spawn_protection(self):
+        dx = self.rect.centerx - self.spawn_protection_center.x
+        dy = self.rect.centery - self.spawn_protection_center.y
+        return (dx * dx + dy * dy) < self.spawn_protection_radius_sq
 
     def status_effects(self, dt):
         if self.poison == True:
@@ -1338,9 +1347,11 @@ class Cat(Mob):
         self.max_health = self.full_health
         self.max_hunger = int(100 * self.hunger_leveler)
         self.hunger = self.max_hunger
-        # Match or exceed the player's base speed so cats can keep up,
-        # even when the player is sprinting.
-        self.base_speed = 275
+        # Wild cats move slower; once tamed, bump their base speed to keep up
+        # with the player, even when sprinting.
+        self.untamed_base_speed = 150
+        self.tamed_base_speed = 275
+        self.base_speed = self.untamed_base_speed
         # Speed is stored as a percentage-like stat for UI (100 = default),
         # and converted to a movement multiplier for actual speed.
         self.speed_stat = 100
@@ -1379,6 +1390,10 @@ class Cat(Mob):
         # to catch up. Smaller radius keeps cats closer.
         self.follow_radius = 140
         self.target_enemy = None  # Enemy cat is attacking
+
+    def _apply_tame_speed(self):
+        """Update base speed based on whether the cat is tamed."""
+        self.base_speed = self.tamed_base_speed if self.tamed else self.untamed_base_speed
 
     def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
         # Timers
@@ -1590,6 +1605,7 @@ class Cat(Mob):
             if self.tame >= self.tame_max and not self.tamed:
                 self.tamed = True
                 self.just_tamed = True
+                self._apply_tame_speed()
                 # Once tamed, let Cat handle its own follow/attack movement
                 # instead of random wandering in the base Mob.update.
                 self.disable_autonomous_movement = True
@@ -2047,7 +2063,7 @@ class Ashhound(Enemy):
         self.last_direction = "right"
         self.attacking = False
         self.attack_timer = 0
-        self.attack_duration = 22
+        self.attack_duration = 30
 
         self.attack_damage = 6
         self.base_speed = 170
@@ -2085,6 +2101,9 @@ class Ashhound(Enemy):
             return
 
         if self.is_alive and distance_sq < (60 * 60):
+            if isinstance(target, Player) and hasattr(target, "is_in_spawn_protection") and target.is_in_spawn_protection():
+                self.attacking = False
+                return
             if not self.attacking:
                 self.attacking = True
                 self.attack_timer = self.attack_duration
@@ -2282,7 +2301,7 @@ class Wolf(Enemy):
         self.attack_duration = 22
 
         self.attack_damage = 7
-        self.base_speed = 180
+        self.base_speed = 150
         self.speed = 1
         self.full_health = 180 + (random.randint(8, 14) * self.level)
         self.health = self.full_health
@@ -2331,12 +2350,36 @@ class Wolf(Enemy):
         # Default to player
         return player_world_x, player_world_y, player
 
-    def attack(self, target_x, target_y, target):
+    def _attack_volume_scale(self, listener_pos):
+        """Scale attack sound based on how far the listener (player) is; keep a stronger floor for audibility."""
+        if not listener_pos:
+            return 1.0
+        listener_x, listener_y = listener_pos
+        dist = math.hypot(listener_x - self.rect.centerx, listener_y - self.rect.centery)
+        falloff_start = 120
+        falloff_end = 700
+        if dist <= falloff_start:
+            return 1.0
+        attenuation = 1.0 - (dist - falloff_start) / max(1.0, (falloff_end - falloff_start))
+        return max(0.6, min(1.0, attenuation))
+
+    def _target_is_moving(self, target):
+        """Determine if the target is currently moving (used for animation choice)."""
+        if target is None:
+            return False
+        if hasattr(target, "direction"):
+            try:
+                return target.direction.length_squared() > 0
+            except Exception:
+                pass
+        return False
+
+    def attack(self, target_x, target_y, target, listener_pos=None):
         dx = target_x - self.rect.centerx
         dy = target_y - self.rect.centery
         distance_sq = dx * dx + dy * dy
         if self.chasing:
-            self.speed = 2.2
+            self.speed = 1.9
         else:
             self.speed = 1
 
@@ -2358,16 +2401,27 @@ class Wolf(Enemy):
                 self.frame_index = 0.0
 
         if self.attacking:
-            frames = self.run_attack_right_images if self.last_direction == "right" else self.run_attack_left_images
-            self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+            target_moving = self._target_is_moving(target)
+            use_run_attack = target_moving or self.chasing or self.direction.length_squared() > 0
+            if use_run_attack:
+                frames = self.run_attack_right_images if self.last_direction == "right" else self.run_attack_left_images
+            else:
+                frames = self.attack_right_images if self.last_direction == "right" else self.attack_left_images
+            attack_anim_speed = self.animation_speed * 0.7
+            self.frame_index = (self.frame_index + attack_anim_speed) % len(frames)
             self.image = frames[int(self.frame_index)]
 
             self.attack_timer -= 1
 
             if self.attack_timer == self.attack_duration // 2 and distance_sq < (60 * 60):
                 if hasattr(target, "health"):
-                    target.health = max(0, target.health - self.attack_damage)
-                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                    if isinstance(target, Player) and hasattr(target, "is_in_spawn_protection") and target.is_in_spawn_protection():
+                        pass  # Don't damage the player inside the spawn protection bubble.
+                    else:
+                        target.health = max(0, target.health - self.attack_damage)
+                # Make sure player hit audio stays audible; use distance falloff otherwise.
+                volume_scale = 1.0 if listener_pos else self._attack_volume_scale(listener_pos)
+                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]), volume_scale=volume_scale)
 
             if self.attack_timer <= 0:
                 self.attacking = False
@@ -2419,28 +2473,46 @@ class Wolf(Enemy):
 
         # Cohesion: stay near pack center
         coh_vector = pygame.Vector2(0, 0)
+        cohesion_weight = 0.0
         if packmates:
             center_x = sum(m.rect.centerx for m in packmates + [self]) / (len(packmates) + 1)
             center_y = sum(m.rect.centery for m in packmates + [self]) / (len(packmates) + 1)
-            coh_vector = pygame.Vector2(center_x - self.rect.centerx, center_y - self.rect.centery)
-            if coh_vector.length_squared() > 0:
-                coh_vector = coh_vector.normalize()
+            offset_to_center = pygame.Vector2(center_x - self.rect.centerx, center_y - self.rect.centery)
+            if offset_to_center.length_squared() > 0:
+                coh_vector = offset_to_center.normalize()
+                distance_to_center = offset_to_center.length()
+                desired_pack_radius = 140
+                spread_threshold = 220
+                if distance_to_center > spread_threshold:
+                    cohesion_weight = 0.65
+                elif distance_to_center > desired_pack_radius:
+                    cohesion_weight = 0.5
+                else:
+                    cohesion_weight = 0.35
 
         # Set chasing based on target distance
         dx = target_x - self.rect.centerx
         dy = target_y - self.rect.centery
         distance_sq = dx * dx + dy * dy
-        self.chasing = distance_sq < (500 * 500)
+        # Always treat chasing the player as a chase state so we use run speed/animations.
+        chasing_player = isinstance(target_obj, Player)
+        self.chasing = chasing_player or distance_sq < (500 * 500)
         if self.chasing and not self.fleeing:
             target_vec = pygame.Vector2(dx, dy)
             if target_vec.length_squared() > 0:
                 target_vec = target_vec.normalize()
             # Blend target pursuit with pack cohesion to keep wolves together
-            direction = (target_vec * 0.7) + (coh_vector * 0.3)
+            pursuit_weight = max(0.0, 1.0 - cohesion_weight)
+            direction = (target_vec * pursuit_weight) + (coh_vector * cohesion_weight)
             if direction.length_squared() > 0:
                 direction = direction.normalize()
+            else:
+                direction = target_vec
             self.direction = direction
+            # Run speed during a chase; keeps up with the player and shows run animations
+            self.speed = 1.9
         else:
+            self.speed = 1.0
             super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
             return
 
@@ -2461,7 +2533,8 @@ class Wolf(Enemy):
             self.animate_stand()
 
         # Attack if close
-        self.attack(target_x, target_y, target_obj)
+        listener_pos = (player_world_x, player_world_y) if player else None
+        self.attack(target_x, target_y, target_obj, listener_pos=listener_pos)
 
         if not self.is_alive:
             self.direction.xy = (0, 0)

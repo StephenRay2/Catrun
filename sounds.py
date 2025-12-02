@@ -9,6 +9,7 @@ class SoundManager:
         pygame.mixer.init()
         self.current_music = None
         self.sounds = {}
+        self.default_volumes = {}
         self.songs = []
         self.ambient_sounds = []
         self.playing_randomly = False
@@ -19,12 +20,24 @@ class SoundManager:
 
 
     def add_sound(self, name, path, volume=.15):
+        clamped_volume = max(0.0, min(1.0, volume))
         self.sounds[name] = pygame.mixer.Sound(path)
-        self.sounds[name].set_volume(volume)
+        self.sounds[name].set_volume(clamped_volume)
+        self.default_volumes[name] = clamped_volume
 
-    def play_sound(self, name):
-        if name in self.sounds:
-            self.sounds[name].play()
+    def play_sound(self, name, volume_scale=None):
+        if name not in self.sounds:
+            return
+
+        sound = self.sounds[name]
+        channel = sound.play()
+        if channel:
+            if volume_scale is not None:
+                base_volume = self.default_volumes.get(name, sound.get_volume())
+                scaled_volume = max(0.0, min(1.0, base_volume * volume_scale))
+                channel.set_volume(scaled_volume)
+            elif name in self.default_volumes:
+                channel.set_volume(self.default_volumes[name])
 
     def play_music(self, path, loop=True, volume=0.4, fade_in=0):
         if path != self.current_music:

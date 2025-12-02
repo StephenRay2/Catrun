@@ -1,6 +1,16 @@
 from mobs import *
 player = Player(width/2, height/2, "Glenjamin")
 
+# Keep hostile spawns away from the starting area so the player isn't spawn-killed.
+SPAWN_PROTECTION_CENTER = (width / 2, height / 2)
+SPAWN_PROTECTION_RADIUS = 900  # pixels
+SPAWN_PROTECTION_RADIUS_SQ = SPAWN_PROTECTION_RADIUS ** 2
+
+def is_in_spawn_protection(x, y):
+    dx = x - SPAWN_PROTECTION_CENTER[0]
+    dy = y - SPAWN_PROTECTION_CENTER[1]
+    return (dx * dx + dy * dy) < SPAWN_PROTECTION_RADIUS_SQ
+
 
 num_deers = 50
 num_squirrels = 100
@@ -294,9 +304,14 @@ for pack_id, size in enumerate(pack_sizes):
         break
     tile_x, tile_image = random.choice(weighted_wolf_tiles)
     for _ in range(size):
-        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-        y = random.randint(0, height - 64)
-        wolves.append(Wolf(x, y, "Wolf", pack_id=pack_id + 1))
+        attempts = 0
+        while attempts < 10:
+            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            y = random.randint(0, height - 64)
+            if not is_in_spawn_protection(x, y):
+                wolves.append(Wolf(x, y, "Wolf", pack_id=pack_id + 1))
+                break
+            attempts += 1
 
 
 allowed_duskwretch_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_snow, bg_wasteland]
