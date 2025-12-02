@@ -4123,9 +4123,21 @@ while running:
                 
             
                 if hasattr(mob, "enemy"):
-                    mob.handle_player_proximity(dt, player_world_x, player_world_y, player=None,
+                    # Pick nearest target between player and any tamed cats
+                    potential_targets = [
+                        (player_world_x, player_world_y, player)
+                    ]
+                    for cat in cats:
+                        if getattr(cat, "tamed", False) and not getattr(cat, "destroyed", False) and getattr(cat, "is_alive", True):
+                            potential_targets.append((cat.rect.centerx, cat.rect.centery, cat))
+                    target_world_x, target_world_y, target_entity = min(
+                        potential_targets,
+                        key=lambda t: (t[0] - mob.rect.centerx) ** 2 + (t[1] - mob.rect.centery) ** 2
+                    )
+
+                    mob.handle_player_proximity(dt, target_world_x, target_world_y, target_entity,
                                                 nearby_objects=None, nearby_mobs=None)
-                    mob.attack(player_world_x, player_world_y, player)
+                    mob.attack(target_world_x, target_world_y, target_entity)
 
                     
             
