@@ -30,7 +30,7 @@ dungeon_depth = absolute_cam_x
 dungeon_depth_high = 0
 scroll = 0
 dungeon_traversal_speed = .1
-time_of_day = 7.00
+time_of_day = 4.00
 total_elapsed_time = 00.00
 time_of_day_start = time_of_day
 stamina_depleted_message_timer = 0
@@ -1069,6 +1069,7 @@ def world_rect_collides(collision_rect):
         cows,
         chickens,
         crawlers,
+        ashhounds,
         pocks,
         deers,
         black_bears,
@@ -1081,6 +1082,7 @@ def world_rect_collides(collision_rect):
         electric_dragons,
         poison_dragons,
         dusk_dragons,
+        glowbirds,
     )
 
     all_mobs = (
@@ -1089,12 +1091,14 @@ def world_rect_collides(collision_rect):
         + cows
         + chickens
         + crawlers
+        + ashhounds
         + pocks
         + deers
         + black_bears
         + brown_bears
         + gilas
         + crows
+        + glowbirds
         + duskwretches
         + fire_dragons
         + ice_dragons
@@ -1625,12 +1629,14 @@ while running:
             cows.clear()
             chickens.clear()
             crawlers.clear()
+            ashhounds.clear()
             pocks.clear()
             deers.clear()
             black_bears.clear()
             brown_bears.clear()
             gilas.clear()
             crows.clear()
+            glowbirds.clear()
             duskwretches.clear()
             fire_dragons.clear()
             ice_dragons.clear()
@@ -1668,6 +1674,13 @@ while running:
                 y = random.randint(0, height - 64)
                 crawlers.append(Crawler(x, y, "Crawler"))
 
+            for _ in range(num_ashhounds):
+                if weighted_ashhound_tiles:
+                    tile_x, tile_image = random.choice(weighted_ashhound_tiles)
+                    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    y = random.randint(0, height - 64)
+                    ashhounds.append(Ashhound(x, y, "Ashhound"))
+
             for _ in range(num_pocks):
                 tile_x, tile_image = random.choice(weighted_pock_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
@@ -1703,6 +1716,13 @@ while running:
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
                 crows.append(Crow(x, y, "Crow"))
+
+            for _ in range(num_glowbirds):
+                if weighted_glowbird_tiles:
+                    tile_x, tile_image = random.choice(weighted_glowbird_tiles)
+                    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    y = random.randint(0, height - 64)
+                    glowbirds.append(Glowbird(x, y, "Glowbird"))
 
             for _ in range(num_duskwretches):
                 tile_x, tile_image = random.choice(weighted_duskwretch_tiles)
@@ -3130,7 +3150,7 @@ while running:
                 
                 collision_detected = False
                 collision_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants + ponds + lavas + banks
-                collision_mobs = cats + squirrels + cows + chickens + crawlers + pocks + deers + black_bears + brown_bears + gilas + crows + duskwretches
+                collision_mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + pocks + deers + black_bears + brown_bears + gilas + crows + glowbirds + duskwretches
                 
                 for obj in collision_objects:
                     obj_rect = obj.get_collision_rect(0) if hasattr(obj, 'get_collision_rect') else obj.rect
@@ -3225,6 +3245,7 @@ while running:
         cows[:] = [cow for cow in cows if not cow.destroyed]
         chickens[:] = [chicken for chicken in chickens if not chicken.destroyed]
         crawlers[:] = [crawler for crawler in crawlers if not crawler.destroyed]
+        ashhounds[:] = [ashhound for ashhound in ashhounds if not ashhound.destroyed]
         duskwretches[:] = [duskwretch for duskwretch in duskwretches if not duskwretch.destroyed]
         pocks[:] = [pock for pock in pocks if not pock.destroyed]
         deers[:] = [deer for deer in deers if not deer.destroyed]
@@ -3232,6 +3253,7 @@ while running:
         brown_bears[:] = [brown_bear for brown_bear in brown_bears if not brown_bear.destroyed]
         gilas[:] = [gila for gila in gilas if not gila.destroyed]
         crows[:] = [crow for crow in crows if not crow.destroyed]
+        glowbirds[:] = [glowbird for glowbird in glowbirds if not glowbird.destroyed]
         fire_dragons[:] = [dragon for dragon in fire_dragons if not dragon.destroyed]
         ice_dragons[:] = [dragon for dragon in ice_dragons if not dragon.destroyed]
         electric_dragons[:] = [dragon for dragon in electric_dragons if not dragon.destroyed]
@@ -3261,7 +3283,7 @@ while running:
         collectibles = sticks + stones + grasses + savannah_grasses + mushrooms + dropped_items + marsh_reeds
         all_objects_no_liquids = rocks + trees + boulders + gemstone_rocks + metal_ore_rocks + metal_vein_rocks + gold_ore_rocks + gold_vein_rocks + berry_bushes + dead_bushes + ferns + fruit_plants + banks
         all_objects = all_objects_no_liquids + ponds + lavas
-        mobs = cats + squirrels + cows + chickens + crawlers + duskwretches + pocks + deers + black_bears + brown_bears + gilas + crows + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
+        mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + duskwretches + pocks + deers + black_bears + brown_bears + gilas + crows + glowbirds + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
         all_mobs = mobs
 
         visibility_cam_x = sleeping_tent_x if (sleeping_in_tent or tent_hide_active) else cam_x
@@ -3287,7 +3309,7 @@ while running:
                 sound_manager.play_sound(random.choice([f"chicken_cluck{i}" for i in range(1,7)]))
             elif isinstance(mob, Cow) and random.random() < 0.0005:
                 sound_manager.play_sound(random.choice(["cow_moo1", "cow_moo2"]))
-            elif isinstance(mob, Crow) and random.random() < 0.001:
+            elif isinstance(mob, (Crow, Glowbird)) and random.random() < 0.001:
                 sound_manager.play_sound(random.choice([f"crow_caw{i}" for i in range(1,4)]))
             elif isinstance(mob, Duskwretch) and random.random() < 0.001 and not mob.chasing and not mob.attacking:
                 sound_manager.play_sound("duskwretch_growl")
@@ -3471,7 +3493,7 @@ while running:
                 height_mult = 0.18
             if hasattr(obj, "resource") and getattr(obj, "resource", "") == "Willow Wood":
                 y_offset = -rect.height * 0.08
-            if name in ("Crow", "Bird", "Duck"):
+            if name in ("Crow", "Glowbird", "Bird", "Duck"):
                 width_mult = 0.35
                 height_mult = 0.18
             if is_player_obj:
@@ -3893,27 +3915,49 @@ while running:
             # Placed torches
             for struct in placed_structures:
                 if struct.get("item_name") == "Torch":
-                    lights.append((struct["x"] - cam_x, struct["y"], 220))
+                    lights.append((struct["x"] - cam_x, struct["y"], 220, None))
                 elif struct.get("item_name") == "Campfire" and campfire and getattr(campfire, "fire_lit", False):
-                    lights.append((struct["x"] - cam_x, struct["y"], 260))
+                    lights.append((struct["x"] - cam_x, struct["y"], 260, None))
                 elif struct.get("item_name") == "Smelter" and smelter and getattr(smelter, "fire_lit", False):
-                    lights.append((struct["x"] - cam_x, struct["y"], 260))
+                    lights.append((struct["x"] - cam_x, struct["y"], 260, None))
             # Held torch (player light)
             player_torch = None
             sel_slot = inventory.selected_hotbar_slot
             if 0 <= sel_slot < len(inventory.hotbar_slots):
                 player_torch = inventory.hotbar_slots[sel_slot]
             if player_torch and player_torch.get("item_name") == "Torch":
-                lights.append((player_pos.x, player_pos.y, 220))
+                lights.append((player_pos.x, player_pos.y, 220, None))
+            # Lava pools give off strong light
+            for lava in lavas:
+                if getattr(lava, "destroyed", False):
+                    continue
+                lights.append((lava.rect.centerx - cam_x, lava.rect.centery, 320, (25, 10, 0)))
+            # Fire ferns glow softly
+            for fern in ferns:
+                if getattr(fern, "destroyed", False):
+                    continue
+                if getattr(fern, "biome", "") == "lavastone":
+                    lights.append((fern.rect.centerx - cam_x, fern.rect.centery, 140, (40, 15, 0)))
+            # Glowbirds emit a smaller, cool-tinted light
+            for glowbird in glowbirds:
+                if getattr(glowbird, "is_alive", False) and not getattr(glowbird, "destroyed", False):
+                    lights.append(
+                        (
+                            glowbird.rect.centerx - cam_x,
+                            glowbird.rect.centery,
+                            getattr(glowbird, "light_radius", 110),
+                            getattr(glowbird, "light_tint", (10, 40, 120)),
+                        )
+                    )
 
-            for lx, ly, radius in lights:
+            for lx, ly, radius, tint_override in lights:
                 flicker_seed = int(lx * 1000 + ly * 1000 + light_flicker_timer * 10)
                 random.seed(flicker_seed)
                 
                 radius_flicker = random.uniform(-3, 3)
                 flickered_radius = int(radius + radius_flicker)
                 
-                tint_choice = random.choice([
+                tint_choice = tint_override if tint_override is not None else random.choice([
                     (0, 0, 0),
                     (5, 3, 0),
                     (3, 2, 0),

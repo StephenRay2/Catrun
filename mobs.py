@@ -179,6 +179,19 @@ crow_start_fly_left_images = ["assets/sprites/mobs/CrowStartFlyLeft1.png", "asse
 crow_landing_left_images = ["assets/sprites/mobs/CrowLandingLeft1.png", "assets/sprites/mobs/CrowLandingLeft2.png", "assets/sprites/mobs/CrowLandingLeft3.png", "assets/sprites/mobs/CrowLandingLeft4.png", "assets/sprites/mobs/CrowLandingLeft5.png", "assets/sprites/mobs/CrowLandingLeft6.png", "assets/sprites/mobs/CrowLandingLeft7.png", "assets/sprites/mobs/CrowLandingLeft8.png"]
 crow_dead_image = pygame.image.load("assets/sprites/mobs/CrowDead.png").convert_alpha()
 
+ashhound_idle_left_images = ["assets/sprites/mobs/AshhoundLeftIdle1.png", "assets/sprites/mobs/AshhoundLeftIdle2.png", "assets/sprites/mobs/AshhoundLeftIdle3.png"]
+ashhound_move_left_images = ["assets/sprites/mobs/AshhoundLeftMove1.png", "assets/sprites/mobs/AshhoundLeftMove2.png", "assets/sprites/mobs/AshhoundLeftMove3.png", "assets/sprites/mobs/AshhoundLeftMove4.png"]
+ashhound_attack_left_images = ["assets/sprites/mobs/AshhoundLeftAttack1.png", "assets/sprites/mobs/AshhoundLeftAttack2.png", "assets/sprites/mobs/AshhoundLeftAttack3.png"]
+ashhound_move_attack_left_images = ["assets/sprites/mobs/AshhoundLeftMoveAttack1.png", "assets/sprites/mobs/AshhoundLeftMoveAttack2.png", "assets/sprites/mobs/AshhoundLeftMoveAttack3.png", "assets/sprites/mobs/AshhoundLeftMoveAttack4.png"]
+ashhound_dead_image_left = pygame.image.load("assets/sprites/mobs/AshhoundLeftDead.png").convert_alpha()
+ashhound_dead_image_right = pygame.transform.flip(ashhound_dead_image_left, True, False)
+
+glowbird_walk_left_images = ["assets/sprites/mobs/GlowbirdWalkLeft1.png", "assets/sprites/mobs/GlowbirdWalkLeft2.png", "assets/sprites/mobs/GlowbirdWalkLeft3.png", "assets/sprites/mobs/GlowbirdWalkLeft4.png", "assets/sprites/mobs/GlowbirdWalkLeft5.png"]
+glowbird_fly_left_images = ["assets/sprites/mobs/GlowbirdFlyLeft1.png", "assets/sprites/mobs/GlowbirdFlyLeft2.png", "assets/sprites/mobs/GlowbirdFlyLeft3.png", "assets/sprites/mobs/GlowbirdFlyLeft4.png"]
+glowbird_start_fly_left_images = ["assets/sprites/mobs/GlowbirdStartFlyLeft1.png", "assets/sprites/mobs/GlowbirdStartFlyLeft2.png", "assets/sprites/mobs/GlowbirdStartFlyLeft3.png", "assets/sprites/mobs/GlowbirdStartFlyLeft4.png", "assets/sprites/mobs/GlowbirdStartFlyLeft5.png", "assets/sprites/mobs/GlowbirdStartFlyLeft6.png"]
+glowbird_landing_left_images = ["assets/sprites/mobs/GlowbirdLandingLeft1.png", "assets/sprites/mobs/GlowbirdLandingLeft2.png", "assets/sprites/mobs/GlowbirdLandingLeft3.png", "assets/sprites/mobs/GlowbirdLandingLeft4.png", "assets/sprites/mobs/GlowbirdLandingLeft5.png", "assets/sprites/mobs/GlowbirdLandingLeft6.png", "assets/sprites/mobs/GlowbirdLandingLeft7.png", "assets/sprites/mobs/GlowbirdLandingLeft8.png"]
+glowbird_dead_image = pygame.image.load("assets/sprites/mobs/GlowbirdDead.png").convert_alpha()
+
 dragon_types = [
     {"type": "fire", "rare_gems": [{"gem": "Ruby", "chance": 0.1}, {"gem": "Garnet", "chance": 0.1}]},
     {"type": "ice", "rare_gems": [{"gem": "Aquamarine", "chance": 0.1}, {"gem": "Sapphire", "chance": 0.1}]},
@@ -1982,6 +1995,118 @@ class Crawler(Enemy):
             else:
                 self.image = crawler_dead_image_right
 
+
+class Ashhound(Enemy):
+    def __init__(self, x, y, name):
+        super().__init__(x, y, name)
+        self.name = name
+        self.walk_left_images = [pygame.image.load(img).convert_alpha() for img in ashhound_move_left_images]
+        self.stand_left_images = [pygame.image.load(img).convert_alpha() for img in ashhound_idle_left_images]
+        self.attack_left_images = [pygame.image.load(img).convert_alpha() for img in ashhound_attack_left_images]
+        self.move_attack_left_images = [pygame.image.load(img).convert_alpha() for img in ashhound_move_attack_left_images]
+
+        self.walk_right_images = [pygame.transform.flip(img, True, False) for img in self.walk_left_images]
+        self.stand_right_images = [pygame.transform.flip(img, True, False) for img in self.stand_left_images]
+        self.attack_right_images = [pygame.transform.flip(img, True, False) for img in self.attack_left_images]
+        self.move_attack_right_images = [pygame.transform.flip(img, True, False) for img in self.move_attack_left_images]
+
+        self.image = self.stand_right_images[0]
+        self.rect = self.image.get_rect(center=(x, y))
+
+        self.frame_index = 0
+        self.animation_speed = 0.2
+        self.direction = pygame.Vector2(0, 0)
+        self.move_timer = 0
+
+        self.last_direction = "right"
+        self.attacking = False
+        self.attack_timer = 0
+        self.attack_duration = 22
+
+        self.attack_damage = 6
+        self.base_speed = 170
+        self.speed = 1
+        self.full_health = 220 + (random.randint(10, 16) * self.level)
+        self.health = self.full_health
+        self.resource = "Monster Meat"
+        self.resource_amount = random.randint(3, 6)
+        self.death_experience = int(700 * (1 + (self.level * 0.04)))
+        self.level = 1
+        self.immune_to_lava = True
+
+    def get_collision_rect(self, cam_x):
+        rect = self.rect
+        return pygame.Rect(rect.x - cam_x + 8, rect.y + 32, rect.width - 16, rect.height - 40)
+
+    def attack(self, player_world_x, player_world_y, player):
+        dx = player_world_x - self.rect.centerx
+        dy = player_world_y - self.rect.centery
+        distance_sq = dx * dx + dy * dy
+        if self.chasing:
+            self.speed = 2.2
+        else:
+            self.speed = 1
+
+        if self.is_alive and (self.health / self.full_health) < 0.15:
+            if not self.fleeing:
+                self.fleeing = True
+                self.flee_timer = 8
+            self.attacking = False
+            return
+
+        if self.fleeing:
+            self.attacking = False
+            return
+
+        if self.is_alive and distance_sq < (60 * 60):
+            if not self.attacking:
+                self.attacking = True
+                self.attack_timer = self.attack_duration
+                self.frame_index = 0.0
+
+        if self.attacking:
+            frames = self.attack_right_images if self.last_direction == "right" else self.attack_left_images
+            self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+            self.image = frames[int(self.frame_index)]
+
+            self.attack_timer -= 1
+
+            if self.attack_timer == self.attack_duration // 2 and distance_sq < (60 * 60):
+                player.health -= self.attack_damage
+                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+
+            if self.attack_timer <= 0:
+                self.attacking = False
+                self.frame_index = 0.0
+                self.image = (self.stand_right_images[0] if self.last_direction == "right"
+                            else self.stand_left_images[0])
+
+    def animate_walk(self, animation_speed_multiplier=1.0):
+        if self.direction.x > 0:
+            self.last_direction = "right"
+        elif self.direction.x < 0:
+            self.last_direction = "left"
+        if getattr(self, "chasing", False):
+            frames = self.move_attack_right_images if self.last_direction == "right" else self.move_attack_left_images
+        else:
+            frames = self.walk_right_images if self.last_direction == "right" else self.walk_left_images
+        effective_animation_speed = self.animation_speed * animation_speed_multiplier
+        self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
+        self.image = frames[int(self.frame_index)]
+
+    def animate_stand(self, animation_speed_multiplier=1.0):
+        frames = self.stand_right_images if self.last_direction == "right" else self.stand_left_images
+        effective_animation_speed = self.animation_speed * animation_speed_multiplier * 0.5
+        self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
+        self.image = frames[int(self.frame_index)]
+
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
+        super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
+
+        if not self.is_alive:
+            self.direction.xy = (0, 0)
+            self.image = ashhound_dead_image_right if self.last_direction == "right" else ashhound_dead_image_left
+
 class Duskwretch(Enemy):
     def __init__(self, x, y, name):
         super().__init__(x, y, name)
@@ -3094,6 +3219,153 @@ class Crow(Mob):
                 self.image = pygame.transform.flip(crow_dead_image, True, False)
             else:
                 self.image = crow_dead_image
+            return
+        
+        sleep_multiplier = 40 if player_sleeping else 1
+        decision_chance = min(0.001 * sleep_multiplier, 1.0)
+        if self.state == "walking" and random.random() < decision_chance:
+            self.state = "flying"
+            self.frame_index = 0
+            self.flying_timer = random.randint(60, 180)
+            self.direction = pygame.Vector2(random.uniform(-1, 1), random.uniform(-1, 1))
+            if self.direction.length_squared() > 0:
+                self.direction = self.direction.normalize()
+        
+        if self.state == "flying":
+            self.flying_timer -= 1
+            if self.flying_timer <= 0:
+                self.state = "landing"
+                self.frame_index = 0
+                self.speed = 1.0
+        
+        if self.state == "landing" and self.frame_index >= len(self.landing_left_images) - 1:
+            self.state = "walking"
+            self.frame_index = 0
+            self.direction = pygame.Vector2(0, 0)
+        
+        if self.state == "flying":
+            if self.direction.length_squared() > 0:
+                actual_speed = self.get_speed() * dt
+                movement = self.direction * actual_speed
+                self.rect.x += movement.x
+                self.rect.y += movement.y
+                if movement.x > 0:
+                    self.last_direction = "right"
+                elif movement.x < 0:
+                    self.last_direction = "left"
+            self.animate_stand()
+        else:
+            super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
+    
+    def animate_stand(self, animation_speed_multiplier=1.0):
+        if self.state == "walking":
+            super().animate_stand(animation_speed_multiplier)
+        elif self.state == "flying":
+            if self.frame_index < len(self.start_fly_left_images):
+                frames = self.start_fly_right_images if self.last_direction == "right" else self.start_fly_left_images
+                effective_animation_speed = self.animation_speed * animation_speed_multiplier
+                self.frame_index += effective_animation_speed
+                if self.frame_index >= len(self.start_fly_left_images):
+                    self.frame_index = 0
+                self.image = frames[int(min(self.frame_index, len(frames) - 1))]
+            else:
+                frames = self.fly_right_images if self.last_direction == "right" else self.fly_left_images
+                effective_animation_speed = self.animation_speed * animation_speed_multiplier
+                self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
+                self.image = frames[int(self.frame_index)]
+        elif self.state == "landing":
+            frames = self.landing_right_images if self.last_direction == "right" else self.landing_left_images
+            effective_animation_speed = self.animation_speed * animation_speed_multiplier
+            self.frame_index = min(self.frame_index + effective_animation_speed, len(frames) - 1)
+            self.image = frames[int(self.frame_index)]
+
+
+class Glowbird(Mob):
+    def __init__(self, x, y, name):
+        super().__init__(x, y, name)
+        
+        self.walk_left_images = [pygame.image.load(img).convert_alpha() for img in glowbird_walk_left_images]
+        self.fly_left_images = [pygame.image.load(img).convert_alpha() for img in glowbird_fly_left_images]
+        self.start_fly_left_images = [pygame.image.load(img).convert_alpha() for img in glowbird_start_fly_left_images]
+        self.landing_left_images = [pygame.image.load(img).convert_alpha() for img in glowbird_landing_left_images]
+        
+        self.walk_right_images = [pygame.transform.flip(img, True, False) for img in self.walk_left_images]
+        self.fly_right_images = [pygame.transform.flip(img, True, False) for img in self.fly_left_images]
+        self.start_fly_right_images = [pygame.transform.flip(img, True, False) for img in self.start_fly_left_images]
+        self.landing_right_images = [pygame.transform.flip(img, True, False) for img in self.landing_left_images]
+        
+        self.image = self.walk_left_images[0]
+        self.rect = self.image.get_rect(center=(x, y))
+        self.base_speed = 140
+        self.speed = 1
+        self.full_health = 30 + (random.randint(5, 10) * self.level)
+        self.health = self.full_health
+        self.resource = "Feathers"
+        self.special_drops = [{'item': 'Raw Small Meat', 'chance': 0.6, 'min': 2, 'max': 4}]
+        self.resource_amount = 4
+        self.death_experience = int(100 * (1 + (self.level * 0.01)))
+        self.level = 1
+        
+        self.frame_index = 0
+        self.animation_speed = 0.25
+        self.direction = pygame.Vector2(0, 0)
+        self.move_timer = 0
+        self.last_direction = "left"
+        self.state = "walking"
+        self.flying_timer = 0
+        # Emits a smaller, cool-colored light compared to torches
+        self.light_radius = 110
+        self.light_tint = (10, 40, 120)
+
+    
+    def get_collision_rect(self, cam_x):
+            rect = self.rect
+            return pygame.Rect(rect.x - cam_x + 25, rect.y + 30, rect.width - 43, rect.height - 47)
+    
+    def handle_health(self, screen, cam_x, dt, player_sleeping=False):
+        max_health = self.full_health
+        health = self.health
+        bar_width = 25
+        bar_height = 4
+        x = self.rect.centerx - bar_width / 2 - cam_x
+        y = self.rect.top + 5
+        health_ratio = health / max_health
+        health_width = int(bar_width * health_ratio)
+        
+        if self.health < self.last_health:
+            self.bar_timer = 5
+            if self.state != "flying":
+                self.state = "flying"
+                self.frame_index = 0
+                self.flying_timer = random.randint(180, 300)
+                self.direction = pygame.Vector2(random.choice([-1, 1]), random.uniform(-1.5, -0.5))
+                if self.direction.length_squared() > 0:
+                    self.direction = self.direction.normalize()
+                self.speed = 1.5
+        
+        if self.bar_timer > 0:
+            pygame.draw.rect(screen, (255, 20, 20), pygame.Rect(x, y, bar_width, bar_height), border_radius=2)
+            pygame.draw.rect(screen, (40, 250, 40), pygame.Rect(x, y, health_width, bar_height), border_radius=2)
+            pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=1, border_radius=2)
+            self.bar_timer -= dt
+        
+        self.last_health = self.health
+        if self.health <= 0:
+            self.is_alive = False
+    
+    def check_collision(self, direction, nearby_objects, nearby_mobs):
+        if self.state == "flying":
+            return True, True 
+        return super().check_collision(direction, nearby_objects, nearby_mobs)
+    
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
+        if not self.is_alive:
+            self.direction.xy = (0, 0)
+            self.state = "walking"
+            if self.last_direction == "right":
+                self.image = pygame.transform.flip(glowbird_dead_image, True, False)
+            else:
+                self.image = glowbird_dead_image
             return
         
         sleep_multiplier = 40 if player_sleeping else 1

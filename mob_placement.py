@@ -8,6 +8,8 @@ num_cats = 250
 num_cows = 50
 num_chickens = 50
 num_crows = 75
+num_ashhounds = 40
+num_glowbirds = 75
 num_gilas = 50
 num_black_bears = 50
 num_brown_bears = 30
@@ -184,6 +186,40 @@ for _ in range(num_crawlers):
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
     crawlers.append(Crawler(x, y, "Crawler"))
+
+
+allowed_ashhound_tiles = [bg_lavastone]
+
+ashhound_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_ashhound_tiles]
+
+ashhound_spawn_weights = {
+    bg_grass: 0,
+    bg_dirt: 0,
+    bg_compact: 0,
+    bg_sand: 0,
+    bg_savannah: 0,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 0,
+    bg_lavastone: 6,
+    bg_snow: 0,
+    bg_wasteland: 0,
+    bg_blackstone: 0,
+    bg_redrock: 0
+}
+
+weighted_ashhound_tiles = []
+for tile_x, tile_image in tiles:
+    weight = ashhound_spawn_weights.get(tile_image, 0)
+    weighted_ashhound_tiles.extend([(tile_x, tile_image)] * weight)
+
+ashhounds = []
+for _ in range(num_ashhounds):
+    if weighted_ashhound_tiles:
+        tile_x, tile_image = random.choice(weighted_ashhound_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        ashhounds.append(Ashhound(x, y, "Ashhound"))
 
 
 allowed_duskwretch_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_snow, bg_wasteland]
@@ -404,6 +440,39 @@ for _ in range(num_crows):
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
     crows.append(Crow(x, y, "Crow"))
+
+allowed_glowbird_tiles = [bg_duskstone, bg_blackstone]
+
+glowbird_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_glowbird_tiles]
+
+glowbird_spawn_weights = {
+    bg_grass: 0,
+    bg_dirt: 0,
+    bg_compact: 0,
+    bg_sand: 0,
+    bg_savannah: 0,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 4,
+    bg_lavastone: 0,
+    bg_snow: 0,
+    bg_wasteland: 0,
+    bg_blackstone: 4,
+    bg_redrock: 0
+}
+
+weighted_glowbird_tiles = []
+for tile_x, tile_image in tiles:
+    weight = glowbird_spawn_weights.get(tile_image, 0)
+    weighted_glowbird_tiles.extend([(tile_x, tile_image)] * weight)
+
+glowbirds = []
+for _ in range(num_glowbirds):
+    if weighted_glowbird_tiles:
+        tile_x, tile_image = random.choice(weighted_glowbird_tiles)
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        glowbirds.append(Glowbird(x, y, "Glowbird"))
 
 allowed_fire_dragon_tiles = [bg_lavastone, bg_sand, bg_wasteland, bg_redrock, bg_blackstone]
 
