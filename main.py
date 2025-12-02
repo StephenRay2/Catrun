@@ -10,6 +10,7 @@ from arcane_crafter import ArcaneCrafter
 from smelter import Smelter
 from campfire import Campfire
 from mortar_pestle import MortarPestle
+from alchemy_bench import AlchemyBench
 from world import DroppedItem, dropped_items, Bank, banks
 from debug import font_path, font
 from mobs import hud_font
@@ -152,6 +153,8 @@ campfire = None
 campfire_in_use = False
 mortar_pestle = None
 mortar_pestle_in_use = False
+alchemy_bench = None
+alchemy_bench_in_use = False
 
 placeable_size_settings = {
     "Torch": {
@@ -164,6 +167,15 @@ placeable_size_settings = {
         }
     },
     "Workbench": {
+        "sprite": (64, 64),
+        "collision": {
+            "width_ratio": 0.8,
+            "height_ratio": 0.4,
+            "offset_x_ratio": -0.5,
+            "offset_y_ratio": -1.0
+        }
+    },
+    "Alchemy Bench": {
         "sprite": (64, 64),
         "collision": {
             "width_ratio": 0.8,
@@ -202,10 +214,11 @@ placeable_size_settings = {
     "Smelter": {
         "sprite": (64, 64),
         "collision": {
-            "width_ratio": 0.6,
-            "height_ratio": 0.2,
+            # Heavier base so it can't be placed through solids
+            "width_ratio": 0.7,
+            "height_ratio": 0.35,
             "offset_x_ratio": -0.5,
-            "offset_y_ratio": -.75
+            "offset_y_ratio": -1.0
         }
     },
     "Empty Cage": {
@@ -247,10 +260,11 @@ placeable_size_settings = {
     "Tent": {
         "sprite": (96, 96),
         "collision": {
-            "width_ratio": 0.8,
-            "height_ratio": 0.5,
+            # Wide, shallow ground footprint; aligned to base
+            "width_ratio": 0.95,
+            "height_ratio": 0.33,
             "offset_x_ratio": -0.5,
-            "offset_y_ratio": 0.0
+            "offset_y_ratio": -1.0
         }
     },
     "Lantern": {
@@ -662,6 +676,9 @@ def build_cat_from_item(cat_data, x, y):
     cat.cat_name = cat_data.get("cat_name")
     cat.tame = cat_data.get("cat_tame", cat.tame)
     cat.tamed = True
+    # Recreated cats are already tamed companions, so let them
+    # use their custom follow/attack movement logic.
+    cat.disable_autonomous_movement = True
     cat.just_tamed = False
     cat.level = cat_data.get("cat_level", cat.level)
     cat.health = min(cat_data.get("cat_health", cat.health), cat.max_health)
@@ -910,96 +927,192 @@ def cancel_placement():
     placement_position = (0, 0)
 
 def world_rect_collides(collision_rect):
-    """Return True if the provided world-space rect hits any blocking object."""
-    # Check collision with world objects
-    from world import rocks, boulders, trees, berry_bushes, ponds, lavas, dead_bushes, grasses, sticks, stones, savannah_grasses, mushrooms, fruit_plants, ferns, gemstone_rocks, metal_ore_rocks, metal_vein_rocks, gold_ore_rocks, gold_vein_rocks, banks
+    """Return True if the provided world-space rect hits any blocking object.
 
-    # Check rocks (use their actual collision rect in world space)
+    Convert both sides to screen space (via cam_x) so placement uses the same
+    collision shapes as movement. Collectibles remain ignored.
+    """
+    from world import (
+        rocks,
+        boulders,
+        trees,
+        berry_bushes,
+        ponds,
+        lavas,
+        dead_bushes,
+        fruit_plants,
+        ferns,
+        gemstone_rocks,
+        metal_ore_rocks,
+        metal_vein_rocks,
+        gold_ore_rocks,
+        gold_vein_rocks,
+        banks,
+    )
+
+    global cam_x
+    cam_offset = int(cam_x) if "cam_x" in globals() else 0
+
+    # Candidate rect in screen space
+    test_rect = pygame.Rect(
+        collision_rect.x - cam_offset,
+        collision_rect.y,
+        collision_rect.width,
+        collision_rect.height,
+    )
+
+    def make_rock_collision(rect):
+        if rect is None:
+            return None
+        return pygame.Rect(
+            rect.x - cam_offset + 10,
+            rect.y + int(rect.height * 0.22),
+            max(1, rect.width - 20),
+            max(1, rect.height - 50),
+        )
+
+    # Rocks and boulders (including special ore/gem rocks)
     for rock in rocks:
-        if hasattr(rock, 'rect'):
-            rock_collision = pygame.Rect(
-                rock.rect.x + 10,
-                rock.rect.y + (rock.rect.height * 0.22),
-                rock.rect.width - 20,
-                rock.rect.height - 50
-            )
-            if rock_collision.colliderect(collision_rect):
-                return True
+        if getattr(rock, "destroyed", False):
+            continue
+        rock_rect = make_rock_collision(getattr(rock, "rect", None))
+        if rock_rect and rock_rect.colliderect(test_rect):
+            return True
 
-    # Check gemstone rocks
-    for gemstone_rock in gemstone_rocks:
-        if hasattr(gemstone_rock, 'rect'):
-            gemstone_collision = pygame.Rect(
-                gemstone_rock.rect.x + 10,
-                gemstone_rock.rect.y + (gemstone_rock.rect.height * 0.22),
-                gemstone_rock.rect.width - 20,
-                gemstone_rock.rect.height - 50
-            )
-            if gemstone_collision.colliderect(collision_rect):
-                return True
+    for gem in gemstone_rocks:
+        if getattr(gem, "destroyed", False):
+            continue
+        gem_rect = make_rock_collision(getattr(gem, "rect", None))
+        if gem_rect and gem_rect.colliderect(test_rect):
+            return True
 
-    # Check ore and vein rocks
-    for ore_rock in metal_ore_rocks + metal_vein_rocks + gold_ore_rocks + gold_vein_rocks:
-        if hasattr(ore_rock, 'rect'):
-            ore_collision = pygame.Rect(
-                ore_rock.rect.x + 10,
-                ore_rock.rect.y + (ore_rock.rect.height * 0.22),
-                ore_rock.rect.width - 20,
-                ore_rock.rect.height - 50
-            )
-            if ore_collision.colliderect(collision_rect):
-                return True
+    for ore in metal_ore_rocks + metal_vein_rocks + gold_ore_rocks + gold_vein_rocks:
+        if getattr(ore, "destroyed", False):
+            continue
+        ore_rect = make_rock_collision(getattr(ore, "rect", None))
+        if ore_rect and ore_rect.colliderect(test_rect):
+            return True
 
-    # Check boulders (use their actual collision rect in world space)
     for boulder in boulders:
-        if hasattr(boulder, 'rect'):
-            boulder_collision = pygame.Rect(
-                boulder.rect.x + 10,
-                boulder.rect.y + (boulder.rect.height * 0.22),
-                boulder.rect.width - 20,
-                boulder.rect.height - 50
-            )
-            if boulder_collision.colliderect(collision_rect):
-                return True
-
-    # Check banks
-    for bank in banks:
-        if hasattr(bank, 'rect') and bank.rect.colliderect(collision_rect):
+        if getattr(boulder, "destroyed", False):
+            continue
+        boulder_rect = make_rock_collision(getattr(boulder, "rect", None))
+        if boulder_rect and boulder_rect.colliderect(test_rect):
             return True
 
-    # Check trees
+    def rect_to_screen(obj):
+        r = getattr(obj, "rect", None)
+        if r is None:
+            return None
+        return pygame.Rect(r.x - cam_offset, r.y, r.width, r.height)
+
     for tree in trees:
-        if hasattr(tree, 'rect') and tree.rect.colliderect(collision_rect):
+        if getattr(tree, "destroyed", False):
+            continue
+        r = rect_to_screen(tree)
+        if r and r.colliderect(test_rect):
             return True
 
-    # Check berry bushes
     for bush in berry_bushes:
-        if hasattr(bush, 'rect') and bush.rect.colliderect(collision_rect):
+        if getattr(bush, "destroyed", False):
+            continue
+        r = rect_to_screen(bush)
+        if r and r.colliderect(test_rect):
             return True
 
-    # Check ponds
+    for bush in dead_bushes:
+        if getattr(bush, "destroyed", False):
+            continue
+        r = rect_to_screen(bush)
+        if r and r.colliderect(test_rect):
+            return True
+
+    for plant in fruit_plants:
+        if getattr(plant, "destroyed", False):
+            continue
+        r = rect_to_screen(plant)
+        if r and r.colliderect(test_rect):
+            return True
+
+    for fern in ferns:
+        if getattr(fern, "destroyed", False):
+            continue
+        r = rect_to_screen(fern)
+        if r and r.colliderect(test_rect):
+            return True
+
+    for bank in banks:
+        if getattr(bank, "destroyed", False):
+            continue
+        r = rect_to_screen(bank)
+        if r and r.colliderect(test_rect):
+            return True
+
     for pond in ponds:
-        if hasattr(pond, 'rect') and pond.rect.colliderect(collision_rect):
+        if getattr(pond, "destroyed", False):
+            continue
+        if hasattr(pond, "get_collision_rect") and pond.get_collision_rect(cam_offset).colliderect(test_rect):
             return True
 
-    # Check lavas
     for lava in lavas:
-        if hasattr(lava, 'rect') and lava.rect.colliderect(collision_rect):
+        if getattr(lava, "destroyed", False):
+            continue
+        if hasattr(lava, "get_collision_rect") and lava.get_collision_rect(cam_offset).colliderect(test_rect):
             return True
 
-    # Check mobs
-    from mob_placement import cats, squirrels, cows, chickens, crawlers, pocks, deers, black_bears, brown_bears, gilas, crows, duskwretches, fire_dragons, ice_dragons, electric_dragons, poison_dragons, dusk_dragons
+    from mob_placement import (
+        cats,
+        squirrels,
+        cows,
+        chickens,
+        crawlers,
+        pocks,
+        deers,
+        black_bears,
+        brown_bears,
+        gilas,
+        crows,
+        duskwretches,
+        fire_dragons,
+        ice_dragons,
+        electric_dragons,
+        poison_dragons,
+        dusk_dragons,
+    )
 
-    all_mobs = cats + squirrels + cows + chickens + crawlers + pocks + deers + black_bears + brown_bears + gilas + crows + duskwretches + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
+    all_mobs = (
+        cats
+        + squirrels
+        + cows
+        + chickens
+        + crawlers
+        + pocks
+        + deers
+        + black_bears
+        + brown_bears
+        + gilas
+        + crows
+        + duskwretches
+        + fire_dragons
+        + ice_dragons
+        + electric_dragons
+        + poison_dragons
+        + dusk_dragons
+    )
 
     for mob in all_mobs:
-        if hasattr(mob, 'rect') and mob.rect.colliderect(collision_rect):
-            return True
+        rect = getattr(mob, "rect", None)
+        if rect is not None:
+            mob_rect = pygame.Rect(rect.x - cam_offset, rect.y, rect.width, rect.height)
+            if mob_rect.colliderect(test_rect):
+                return True
 
-    # Check already placed structures
     for structure in placed_structures:
-        if structure['rect'].colliderect(collision_rect):
-            return True
+        rect = structure.get("rect")
+        if rect:
+            struct_rect = pygame.Rect(rect.x - cam_offset, rect.y, rect.width, rect.height)
+            if struct_rect.colliderect(test_rect):
+                return True
 
     return False
 
@@ -1702,6 +1815,7 @@ while running:
             globals()['smelter'] = Smelter(inventory)
             globals()['campfire'] = Campfire(inventory)
             globals()['mortar_pestle'] = MortarPestle(inventory)
+            globals()['alchemy_bench'] = AlchemyBench(inventory)
 
             inventory_resources = []
             collection_messages = []
@@ -1713,12 +1827,11 @@ while running:
                 "Smelter",
                 "Workbench",
                 "Mortar And Pestle",
-                "Campfire",
                 "Tent",
                 "Fire Dragon Scale Sword",
                 "Fire Dragon Scale Axe",
-                "Fire Dragon Scale Shovel",
-                "Fire Dragon Scale Pickaxe"
+                "Fire Dragon Scale Pickaxe",
+                "Alchemy Bench",
             ]
             # Add 20 torches (will stack) plus other starter items
             torch_stack = ["Torch"] * 20
@@ -1737,7 +1850,7 @@ while running:
         else:
             player_world_x = player_pos.x + cam_x
             player_world_y = player_pos.y
-        inventory.ui_open = inventory_in_use or campfire_in_use or smelter_in_use or crafting_bench_in_use or mortar_pestle_in_use or inventory.drop_menu_active or tent_menu_active or fast_travel_menu_active
+        inventory.ui_open = inventory_in_use or campfire_in_use or smelter_in_use or crafting_bench_in_use or mortar_pestle_in_use or alchemy_bench_in_use or inventory.drop_menu_active or tent_menu_active or fast_travel_menu_active
         
         player_speed = player.get_speed()
         if player.swimming:
@@ -1812,6 +1925,9 @@ while running:
                     elif mortar_pestle_in_use:
                         mortar_pestle.close()
                         mortar_pestle_in_use = False
+                    elif alchemy_bench_in_use:
+                        alchemy_bench.close()
+                        alchemy_bench_in_use = False
                     elif not inventory_in_use:
                         if placement_mode:
                             cancel_placement()
@@ -1823,15 +1939,21 @@ while running:
                         inventory.selection_mode = "hotbar"
                         inventory.selected_inventory_slot = None
                         inventory.close_drop_menu()
-                
-                inventory.handle_keydown_hotbar(event, screen=None, use_on_press=False)
+
+                # Disable hotbar key switching while placing a structure
+                if not placement_mode:
+                    inventory.handle_keydown_hotbar(event, screen=None, use_on_press=False)
                 
                 if crafting_bench_in_use:
                     crafting_bench.handle_key_event(event)
+                elif arcane_crafter_in_use:
+                    arcane_crafter.handle_key_event(event)
+                elif alchemy_bench_in_use:
+                    alchemy_bench.handle_key_event(event)
                 elif mortar_pestle_in_use:
                     mortar_pestle.handle_key_event(event)
                 # Allow exiting smelter/campfire with E or ESC even while UI is open
-                if (smelter_in_use or campfire_in_use or mortar_pestle_in_use) and event.key not in (pygame.K_e, pygame.K_ESCAPE):
+                if (smelter_in_use or campfire_in_use or mortar_pestle_in_use or alchemy_bench_in_use) and event.key not in (pygame.K_e, pygame.K_ESCAPE):
                     continue
 
             if inventory_in_use:
@@ -1858,7 +1980,7 @@ while running:
                 inventory.handle_level_up_event(event)
                 inventory.handle_cats_event(event)
 
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_f and not inventory_in_use and not crafting_bench_in_use and not mortar_pestle_in_use and player.is_alive:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_f and not inventory_in_use and not crafting_bench_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and player.is_alive:
                 consumed_item = False
                 success, tags = inventory.consume_item()
                 if success:
@@ -1873,7 +1995,7 @@ while running:
                         player.thirst_full_timer = getattr(player, "thirst_full_timer", 60)
                         sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
 
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_q and not crafting_bench_in_use and not smelter_in_use and not campfire_in_use and not mortar_pestle_in_use and not arcane_crafter_in_use:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_q and not crafting_bench_in_use and not smelter_in_use and not campfire_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and not arcane_crafter_in_use:
                 inventory_in_use = not inventory_in_use
                 inventory.ui_open = inventory_in_use
                 if not inventory_in_use:
@@ -1964,6 +2086,8 @@ while running:
                     or smelter_in_use
                     or crafting_bench_in_use
                     or arcane_crafter_in_use
+                    or mortar_pestle_in_use
+                    or alchemy_bench_in_use
                 )
                 if ui_context_open:
                     mouse_pos = pygame.mouse.get_pos()
@@ -2006,6 +2130,11 @@ while running:
                                     continue
                             elif arcane_crafter.open_drop_menu(slot_index, slot_type, mouse_pos):
                                 continue
+                    elif alchemy_bench_in_use:
+                        slot_index, is_hotbar = alchemy_bench.get_slot_at_mouse(mouse_pos, screen)
+                        if slot_index is not None:
+                            if alchemy_bench.open_drop_menu(slot_index, is_hotbar, mouse_pos):
+                                continue
                     
                     inventory.close_drop_menu()
                     continue
@@ -2020,6 +2149,7 @@ while running:
                 and not smelter_in_use
                 and not campfire_in_use
                 and not mortar_pestle_in_use
+                and not alchemy_bench_in_use
                 and not inventory_in_use
             ):
                 if placement_mode:
@@ -2314,6 +2444,25 @@ while running:
                         else:
                             arcane_crafter.cancel_drag()
 
+            # Alchemy bench drag handling
+            if alchemy_bench_in_use:
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    mouse_pos = pygame.mouse.get_pos()
+                    slot_index, is_hotbar = alchemy_bench.get_slot_at_mouse(mouse_pos, screen)
+                    if slot_index is not None:
+                        if alchemy_bench.dragging:
+                            alchemy_bench.end_drag(slot_index, is_hotbar)
+                        else:
+                            alchemy_bench.start_drag(slot_index, is_hotbar)
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    if alchemy_bench.dragging:
+                        mouse_pos = pygame.mouse.get_pos()
+                        slot_index, is_hotbar = alchemy_bench.get_slot_at_mouse(mouse_pos, screen)
+                        if slot_index is not None:
+                            alchemy_bench.end_drag(slot_index, is_hotbar)
+                        else:
+                            alchemy_bench.cancel_drag()
+
             # Mortar and Pestle drag handling
             if mortar_pestle_in_use:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -2333,11 +2482,11 @@ while running:
                         else:
                             mortar_pestle.cancel_drag()
 
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not arcane_crafter_in_use and not mortar_pestle_in_use:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not arcane_crafter_in_use and not alchemy_bench_in_use and not mortar_pestle_in_use:
                 mouse_pos = pygame.mouse.get_pos()
 
                 slot_index, is_hotbar = inventory.get_slot_at_mouse(mouse_pos, screen)
-                if is_hotbar:
+                if is_hotbar and not placement_mode:
                     mouse_attack_blocked = True
                     mouse_attack_block_expires = pygame.time.get_ticks() + 200
                     inventory.handle_selection_click(mouse_pos, screen)
@@ -2358,7 +2507,7 @@ while running:
                             if allow_drag:
                                 inventory.start_drag(slot_index, is_hotbar)
 
-            if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not mortar_pestle_in_use:
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not alchemy_bench_in_use and not mortar_pestle_in_use:
                 mouse_attack_blocked = False
                 if placement_mode:
                     # Try to place the item
@@ -2384,6 +2533,8 @@ while running:
                     scroll_target = crafting_bench
                 elif arcane_crafter_in_use:
                     scroll_target = arcane_crafter
+                elif alchemy_bench_in_use:
+                    scroll_target = alchemy_bench
                 elif mortar_pestle_in_use:
                     scroll_target = mortar_pestle
 
@@ -2392,7 +2543,7 @@ while running:
                         scroll_target.handle_mouse_scroll(1)
                     else:
                         scroll_target.handle_mouse_scroll(-1)
-                else:
+                elif not placement_mode:
                     if event.button == 4:
                         inventory.selected_hotbar_slot = (inventory.selected_hotbar_slot - 1) % inventory.hotbar_size
                     elif event.button == 5:
@@ -2463,6 +2614,9 @@ while running:
                 elif arcane_crafter_in_use:
                     mouse_pos = pygame.mouse.get_pos()
                     arcane_crafter.handle_mouse_click(mouse_pos, event.button, screen)
+                elif alchemy_bench_in_use:
+                    mouse_pos = pygame.mouse.get_pos()
+                    alchemy_bench.handle_mouse_click(mouse_pos, event.button, screen)
                 elif mortar_pestle_in_use:
                     mouse_pos = pygame.mouse.get_pos()
                     mortar_pestle.handle_mouse_click(mouse_pos, event.button, screen)
@@ -2483,6 +2637,9 @@ while running:
                 elif mortar_pestle_in_use:
                     mortar_pestle.close()
                     mortar_pestle_in_use = False
+                elif alchemy_bench_in_use:
+                    alchemy_bench.close()
+                    alchemy_bench_in_use = False
                 elif fast_travel_menu_active:
                     fast_travel_menu_active = False
                 elif tent_menu_active:
@@ -2588,7 +2745,7 @@ while running:
                                     campfire_in_use = True
                                     break
 
-                    if not crafting_bench_in_use and not smelter_in_use and not campfire_in_use and not mortar_pestle_in_use:
+                    if not crafting_bench_in_use and not smelter_in_use and not campfire_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use:
                         for structure in nearby_structures:
                             if structure['item_name'] == 'Mortar And Pestle':
                                 struct_collision = structure['rect']
@@ -2612,8 +2769,33 @@ while running:
                                     mortar_pestle.open((structure['x'], structure['y']))
                                     mortar_pestle_in_use = True
                                     break
+
+                    if not crafting_bench_in_use and not smelter_in_use and not campfire_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use:
+                        for structure in nearby_structures:
+                            if structure['item_name'] == 'Alchemy Bench':
+                                struct_collision = structure['rect']
+                                horizontal_dist = abs(struct_collision.centerx - player_world_x)
+                                vertical_dist = abs(struct_collision.centery - player_world_y)
+                                alchemy_reach = 20
+                                horizontal_range = (struct_collision.width / 2) + alchemy_reach
+                                vertical_range = (struct_collision.height / 2) + alchemy_reach
+
+                                facing_object = False
+                                if player.last_direction == "right" and struct_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                    facing_object = True
+                                elif player.last_direction == "left" and struct_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                    facing_object = True
+                                elif player.last_direction == "up" and struct_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                    facing_object = True
+                                elif player.last_direction == "down" and struct_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                    facing_object = True
+
+                                if facing_object:
+                                    alchemy_bench.open((structure['x'], structure['y']))
+                                    alchemy_bench_in_use = True
+                                    break
                     
-                    if not crafting_bench_in_use and not smelter_in_use and not campfire_in_use and not mortar_pestle_in_use:
+                    if not crafting_bench_in_use and not smelter_in_use and not campfire_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use:
                         for structure in nearby_structures:
                             if structure.get('item_name') == 'Tent':
                                 struct_collision = structure['rect']
@@ -2791,7 +2973,7 @@ while running:
         hotbar_rect = pygame.Rect(width/2 - 257, height - 70, 514, 55)
         mouse_over_hotbar = hotbar_rect.collidepoint(mouse_pos) if hotbar_rect else False
         
-        if not paused and not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not mortar_pestle_in_use and naming_cat is None and pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not mouse_over_hotbar:
+        if not paused and not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and naming_cat is None and pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not mouse_over_hotbar:
             if current_time - harvest_cooldown > harvest_delay:
                 held_item = get_selected_hotbar_item()
                 base_attack_val = int(round(player.damage + (player.strength_leveler - 1) * player.strength_level_gain))
@@ -3686,7 +3868,7 @@ while running:
         inventory.draw_hotbar(screen)
 
 
-        if not paused and not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not mortar_pestle_in_use and not tent_menu_active and not fast_travel_menu_active and not tent_hide_active and player.dead == False:
+        if not paused and not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and not tent_menu_active and not fast_travel_menu_active and not tent_hide_active and player.dead == False:
 
             if keys[pygame.K_e] and current_time - collect_cooldown > collect_delay:
                 for obj in visible_objects:
@@ -3957,7 +4139,7 @@ while running:
             if not in_liquid:
                 player.exit_liquid()
 
-            if not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not mortar_pestle_in_use and naming_cat is None:
+            if not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and naming_cat is None:
 
                 if (((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]) and (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT])) or (pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not mouse_over_hotbar)) and not player.exhausted:
                     if player.lose_stamina(screen, dt):
@@ -4267,7 +4449,7 @@ while running:
             screen.blit(full_text, (x, y))
             inventory.inventory_full_message_timer -= dt
 
-        if inventory_in_use or campfire_in_use or smelter_in_use or crafting_bench_in_use or arcane_crafter_in_use:
+        if inventory_in_use or campfire_in_use or smelter_in_use or crafting_bench_in_use or arcane_crafter_in_use or mortar_pestle_in_use or alchemy_bench_in_use:
             inventory.begin_hover_pass()
         else:
             inventory.clear_hover_state()
@@ -4368,6 +4550,12 @@ while running:
                 inventory.draw_drop_menu(screen)
                 inventory.draw_dragged_item(screen)
 
+        if alchemy_bench_in_use:
+            alchemy_bench.draw(screen)
+            if inventory.drop_menu_active:
+                inventory.draw_drop_menu(screen)
+                inventory.draw_dragged_item(screen)
+
         if mortar_pestle_in_use:
             mortar_pestle.draw(screen)
             if inventory.drop_menu_active:
@@ -4376,7 +4564,7 @@ while running:
 
         inventory.draw_hover_tooltip(screen)
 
-        if not paused and not inventory_in_use and naming_cat is None and not crafting_bench_in_use and not arcane_crafter_in_use and not mortar_pestle_in_use:
+        if not paused and not inventory_in_use and naming_cat is None and not crafting_bench_in_use and not arcane_crafter_in_use and not alchemy_bench_in_use and not mortar_pestle_in_use:
             if keys[pygame.K_o]:
                 dungeon_depth -= 500
                 absolute_cam_x -= 500

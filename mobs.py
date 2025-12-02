@@ -1308,9 +1308,6 @@ class Cat(Mob):
         self.speed = self.speed_stat / 100.0
         self.attack = max(5, int(self.level * 4 * self.attack_leveler))
         self.defense = max(5, int(self.level * 5 * self.defense_leveler))
-        # Let Cat control its own movement logic (follow/attack) without
-        # random wandering from the base Mob.update.
-        self.disable_autonomous_movement = True
 
         # Passive experience gain timer (for time-based XP)
         self._exp_time_accumulator = 0.0
@@ -1554,6 +1551,9 @@ class Cat(Mob):
             if self.tame >= self.tame_max and not self.tamed:
                 self.tamed = True
                 self.just_tamed = True
+                # Once tamed, let Cat handle its own follow/attack movement
+                # instead of random wandering in the base Mob.update.
+                self.disable_autonomous_movement = True
             
             # Play cat purr sound
             sound_manager.play_sound(random.choice(["cat_purr1", "cat_purr2"]))
