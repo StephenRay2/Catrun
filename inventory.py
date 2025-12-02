@@ -4862,7 +4862,7 @@ items_list = [
         "type": "building_material",
         "description": "Nailed it. A sturdy metal nail. Used in various building recipes.",
         "use_effect": None,
-        "placeable": True,
+        "placeable": False,
         "consumable": False,
         "durability": None,
         "recipe": [{"item": "Metal Ingot", "amount": 1}],
