@@ -3497,6 +3497,15 @@ class Pock(Enemy):
         self.throw_cooldown = 0
         self.throw_cooldown_duration = 90
 
+        # Melee attack (used when the target is very close)
+        self.attacking = False
+        self.attack_timer = 0
+        self.attack_duration = 20
+        # Use a slightly larger melee radius than the minimum throw range
+        # so that when the player is "too close to throw", the Pock swaps
+        # to a regular melee instead of trying to walk in place.
+        self.melee_range_sq = 45 * 45
+
         self.attack_damage = 5
         self.base_speed = 120
         self.speed = 1
@@ -3518,13 +3527,58 @@ class Pock(Enemy):
         dy = target_world_y - self.rect.centery
         distance_sq = dx*dx + dy*dy
 
+        # Always face the target while engaged.
+        self.last_direction = "right" if dx >= 0 else "left"
+
+        # === Melee attack when very close ===
+        if distance_sq <= self.melee_range_sq:
+            # Stop trying to walk into the target when already in melee.
+            self.direction.xy = (0, 0)
+            # Cancel any ongoing throw so we fully commit to melee.
+            self.throwing = False
+            self.rock_spawned = False
+
+            if not self.attacking and self.is_alive:
+                self.attacking = True
+                self.attack_timer = self.attack_duration
+                self.frame_index = 0.0
+
+            if self.attacking:
+                # Reuse idle frames as a simple melee animation.
+                frames = self.stand_right_images if self.last_direction == "right" else self.stand_left_images
+                if frames:
+                    self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+                    self.image = frames[int(self.frame_index)]
+
+                self.attack_timer -= 1
+
+                # Apply damage halfway through the swing if still in range.
+                if self.attack_timer == self.attack_duration // 2 and distance_sq <= self.melee_range_sq:
+                    if hasattr(target_entity, "health"):
+                        target_entity.health = max(0, target_entity.health - self.attack_damage)
+                        # Play the regular player hit sound when hitting the player.
+                        try:
+                            if isinstance(target_entity, Player):
+                                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                        except NameError:
+                            # Fallback if Player is not in scope for any reason.
+                            pass
+
+                if self.attack_timer <= 0:
+                    self.attacking = False
+                    self.frame_index = 0.0
+                    self.image = (self.stand_right_images[0] if self.last_direction == "right"
+                                  else self.stand_left_images[0])
+
+            # While in melee mode we skip ranged throwing logic.
+            return
+
         if self.is_alive and self.throw_min_range_sq < distance_sq < self.throw_max_range_sq and self.throw_cooldown <= 0:
             if not self.throwing:
                 self.throwing = True
                 self.throw_timer = self.throw_duration
                 self.frame_index = 0.0
                 self.rock_spawned = False
-                self.last_direction = "right" if dx >= 0 else "left"
                 self.direction.xy = (0, 0)
         elif not self.throwing and distance_sq >= self.throw_min_range_sq:
             # Walk toward the target between throws to close the gap.
