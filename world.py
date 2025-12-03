@@ -100,11 +100,13 @@ grassland_tree_types = [
     {"type": "Duskwood Tree", "image": "assets/sprites/biomes/grassland/DuskwoodTree.png", "bare_image": None, "fruit": None, "wood": "Dusk Wood", "width" : 64, "height" : 128},
     {"type": "Fir Tree", "image": "assets/sprites/biomes/grassland/FirTree.png", "bare_image": None, "fruit": None, "wood": "Fir Wood", "width" : 64, "height" : 128},
     {"type": "Oak Tree", "image": "assets/sprites/biomes/grassland/OakTree.png", "bare_image": None, "fruit": None, "wood": "Oak Wood", "width" : 64, "height" : 128}, 
-    {"type": "Willow Tree", "image": "assets/sprites/biomes/grassland/WillowTree.png", "bare_image": None, "fruit": None, "wood": "Willow Wood", "width" : 128, "height" : 128}
+    {"type": "Willow Tree", "image": "assets/sprites/biomes/marsh/WillowTree.png", "bare_image": None, "fruit": None, "wood": "Willow Wood", "width" : 128, "height" : 128}
 ]
 
-savannah_tree_types = [{"type": "Orange Tree", "image": "assets/sprites/biomes/grassland/OrangeTree.png", "bare_image": "assets/sprites/biomes/grassland/BareOrangeTree.png", "fruit": "Oranges", "wood": "Orange Wood", "width" : 96, "height" : 96}, 
-{"type": "Olive Tree", "image": "assets/sprites/biomes/grassland/OliveTree.png", "bare_image": "assets/sprites/biomes/grassland/BareOliveTree.png", "fruit": "Olives", "wood": "Olive Wood", "width" : 96, "height" : 128}]
+savannah_tree_types = [
+    {"type": "Orange Tree", "image": "assets/sprites/biomes/savannah/OrangeTree.png", "bare_image": "assets/sprites/biomes/savannah/BareOrangeTree.png", "fruit": "Oranges", "wood": "Orange Wood", "width" : 96, "height" : 96},
+    {"type": "Olive Tree", "image": "assets/sprites/biomes/savannah/OliveTree.png", "bare_image": "assets/sprites/biomes/savannah/BareOliveTree.png", "fruit": "Olives", "wood": "Olive Wood", "width" : 96, "height" : 128}
+]
 
 beach_tree_types = [{"type": "Palm Tree", "image": "assets/sprites/biomes/beach/PalmTree.png", "bare_image": "assets/sprites/biomes/beach/BarePalmTree.png", "fruit": "Coconuts", "wood": "Palm Wood", "width" : 64, "height" : 128}]
 
@@ -135,9 +137,24 @@ snowy_stone_data = [
     {"resource": "Stone", "icon": "assets/sprites/items/Stone.png", "image10": "assets/sprites/biomes/snow/SnowyStone10.png"}
 ]
 
-redrock_rock_images = ["assets/sprites/biomes/grassland/RedrockRock1.png", "assets/sprites/biomes/grassland/RedrockRock2.png", "assets/sprites/biomes/grassland/RedrockRock3.png", "assets/sprites/biomes/grassland/RedrockRock4.png", "assets/sprites/biomes/grassland/RedrockRock6.png"]
+redrock_rock_images = [
+    "assets/sprites/biomes/redrock/RedrockRock1.png",
+    "assets/sprites/biomes/redrock/RedrockRock2.png",
+    "assets/sprites/biomes/redrock/RedrockRock3.png",
+    "assets/sprites/biomes/redrock/RedrockRock4.png",
+    "assets/sprites/biomes/redrock/RedrockRock5.png",
+    "assets/sprites/biomes/redrock/RedrockRock6.png",
+]
 
-redrock_boulder_images = ["assets/sprites/biomes/grassland/RedrockBoulder1.png", "assets/sprites/biomes/grassland/RedrockBoulder2.png", "assets/sprites/biomes/grassland/RedrockBoulder3.png", "assets/sprites/biomes/grassland/RedrockBoulder4.png", "assets/sprites/biomes/grassland/RedrockBoulder5.png", "assets/sprites/biomes/grassland/RedrockBoulder6.png", "assets/sprites/biomes/grassland/RedrockBoulder7.png", ]
+redrock_boulder_images = [
+    "assets/sprites/biomes/redrock/RedrockBoulder1.png",
+    "assets/sprites/biomes/redrock/RedrockBoulder2.png",
+    "assets/sprites/biomes/redrock/RedrockBoulder3.png",
+    "assets/sprites/biomes/redrock/RedrockBoulder4.png",
+    "assets/sprites/biomes/redrock/RedrockBoulder5.png",
+    "assets/sprites/biomes/redrock/RedrockBoulder6.png",
+    "assets/sprites/biomes/redrock/RedrockBoulder7.png",
+]
 
 berry_bush_types = [
     {"image": "assets/sprites/biomes/grassland/BloodBerryBush.png", "bare_image": "assets/sprites/biomes/grassland/BareBloodBerryBush.png", "berry": "Blood Berries", "resource": "Sticks"},
@@ -221,10 +238,10 @@ grass_data = [
 ]
 
 savannah_grass_data = [
-    {"resource": "Fiber", "icon": "assets/sprites/items/SavannahGrass.png", "image1": "assets/sprites/biomes/grassland/SavannahGrass1.png"},
-    {"resource": "Fiber", "icon": "assets/sprites/items/SavannahGrass.png", "image2": "assets/sprites/biomes/grassland/SavannahGrass2.png"},
-    {"resource": "Fiber", "icon": "assets/sprites/items/SavannahGrass.png", "image3": "assets/sprites/biomes/grassland/SavannahGrass3.png"},
-    {"resource": "Fiber", "icon": "assets/sprites/items/SavannahGrass.png", "image4": "assets/sprites/biomes/grassland/SavannahGrass4.png"}
+    {"resource": "Fiber", "icon": "assets/sprites/items/SavannahGrass.png", "image1": "assets/sprites/biomes/savannah/SavannahGrass1.png"},
+    {"resource": "Fiber", "icon": "assets/sprites/items/SavannahGrass.png", "image2": "assets/sprites/biomes/savannah/SavannahGrass2.png"},
+    {"resource": "Fiber", "icon": "assets/sprites/items/SavannahGrass.png", "image3": "assets/sprites/biomes/savannah/SavannahGrass3.png"},
+    {"resource": "Fiber", "icon": "assets/sprites/items/SavannahGrass.png", "image4": "assets/sprites/biomes/savannah/SavannahGrass4.png"}
 ]
 
 fern_data = [{"image": "assets/sprites/biomes/lavastone/FireFern.png", "resource": "Fire Fern Leaf", "biome" : "lavastone"}, 
@@ -1153,15 +1170,19 @@ class SaltBank(Bank):
 
 class ClayBank(Bank):
     def __init__(self, x, y):
-        super().__init__("assets/sprites/biomes/grassland/ClayBank.png", x, y, "Clay", resource_amount=random.randint(20, 40))
+        super().__init__("assets/sprites/biomes/marsh/ClayBank.png", x, y, "Clay", resource_amount=random.randint(20, 40))
 
 class SnowBank(Bank):
     def __init__(self, x, y):
         super().__init__("assets/sprites/biomes/snow/SnowBank.png", x, y, "Snowball", resource_amount=random.randint(20, 40))
 
-class SandBank(Bank):
+class BeachSandBank(Bank):
     def __init__(self, x, y):
-        super().__init__("assets/sprites/biomes/desert/SandBank.png", x, y, "Sand", resource_amount=random.randint(20, 40))
+        super().__init__("assets/sprites/biomes/beach/BeachSandBank.png", x, y, "Sand", resource_amount=random.randint(20, 40))
+
+class DesertSandBank(Bank):
+    def __init__(self, x, y):
+        super().__init__("assets/sprites/biomes/desert/DesertSandBank.png", x, y, "Sand", resource_amount=random.randint(20, 40))
 
 class Grass(Collectible):
     def __init__(self, x, y):
@@ -1173,12 +1194,12 @@ class SavannahGrass(Collectible):
     def __init__(self, x, y):
         self.amount = random.randint(3, 6)
         image_index = random.randint(1, 4)
-        image_path = f"assets/sprites/biomes/grassland/SavannahGrass{image_index}.png"
+        image_path = f"assets/sprites/biomes/savannah/SavannahGrass{image_index}.png"
         super().__init__(x, y, image_path, "Fiber", size=(64, 64))
 
 class MarshReed(Collectible):
     def __init__(self, x, y):
-        super().__init__(x, y, "assets/sprites/biomes/grassland/MarshReed.png", "Marsh Reed", size=(64, 64))
+        super().__init__(x, y, "assets/sprites/biomes/marsh/MarshReed.png", "Marsh Reed", size=(64, 64))
 
     def draw(self, screen, cam_x):
         if self.destroyed:
@@ -1197,11 +1218,12 @@ class Mushroom(Collectible):
 bg_green = pygame.Surface((width, height))
 bg_grass = pygame.image.load("assets/sprites/biomes/backgrounds/bg_grass.png").convert()
 bg_dirt = pygame.image.load("assets/sprites/biomes/backgrounds/bg_dirt.png").convert()
-bg_compact = pygame.image.load("assets/sprites/biomes/backgrounds/bg_compact_dirt.png").convert()
-bg_sand = pygame.image.load("assets/sprites/biomes/backgrounds/bg_sand.png").convert()
+bg_marsh = pygame.image.load("assets/sprites/biomes/backgrounds/bg_marsh.png").convert()
+bg_beach = pygame.image.load("assets/sprites/biomes/backgrounds/bg_beach.png").convert()
+bg_desert = pygame.image.load("assets/sprites/biomes/backgrounds/bg_desert.png").convert()
 bg_savannah = pygame.image.load("assets/sprites/biomes/backgrounds/bg_savannah.png").convert()
-bg_riverrock = pygame.image.load("assets/sprites/biomes/backgrounds/bg_riverrock.png").convert()
-bg_bigrock = pygame.image.load("assets/sprites/biomes/backgrounds/bg_bigrock.png").convert()
+bg_river = pygame.image.load("assets/sprites/biomes/backgrounds/bg_river.png").convert()
+bg_mountain = pygame.image.load("assets/sprites/biomes/backgrounds/bg_mountain.png").convert()
 bg_duskstone = pygame.image.load("assets/sprites/biomes/backgrounds/bg_duskstone.png").convert()
 bg_lavastone = pygame.image.load("assets/sprites/biomes/backgrounds/bg_lavastone.png").convert()
 bg_snow = pygame.image.load("assets/sprites/biomes/backgrounds/bg_snow.png").convert()
@@ -1211,11 +1233,12 @@ bg_redrock = pygame.image.load("assets/sprites/biomes/backgrounds/bg_redrock.png
 
 bg_dirt = pygame.transform.scale(bg_dirt, (width, height))
 bg_grass = pygame.transform.scale(bg_grass, (width, height))
-bg_compact = pygame.transform.scale(bg_compact, (width, height))
-bg_sand = pygame.transform.scale(bg_sand, (width, height))
+bg_marsh = pygame.transform.scale(bg_marsh, (width, height))
+bg_beach = pygame.transform.scale(bg_beach, (width, height))
+bg_desert = pygame.transform.scale(bg_desert, (width, height))
 bg_savannah = pygame.transform.scale(bg_savannah, (width, height))
-bg_riverrock = pygame.transform.scale(bg_riverrock, (width, height))
-bg_bigrock = pygame.transform.scale(bg_bigrock, (width, height))
+bg_river = pygame.transform.scale(bg_river, (width, height))
+bg_mountain = pygame.transform.scale(bg_mountain, (width, height))
 bg_duskstone = pygame.transform.scale(bg_duskstone, (width, height))
 bg_lavastone = pygame.transform.scale(bg_lavastone, (width, height))
 bg_wasteland = pygame.transform.scale(bg_wasteland, (width, height))
@@ -1223,6 +1246,11 @@ bg_snow = pygame.transform.scale(bg_snow, (width, height))
 bg_blackstone = pygame.transform.scale(bg_blackstone, (width, height))
 bg_redrock = pygame.transform.scale(bg_redrock, (width, height))
 bg_green.fill((0, 120, 0))
+# Legacy aliases to avoid touching all downstream references
+bg_compact = bg_marsh
+bg_sand = bg_beach
+bg_riverrock = bg_river
+bg_bigrock = bg_mountain
 
 background_image = bg_grass
 background_image = pygame.transform.scale(background_image, (width, height))
@@ -1236,15 +1264,15 @@ for i in range(-1, 6):
 for i in range(6, 20):
     tiles.append((i * BACKGROUND_SIZE, bg_dirt))
 for i in range(20, 40):
-    tiles.append((i * BACKGROUND_SIZE, bg_compact))
+    tiles.append((i * BACKGROUND_SIZE, bg_marsh))
 for i in range(40, 60):
-    tiles.append((i * BACKGROUND_SIZE, bg_sand))
+    tiles.append((i * BACKGROUND_SIZE, bg_beach))
 for i in range(60, 86):
     tiles.append((i * BACKGROUND_SIZE, bg_savannah))
 for i in range(86, 116):
-    tiles.append((i * BACKGROUND_SIZE, bg_riverrock))
+    tiles.append((i * BACKGROUND_SIZE, bg_river))
 for i in range(116, 144):
-    tiles.append((i * BACKGROUND_SIZE, bg_bigrock))
+    tiles.append((i * BACKGROUND_SIZE, bg_mountain))
 for i in range(144, 150):
     tiles.append((i * BACKGROUND_SIZE, bg_grass))
 for i in range(150, 180):
@@ -1265,10 +1293,12 @@ for i in range(380, 390):
     tiles.append((i * BACKGROUND_SIZE, bg_grass))
 for i in range(390, 401):
     tiles.append((i * BACKGROUND_SIZE, bg_redrock))
+for i in range(401, 421):
+    tiles.append((i * BACKGROUND_SIZE, bg_desert))
 
 
 
-allowed_rock_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_lavastone, bg_wasteland, bg_blackstone, bg_redrock]
+allowed_rock_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_lavastone, bg_wasteland, bg_blackstone, bg_redrock, bg_desert]
 
 rock_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_rock_tiles]
 
@@ -1284,7 +1314,8 @@ rock_weights = {
     bg_snow: 1,
     bg_wasteland: 1,
     bg_blackstone: 1,
-    bg_redrock: 10
+    bg_redrock: 10,
+    bg_desert: 3
 }
 
 weighted_rock_tiles = []
@@ -1417,7 +1448,7 @@ for tile_x, tile_image in tiles:
 
 
 
-allowed_stick_tiles = [bg_grass, bg_dirt, bg_compact, bg_sand, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_wasteland, bg_blackstone, bg_redrock]
+allowed_stick_tiles = [bg_grass, bg_dirt, bg_compact, bg_sand, bg_desert, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_wasteland, bg_blackstone, bg_redrock]
 
 stick_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_stick_tiles]
 
@@ -1426,6 +1457,7 @@ stick_weights = {
     bg_dirt: 2,
     bg_compact: 1,
     bg_sand: 1,
+    bg_desert: 1,
     bg_savannah: 3,
     bg_riverrock: 1,
     bg_bigrock: 1,
@@ -1445,7 +1477,7 @@ for tile_x, tile_image in tiles:
 
 
 
-allowed_stone_tiles = [bg_grass, bg_dirt, bg_compact, bg_sand, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_wasteland, bg_blackstone, bg_redrock]
+allowed_stone_tiles = [bg_grass, bg_dirt, bg_compact, bg_sand, bg_desert, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_wasteland, bg_blackstone, bg_redrock]
 
 stone_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_stone_tiles]
 
@@ -1454,6 +1486,7 @@ stone_weights = {
     bg_dirt: 2,
     bg_compact: 1,
     bg_sand: 1,
+    bg_desert: 1,
     bg_savannah: 3,
     bg_riverrock: 1,
     bg_bigrock: 1,
@@ -1545,11 +1578,11 @@ for tile_x, tile_image in tiles:
     weighted_mushroom_tiles.extend([(tile_x, tile_image)] * weight)
 
 
-allowed_clay_bank_tiles = [bg_compact, bg_riverrock, bg_bigrock, bg_wasteland]
+allowed_clay_bank_tiles = [bg_marsh, bg_river, bg_mountain, bg_wasteland]
 clay_bank_weights = {
-    bg_compact: 4,
-    bg_riverrock: 2,
-    bg_bigrock: 1,
+    bg_marsh: 4,
+    bg_river: 2,
+    bg_mountain: 1,
     bg_wasteland: 1
 }
 weighted_clay_bank_tiles = []
@@ -1558,9 +1591,9 @@ for tile_x, tile_image in tiles:
     if weight > 0:
         weighted_clay_bank_tiles.extend([(tile_x, tile_image)] * weight)
 
-allowed_salt_bank_tiles = [bg_sand]
+allowed_salt_bank_tiles = [bg_beach]
 salt_bank_weights = {
-    bg_sand: 1
+    bg_beach: 1
 }
 weighted_salt_bank_tiles = []
 for tile_x, tile_image in tiles:
@@ -1568,15 +1601,23 @@ for tile_x, tile_image in tiles:
     if weight > 0:
         weighted_salt_bank_tiles.extend([(tile_x, tile_image)] * weight)
 
-allowed_sand_bank_tiles = [bg_wasteland]
-sand_bank_weights = {
-    bg_sand: 1
+allowed_beach_sand_bank_tiles = [bg_beach]
+allowed_desert_sand_bank_tiles = [bg_desert]
+beach_sand_bank_weights = {
+    bg_beach: 1
 }
-weighted_sand_bank_tiles = []
+desert_sand_bank_weights = {
+    bg_desert: 1
+}
+weighted_beach_sand_bank_tiles = []
+weighted_desert_sand_bank_tiles = []
 for tile_x, tile_image in tiles:
-    weight = sand_bank_weights.get(tile_image, 0)
+    weight = beach_sand_bank_weights.get(tile_image, 0)
     if weight > 0:
-        weighted_sand_bank_tiles.extend([(tile_x, tile_image)] * weight)
+        weighted_beach_sand_bank_tiles.extend([(tile_x, tile_image)] * weight)
+    weight = desert_sand_bank_weights.get(tile_image, 0)
+    if weight > 0:
+        weighted_desert_sand_bank_tiles.extend([(tile_x, tile_image)] * weight)
 
 allowed_snow_bank_tiles = [bg_snow]
 snow_bank_weights = {
@@ -1596,6 +1637,7 @@ dead_bush_weights = {
     bg_dirt: 4,
     bg_compact: 6,
     bg_sand: 4,
+    bg_desert: 4,
     bg_savannah: 4,
     bg_riverrock: 4,
     bg_bigrock: 4,
@@ -1870,12 +1912,19 @@ def generate_world():
             y = random.randint(0, height - 64)
             banks.append(SaltBank(x, y))
 
-    if weighted_sand_bank_tiles:
-        for _ in range(num_sand_banks):
-            tile_x, tile_image = random.choice(weighted_sand_bank_tiles)
+    if weighted_beach_sand_bank_tiles:
+        for _ in range(max(1, num_sand_banks // 2)):
+            tile_x, tile_image = random.choice(weighted_beach_sand_bank_tiles)
             x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
             y = random.randint(0, height - 64)
-            banks.append(SandBank(x, y))
+            banks.append(BeachSandBank(x, y))
+
+    if weighted_desert_sand_bank_tiles:
+        for _ in range(num_sand_banks - max(1, num_sand_banks // 2)):
+            tile_x, tile_image = random.choice(weighted_desert_sand_bank_tiles)
+            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            y = random.randint(0, height - 64)
+            banks.append(DesertSandBank(x, y))
 
     if weighted_snow_bank_tiles:
         for _ in range(num_snow_banks):

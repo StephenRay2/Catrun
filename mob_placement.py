@@ -703,21 +703,10 @@ for _ in range(num_salamanders):
     y = random.randint(0, height - 64)
     salamanders.append(Salamander(x, y, "Salamander"))
 
-allowed_redmite_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah]
+allowed_redmite_tiles = [bg_redrock]
 
 redmite_spawn_weights = {
-    bg_grass: 2,
-    bg_dirt: 2,
-    bg_compact: 2,
-    bg_savannah: 1,
-    bg_riverrock: 0,
-    bg_bigrock: 0,
-    bg_duskstone: 0,
-    bg_lavastone: 0,
-    bg_snow: 0,
-    bg_wasteland: 0,
-    bg_blackstone: 0,
-    bg_redrock: 0
+    bg_redrock: 6
 }
 
 weighted_redmite_tiles = []
