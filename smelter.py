@@ -391,7 +391,7 @@ class Smelter:
             self.dragged_from_type = None
             self.dragged_source_container = None
         
-        def update_input_state(idx):
+        def update_input_state(idx, reset_progress=True):
             if idx is None:
                 return
             if idx < 0 or idx >= len(self.input_slots):
@@ -401,7 +401,8 @@ class Smelter:
                 self.smelting_progress[idx] = 0.0
             elif self.fire_lit:
                 self.is_smelting[idx] = True
-                self.smelting_progress[idx] = 0.0
+                if reset_progress:
+                    self.smelting_progress[idx] = 0.0
         
         if slot_type in ["inventory", "hotbar"]:
             target_container = self.inventory.hotbar_slots if slot_type == "hotbar" else self.inventory.inventory_list
@@ -444,21 +445,26 @@ class Smelter:
                 can_place = self.has_fuel_tag(self.dragged_item["item_name"])
             
             target_slot = target_container[slot_index]
+            original_target = target_slot
             
             if not can_place:
                 restore_source(self.dragged_item)
                 finish()
                 return
-            
+
+            placed_new_input = False
+            stacked_same_item = False
+            swapped_item = False
+
             if target_slot is None:
                 target_container[slot_index] = self.dragged_item
+                placed_new_input = True
             elif target_slot["item_name"] == self.dragged_item["item_name"]:
                 max_stack = 100
                 for item in items_list:
                     if item["item_name"] == self.dragged_item["item_name"]:
                         max_stack = item["stack_size"]
                         break
-                
                 space_available = max_stack - target_slot["quantity"]
                 amount_to_add = min(space_available, self.dragged_item["quantity"])
                 
@@ -467,13 +473,17 @@ class Smelter:
                 
                 if self.dragged_item["quantity"] > 0:
                     restore_source(self.dragged_item)
+                stacked_same_item = True
             else:
                 target_container[slot_index] = self.dragged_item
                 restore_source(target_slot)
+                swapped_item = True
             
             # Reset smelting state for affected input slots when fire is lit
             if target_container is self.input_slots:
-                update_input_state(slot_index)
+                # Only reset progress if a new or different item was placed.
+                reset = placed_new_input or swapped_item
+                update_input_state(slot_index, reset_progress=reset)
             if source_container is self.input_slots:
                 update_input_state(self.dragged_from_slot)
             

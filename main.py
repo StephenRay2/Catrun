@@ -4,6 +4,7 @@ import random
 pygame.init()
 from buttons import *
 from mob_placement import *
+import mob_placement
 from sounds import *
 from crafting_bench import CraftingBench
 from arcane_crafter import ArcaneCrafter
@@ -78,6 +79,12 @@ light_mask_cache = {}  # Cache for radial light masks
 LIGHT_THROW_ITEMS = {"Feathers", "Phoenix Feather"}
 STONE_THROW_ITEMS = {"Stone", "Redrock Stone", "Snowy Stone"}
 BREAK_ON_HIT_ITEMS = {"Throwing Star", "Throwing Knife", "Snowball"}
+
+# Hold-to-consume (F key) timing (milliseconds)
+consume_hold_active = False
+consume_hold_next_time = 0
+consume_hold_initial_delay = 350  # delay before auto-repeat kicks in
+consume_hold_interval = 120       # interval between repeated consumes
 
 # Light flicker variables
 light_flicker_timer = 0
@@ -638,7 +645,7 @@ def apply_snowball_slow_effect(mob, stack_duration=1.5, max_duration=7.5, max_st
     current_timer = getattr(mob, "snowball_slow_timer", 0.0)
     mob.snowball_slow_timer = min(max_duration, current_timer + stack_duration)
 
-def handle_thrown_hit(thrown_item, mob, base_attack):
+def handle_thrown_hit(thrown_item, mob, base_attack, attacker=None):
     if not thrown_item or thrown_item.get("is_cat"):
         return
     item_data = thrown_item.get("item")
@@ -647,6 +654,8 @@ def handle_thrown_hit(thrown_item, mob, base_attack):
     damage = calculate_thrown_damage(item_data, base_attack)
     if damage > 0:
         mob.health = max(0, mob.health - damage)
+        if attacker is not None and hasattr(mob, "register_attack"):
+            mob.register_attack(attacker)
         if item_data.get("item_name", "").lower() == "snowball":
             apply_snowball_slow_effect(mob)
     break_on_hit = thrown_item.get("break_on_hit", False)
@@ -1696,17 +1705,54 @@ while running:
                     y = random.randint(0, height - 64)
                     wastedogs.append(Wastedog(x, y, "Wastedog"))
 
-            for _ in range(num_wolves):
-                if weighted_wolf_tiles:
-                    tile_x, tile_image = random.choice(weighted_wolf_tiles)
-                    attempts = 0
-                    while attempts < 10:
-                        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-                        y = random.randint(0, height - 64)
-                        if not is_in_spawn_protection(x, y):
-                            wolves.append(Wolf(x, y, "Wolf"))
-                            break
-                        attempts += 1
+            pack_sizes = []
+            remaining_wolves = num_wolves
+            while remaining_wolves > 0:
+                pack_size = random.randint(3, 6)
+                if pack_size > remaining_wolves:
+                    pack_size = remaining_wolves
+                pack_sizes.append(pack_size)
+                remaining_wolves -= pack_size
+
+            if len(pack_sizes) > 1:
+                i = 0
+                while i < len(pack_sizes):
+                    if pack_sizes[i] == 1:
+                        if i > 0:
+                            pack_sizes[i - 1] += 1
+                            pack_sizes.pop(i)
+                            continue
+                        elif i + 1 < len(pack_sizes):
+                            pack_sizes[i + 1] += 1
+                            pack_sizes.pop(i)
+                            continue
+                    i += 1
+
+            for pack_id, size in enumerate(pack_sizes):
+                if not weighted_wolf_tiles:
+                    break
+                tile_x, tile_image = random.choice(weighted_wolf_tiles)
+
+                pack_center = None
+                attempts = 0
+                while attempts < 20:
+                    cx = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    cy = random.randint(0, height - 64)
+                    if not is_in_spawn_protection(cx, cy):
+                        pack_center = (cx, cy)
+                        break
+                    attempts += 1
+
+                if pack_center is None:
+                    continue
+
+                base_x, base_y = pack_center
+                for _ in range(size):
+                    offset_x = random.randint(-32, 32)
+                    offset_y = random.randint(-32, 32)
+                    x = base_x + offset_x
+                    y = base_y + offset_y
+                    wolves.append(Wolf(x, y, "Wolf", pack_id=pack_id + 1))
 
             for _ in range(num_pocks):
                 tile_x, tile_image = random.choice(weighted_pock_tiles)
@@ -1847,7 +1893,7 @@ while running:
             player.max_warmth = 100
             player.max_heat_resistance = int(round(100 * player.weather_resistance_leveler))
             player.max_cold_resistance = int(round(100 * player.weather_resistance_leveler))
-            player.max_weight = int(round(400 * player.weight_leveler * player.temp_weight_increase))
+            player.max_weight = int(round(100 * player.weight_leveler * player.temp_weight_increase))
             player.attack = int(round(player.damage + (player.strength_leveler - 1) * player.strength_level_gain))
             player.speed = int(round(100 * player.speed_leveler))
             player.defense = int(round(100 * player.defense_leveler))
@@ -1876,21 +1922,21 @@ while running:
             thrown_items = []
 
             inventory.state = "inventory"
-            # starter_items = [
-            #     "Arcane Crafter",
-            #     "Smelter",
-            #     "Workbench",
-            #     "Mortar And Pestle",
-            #     "Tent",
-            #     "Fire Dragon Scale Sword",
-            #     "Fire Dragon Scale Pickaxe",
-            #     "Chest",
-            #     "Chest"
-            # ]
-            # # Add 20 torches (will stack) plus other starter items
-            # torch_stack = ["Torch"] * 10
-            # beef_stack = ["Raw Beef"] * 20
-            # inventory.add(torch_stack + starter_items + beef_stack)
+            starter_items = [
+                # "Arcane Crafter",
+                # "Smelter",
+                # "Workbench",
+                # "Mortar And Pestle",
+                "Tent",
+                "Fire Dragon Scale Sword",
+                "Fire Dragon Scale Pickaxe",
+                "Chest",
+                "Chest"
+            ]
+            # Add 20 torches (will stack) plus other starter items
+            torch_stack = ["Torch"] * 10
+            beef_stack = ["Raw Beef"] * 20
+            inventory.add(torch_stack + starter_items + beef_stack)
             
             from world import gemstone_rocks, GemstoneRock
             gemstone_rocks.append(GemstoneRock(int(player_pos.x + cam_x + 100), int(player_pos.y + 50)))
@@ -1905,7 +1951,29 @@ while running:
             player_world_x = player_pos.x + cam_x
             player_world_y = player_pos.y
         inventory.ui_open = inventory_in_use or campfire_in_use or smelter_in_use or crafting_bench_in_use or mortar_pestle_in_use or alchemy_bench_in_use or chest_in_use or inventory.drop_menu_active or tent_menu_active or fast_travel_menu_active
-        
+
+        # Update any scheduled animal respawns so populations stay healthy.
+        mob_placement.process_respawns()
+
+        # Banks (e.g., snowbanks) no longer block the player but add a
+        # slight movement slow while standing on them.
+        player.ground_slow_factor = 1.0
+        # Only apply terrain slow while in the world (not in tent sleep/hide).
+        if not (sleeping_in_tent or tent_hide_active):
+            player_rect_world = pygame.Rect(
+                int(player_world_x - player.rect.width / 2),
+                int(player_world_y - player.rect.height / 2),
+                player.rect.width,
+                player.rect.height,
+            )
+            for bank in banks:
+                if getattr(bank, "destroyed", False):
+                    continue
+                bank_rect = bank.get_collision_rect(0) if hasattr(bank, "get_collision_rect") else bank.rect
+                if player_rect_world.colliderect(bank_rect):
+                    player.ground_slow_factor = 0.75
+                    break
+
         player_speed = player.get_speed()
         if player.swimming:
             player_speed *= 0.5
@@ -2046,6 +2114,13 @@ while running:
                         sound_manager.play_sound(random.choice([f"consume_item{i}" for i in range(1, 7)]))
                     elif any(tag in tags for tag in ["liquid", "consumable"]):
                         sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
+                    # Start hold-to-consume after initial delay
+                    consume_hold_active = True
+                    consume_hold_next_time = pygame.time.get_ticks() + consume_hold_initial_delay
+                else:
+                    # No consumable item; do not start hold-to-consume
+                    consume_hold_active = False
+
                 if not consumed_item and player.swimming and player.current_liquid and not player.in_lava:
                     if getattr(player.current_liquid, "liquid_type", "") == "water":
                         player.thirst = player.max_thirst
@@ -2606,7 +2681,44 @@ while running:
                     if slot_index is not None:
                         inventory.end_drag(slot_index, is_hotbar, screen)
                     else:
-                        inventory.cancel_drag()
+                        # If dragging from a hotbar slot and released over the world,
+                        # drop the dragged item into the world at the player's feet.
+                        dropped_from_hotbar = False
+                        if inventory.dragged_from_hotbar and inventory.dragged_item:
+                            from mobs import DroppedItem
+                            icon_path = None
+                            for item in items_list:
+                                if item["item_name"] == inventory.dragged_item.get("item_name"):
+                                    icon = item.get("icon")
+                                    if icon:
+                                        icon_path = icon if icon.startswith("assets/") else f"assets/sprites/items/{icon}"
+                                    break
+                            if icon_path is None:
+                                icon_path = inventory.dragged_item.get("icon")
+                                if icon_path and not icon_path.startswith("assets/"):
+                                    icon_path = f"assets/sprites/items/{icon_path}"
+                            amount = inventory.dragged_item.get("quantity", 1)
+                            if amount > 0 and icon_path:
+                                x = int(player_world_x)
+                                y = int(player_world_y)
+                                for _ in range(amount):
+                                    dropped_items.append(
+                                        DroppedItem(
+                                            x,
+                                            y,
+                                            inventory.dragged_item.get("item_name", ""),
+                                            icon_path,
+                                            amount=1,
+                                            item_instance=None
+                                        )
+                                    )
+                                dropped_from_hotbar = True
+                        # If we dropped into the world, finalize without restoring
+                        # the item back into the hotbar. Otherwise, cancel the drag.
+                        if dropped_from_hotbar:
+                            inventory.complete_world_drop()
+                        else:
+                            inventory.cancel_drag()
 
 
 
@@ -2705,6 +2817,11 @@ while running:
                     mortar_pestle.handle_mouse_click(mouse_pos, event.button, screen)
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
+                # When the inventory UI is open, ignore E so we don't
+                # accidentally open or interact with world UIs underneath.
+                if inventory_in_use:
+                    continue
+
                 if crafting_bench_in_use:
                     crafting_bench.close()
                     crafting_bench_in_use = False
@@ -3207,12 +3324,18 @@ while running:
                                     damage = max(0, int(base_throw_attack + cat_attack))
                                     if damage > 0:
                                         mob.health = max(0, mob.health - damage)
+                                        if cat_obj and getattr(cat_obj, "tamed", False) and getattr(cat_obj, "is_alive", True) and not getattr(cat_obj, "destroyed", False):
+                                            attacker_for_xp = cat_obj
+                                        else:
+                                            attacker_for_xp = player
+                                        if hasattr(mob, "register_attack"):
+                                            mob.register_attack(attacker_for_xp)
                                         # Let mob AI and other cats treat this
                                         # as a player attack on this target.
                                         setattr(player, "attacking_target", mob)
                                 # Cat still "lands" via the landing logic below.
                             else:
-                                handle_thrown_hit(thrown, mob, base_throw_attack)
+                                handle_thrown_hit(thrown, mob, base_throw_attack, player)
                                 if thrown in thrown_items:
                                     thrown_items.remove(thrown)
                                 removed_due_to_hit = True
@@ -3267,16 +3390,48 @@ while running:
         lavas[:] = [lava for lava in lavas if not lava.destroyed]
         banks[:] = [bank for bank in banks if not bank.destroyed]
 
+        # When animals are fully destroyed (e.g., eaten or harvested), schedule
+        # a delayed respawn elsewhere in the world to keep populations healthy.
+        respawn_delay_ms = 30000  # 30 seconds
+
+        destroyed_cats = [cat for cat in cats if cat.destroyed]
+        if destroyed_cats:
+            for _ in destroyed_cats:
+                mob_placement.schedule_respawn("cat", respawn_delay_ms)
         cats[:] = [cat for cat in cats if not cat.destroyed]
+
+        destroyed_squirrels = [squirrel for squirrel in squirrels if squirrel.destroyed]
+        if destroyed_squirrels:
+            for _ in destroyed_squirrels:
+                mob_placement.schedule_respawn("squirrel", respawn_delay_ms)
         squirrels[:] = [squirrel for squirrel in squirrels if not squirrel.destroyed]
+
+        destroyed_cows = [cow for cow in cows if cow.destroyed]
+        if destroyed_cows:
+            for _ in destroyed_cows:
+                mob_placement.schedule_respawn("cow", respawn_delay_ms)
         cows[:] = [cow for cow in cows if not cow.destroyed]
+
+        destroyed_chickens = [chicken for chicken in chickens if chicken.destroyed]
+        if destroyed_chickens:
+            for _ in destroyed_chickens:
+                mob_placement.schedule_respawn("chicken", respawn_delay_ms)
         chickens[:] = [chicken for chicken in chickens if not chicken.destroyed]
         crawlers[:] = [crawler for crawler in crawlers if not crawler.destroyed]
         ashhounds[:] = [ashhound for ashhound in ashhounds if not ashhound.destroyed]
         wastedogs[:] = [wastedog for wastedog in wastedogs if not wastedog.destroyed]
+        destroyed_wolves = [wolf for wolf in wolves if wolf.destroyed]
+        if destroyed_wolves:
+            for _ in destroyed_wolves:
+                mob_placement.schedule_respawn("wolf", respawn_delay_ms)
         wolves[:] = [wolf for wolf in wolves if not wolf.destroyed]
         duskwretches[:] = [duskwretch for duskwretch in duskwretches if not duskwretch.destroyed]
         pocks[:] = [pock for pock in pocks if not pock.destroyed]
+
+        destroyed_deers = [deer for deer in deers if deer.destroyed]
+        if destroyed_deers:
+            for _ in destroyed_deers:
+                mob_placement.schedule_respawn("deer", respawn_delay_ms)
         deers[:] = [deer for deer in deers if not deer.destroyed]
         black_bears[:] = [black_bear for black_bear in black_bears if not black_bear.destroyed]
         brown_bears[:] = [brown_bear for brown_bear in brown_bears if not brown_bear.destroyed]
@@ -3295,6 +3450,33 @@ while running:
                 screen.blit(tile_image, (screen_x, floor_y))
 
         keys = pygame.key.get_pressed()
+
+        # Hold-to-consume (F key): after an initial press that successfully
+        # consumed an item, keep consuming while F is held down.
+        if consume_hold_active:
+            can_auto_consume = (
+                not inventory_in_use
+                and not crafting_bench_in_use
+                and not mortar_pestle_in_use
+                and not alchemy_bench_in_use
+                and not chest_in_use
+                and player.is_alive
+            )
+            if not keys[pygame.K_f] or not can_auto_consume:
+                consume_hold_active = False
+            else:
+                now_ms = pygame.time.get_ticks()
+                if now_ms >= consume_hold_next_time:
+                    success, tags = inventory.consume_item()
+                    if success:
+                        if "food" in tags:
+                            sound_manager.play_sound(random.choice([f"consume_item{i}" for i in range(1, 7)]))
+                        elif any(tag in tags for tag in ["liquid", "consumable"]):
+                            sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
+                        consume_hold_next_time = now_ms + consume_hold_interval
+                    else:
+                        # Nothing more to consume; stop repeating.
+                        consume_hold_active = False
 
         rocks[:] = [rock for rock in rocks if not rock.destroyed]
         boulders[:] = [boulder for boulder in boulders if not boulder.destroyed]
@@ -3429,9 +3611,8 @@ while running:
                             scaled_size = (int(rotated_image.get_width() * scale_factor), int(rotated_image.get_height() * scale_factor))
                             rotated_image = pygame.transform.scale(rotated_image, scaled_size)
                             
-                            base_anchor_y = player_pos.y - size + 20
-                            held_x = player_pos.x - size/2 + swing_offset[0]
-                            held_y = base_anchor_y + swing_offset[1]
+                            held_x = int(player_pos.x - size - 28 + swing_offset[0])
+                            held_y = int(player_pos.y - size - 34 + swing_offset[1])
                             
                             screen.blit(rotated_image, (held_x, held_y))
                         elif held_image:
@@ -3470,9 +3651,12 @@ while running:
                             else:
                                 offset = base_offset
                             
-                            base_anchor_y = player_pos.y - size + 20
-                            held_x = player_pos.x - size/2 + offset[0]
-                            held_y = base_anchor_y + offset[1]
+                            base_anchor_y = int(player_pos.y - size - 6)
+                            # Shift held item up/left to align with adjusted player sprite.
+                            # Nudge up while moving, and slightly up when idle.
+                            move_nudge = -3 if is_moving else -2
+                            held_x = int(player_pos.x - size - 28 + offset[0])
+                            held_y = int(player_pos.y - size - 34 + offset[1] + move_nudge)
                             
                             if player.last_direction == "left":
                                 held_image = pygame.transform.flip(held_image, True, False)
@@ -3691,13 +3875,17 @@ while running:
                     clipped_image = player_current_image.subsurface(clip_rect)
 
                     y_offset = sinking_ratio * 4
-                    screen.blit(clipped_image, (player_pos.x - size/2, player_pos.y - size/2 + y_offset))
+                    half_w = player_current_image.get_width() / 2
+                    half_h = clip_height / 2
+                    screen.blit(clipped_image, (int(player_pos.x - half_w), int(player_pos.y - half_h + y_offset)))
                 else:
-                    screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size + 20))
+                    half_w = player_current_image.get_width() / 2
+                    half_h = player_current_image.get_height() / 2
+                    screen.blit(player_current_image, (int(player_pos.x - half_w), int(player_pos.y - half_h - 12)))
 
                 # Draw axe after for right/down directions (in front of the player)
-                if player.last_direction in ["right", "down"]:
-                    draw_held_item()
+                    if player.last_direction in ["right", "down"]:
+                        draw_held_item()
 
                 player_drawn = True
 
@@ -3778,9 +3966,13 @@ while running:
                 clipped_image = player_current_image.subsurface(clip_rect)
 
                 y_offset = sinking_ratio * 4
-                screen.blit(clipped_image, (player_pos.x - size/2, player_pos.y - size/2 + y_offset))
+                half_w = player_current_image.get_width() / 2
+                half_h = clip_height / 2
+                screen.blit(clipped_image, (int(player_pos.x - half_w), int(player_pos.y - half_h + y_offset)))
             else:
-                screen.blit(player_current_image, (player_pos.x - size/2, player_pos.y - size/2))
+                half_w = player_current_image.get_width() / 2
+                half_h = player_current_image.get_height() / 2
+                screen.blit(player_current_image, (int(player_pos.x - half_w), int(player_pos.y - half_h)))
 
             if player.last_direction in ["right", "down"]:
                 draw_held_item()
@@ -4239,9 +4431,16 @@ while running:
             for mob in mobs:
                 mob.collision_rect = mob.rect.inflate(-15, -15)
 
-            # Exclude liquids from collision detection so player can enter them
-            all_nearby_solid = [obj for obj in (nearby_objects + nearby_mobs)
-                               if not hasattr(obj, 'liquid_type')]
+            # Exclude liquids from collision detection so player can enter them,
+            # and treat banks (e.g., snowbanks) as non-solid terrain that only
+            # slows movement instead of blocking it.
+            all_nearby_solid = []
+            for obj in (nearby_objects + nearby_mobs):
+                if hasattr(obj, 'liquid_type'):
+                    continue
+                if isinstance(obj, Bank):
+                    continue
+                all_nearby_solid.append(obj)
 
             # Add placed structures to collision detection
             all_collision_objects = all_nearby_solid + nearby_structures

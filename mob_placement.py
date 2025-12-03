@@ -1,4 +1,6 @@
+import pygame
 from mobs import *
+
 player = Player(width/2, height/2, "Glenjamin")
 
 # Keep hostile spawns away from the starting area so the player isn't spawn-killed.
@@ -8,6 +10,97 @@ SPAWN_PROTECTION_RADIUS_SQ = SPAWN_PROTECTION_RADIUS ** 2
 
 def is_in_spawn_protection(x, y):
     return False
+
+
+# Simple respawn queue so animal populations can recover over time.
+# Entries are dicts: {"kind": str, "spawn_time": ms_since_start}
+pending_respawns = []
+
+
+def schedule_respawn(kind, delay_ms=30000):
+    """Schedule a new animal of the given kind to spawn after delay_ms."""
+    spawn_time = pygame.time.get_ticks() + max(0, int(delay_ms))
+    pending_respawns.append({"kind": kind, "spawn_time": spawn_time})
+
+
+def _spawn_squirrel():
+    if not weighted_squirrel_tiles:
+        return
+    tile_x, tile_image = random.choice(weighted_squirrel_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    squirrels.append(Squirrel(x, y, "Squirrel"))
+
+def _spawn_cat():
+    if not weighted_cat_tiles:
+        return
+    tile_x, tile_image = random.choice(weighted_cat_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    cats.append(Cat(x, y, "Cat"))
+
+def _spawn_cow():
+    if not weighted_cow_tiles:
+        return
+    tile_x, tile_image = random.choice(weighted_cow_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    cows.append(Cow(x, y, "Cow"))
+
+def _spawn_chicken():
+    if not weighted_chicken_tiles:
+        return
+    tile_x, tile_image = random.choice(weighted_chicken_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    chickens.append(Chicken(x, y, "Chicken"))
+
+def _spawn_deer():
+    if not weighted_deer_tiles:
+        return
+    tile_x, tile_image = random.choice(weighted_deer_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    deers.append(Deer(x, y, "Deer"))
+
+def _spawn_wolf():
+    if not weighted_wolf_tiles:
+        return
+    tile_x, tile_image = random.choice(weighted_wolf_tiles)
+    attempts = 0
+    while attempts < 10:
+        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        y = random.randint(0, height - 64)
+        if not is_in_spawn_protection(x, y):
+            wolves.append(Wolf(x, y, "Wolf"))
+            break
+        attempts += 1
+
+def process_respawns():
+    """Spawn any pending animals whose timers have expired."""
+    if not pending_respawns:
+        return
+    now = pygame.time.get_ticks()
+    remaining = []
+    for entry in pending_respawns:
+        if entry.get("spawn_time", 0) > now:
+            remaining.append(entry)
+            continue
+        kind = entry.get("kind")
+        if kind == "squirrel":
+            _spawn_squirrel()
+        elif kind == "cat":
+            _spawn_cat()
+        elif kind == "cow":
+            _spawn_cow()
+        elif kind == "chicken":
+            _spawn_chicken()
+        elif kind == "deer":
+            _spawn_deer()
+        elif kind == "wolf":
+            _spawn_wolf()
+        # Unknown kinds are ignored.
+    pending_respawns[:] = remaining
 
 
 num_deers = 50
@@ -287,29 +380,6 @@ for tile_x, tile_image in tiles:
     weighted_wolf_tiles.extend([(tile_x, tile_image)] * weight)
 
 wolves = []
-# Spawn wolves in packs of 3–6
-pack_sizes = []
-remaining_wolves = num_wolves
-while remaining_wolves > 0:
-    pack_size = random.randint(3, 6)
-    if pack_size > remaining_wolves:
-        pack_size = remaining_wolves
-    pack_sizes.append(pack_size)
-    remaining_wolves -= pack_size
-
-for pack_id, size in enumerate(pack_sizes):
-    if not weighted_wolf_tiles:
-        break
-    tile_x, tile_image = random.choice(weighted_wolf_tiles)
-    for _ in range(size):
-        attempts = 0
-        while attempts < 10:
-            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
-            y = random.randint(0, height - 64)
-            if not is_in_spawn_protection(x, y):
-                wolves.append(Wolf(x, y, "Wolf", pack_id=pack_id + 1))
-                break
-            attempts += 1
 
 
 allowed_duskwretch_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_snow, bg_wasteland]

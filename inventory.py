@@ -39,70 +39,70 @@ def get_weapon_animation_data():
     return {
         "movement_frame_data": {
             "right": [
-                {"offset": (15, 21), "rotation": 2},
-                {"offset": (21, 18), "rotation": 7},
-                {"offset": (17, 3), "rotation": 45},
-                {"offset": (21, 18), "rotation": 7},
-                {"offset": (15, 21), "rotation": 0},
-                {"offset": (11, 21), "rotation": 0},
-                {"offset": (7, 21), "rotation": 0},
-                {"offset": (11, 21), "rotation": 0},
+                {"offset": (15, 19), "rotation": 2},
+                {"offset": (21, 16), "rotation": 7},
+                {"offset": (17, 1), "rotation": 45},
+                {"offset": (21, 16), "rotation": 7},
+                {"offset": (15, 19), "rotation": 0},
+                {"offset": (11, 19), "rotation": 0},
+                {"offset": (7, 19), "rotation": 0},
+                {"offset": (11, 19), "rotation": 0},
             ],
             "left": [
-                {"offset": (5, 21), "rotation": 0},
-                {"offset": (9, 21), "rotation": 2},
-                {"offset": (11, 21), "rotation": 4},
-                {"offset": (9, 21), "rotation": 2},
-                {"offset": (5, 21), "rotation": 0},
-                {"offset": (-5, 16), "rotation": -9},
-                {"offset": (-13, 2), "rotation": -45},
-                {"offset": (-5, 16), "rotation": -9},
+                {"offset": (5, 19), "rotation": 0},
+                {"offset": (9, 19), "rotation": 2},
+                {"offset": (11, 19), "rotation": 4},
+                {"offset": (9, 19), "rotation": 2},
+                {"offset": (5, 19), "rotation": 0},
+                {"offset": (-5, 14), "rotation": -9},
+                {"offset": (-13, 0), "rotation": -45},
+                {"offset": (-5, 14), "rotation": -9},
             ],
             "up": [
-                {"offset": (13, 20), "rotation": 0},
-                {"offset": (9, 17), "rotation": 2},
-                {"offset": (8, 11), "rotation": 5},
-                {"offset": (9, 17), "rotation": 2},
-                {"offset": (13, 20), "rotation": 0},
-                {"offset": (9, 17), "rotation": 2},
-                {"offset": (8, 15), "rotation": 5},
-                {"offset": (9, 17), "rotation": 2},
+                {"offset": (13, 18), "rotation": 0},
+                {"offset": (9, 15), "rotation": 2},
+                {"offset": (8, 9), "rotation": 5},
+                {"offset": (9, 15), "rotation": 2},
+                {"offset": (13, 18), "rotation": 0},
+                {"offset": (9, 15), "rotation": 2},
+                {"offset": (8, 13), "rotation": 5},
+                {"offset": (9, 15), "rotation": 2},
             ],
             "down": [
-                {"offset": (0, 20), "rotation": 0},
-                {"offset": (1, 18), "rotation": -5},
-                {"offset": (3, 16), "rotation": 0},
-                {"offset": (1, 18), "rotation": 5},
-                {"offset": (0, 20), "rotation": 0},
-                {"offset": (1, 18), "rotation": -5},
-                {"offset": (3, 16), "rotation": 0},
-                {"offset": (1, 18), "rotation": 5},
+                {"offset": (0, 18), "rotation": 0},
+                {"offset": (1, 16), "rotation": -5},
+                {"offset": (3, 14), "rotation": 0},
+                {"offset": (1, 16), "rotation": 5},
+                {"offset": (0, 18), "rotation": 0},
+                {"offset": (1, 16), "rotation": -5},
+                {"offset": (3, 14), "rotation": 0},
+                {"offset": (1, 16), "rotation": 5},
             ]
         },
         "attack_frame_data": {
             "right": [
-                {"offset": (7, 0), "rotation": 45},
-                {"offset": (-7, -16), "rotation": 135},
-                {"offset": (30, 4), "rotation": 90},
-                {"offset": (16, 5), "rotation": 45},
+                {"offset": (7, -2), "rotation": 45},
+                {"offset": (-7, -18), "rotation": 135},
+                {"offset": (30, 2), "rotation": 90},
+                {"offset": (16, 3), "rotation": 45},
             ],
             "left": [
-                {"offset": (0, 0), "rotation": 45},
-                {"offset": (14, -16), "rotation": 135},
-                {"offset": (-8, 0), "rotation": 90},
-                {"offset": (-9, 6), "rotation": 45},
+                {"offset": (0, -2), "rotation": 45},
+                {"offset": (14, -18), "rotation": 135},
+                {"offset": (-8, -2), "rotation": 90},
+                {"offset": (-9, 4), "rotation": 45},
             ],
             "up": [
-                {"offset": (8, 11), "rotation": -5},
-                {"offset": (5, 3), "rotation": -10},
-                {"offset": (9, 17), "rotation": 2},
-                {"offset": (13, 20), "rotation": 0},
+                {"offset": (8, 9), "rotation": -5},
+                {"offset": (5, 1), "rotation": -10},
+                {"offset": (9, 15), "rotation": 2},
+                {"offset": (13, 18), "rotation": 0},
             ],
             "down": [
-                {"offset": (-2, 4), "rotation": -5},
-                {"offset": (2, -1), "rotation": -10},
-                {"offset": (0, 20), "rotation": 2},
-                {"offset": (2, 16), "rotation": 0},
+                {"offset": (-2, 2), "rotation": -5},
+                {"offset": (2, -3), "rotation": -10},
+                {"offset": (0, 18), "rotation": 2},
+                {"offset": (2, 14), "rotation": 0},
             ]
         }
     }
@@ -7012,7 +7012,12 @@ class Inventory():
             self.hotbar_name_display_until = 0
             return
 
-        self.hotbar_name_display_text = slot["item_name"]
+        # Prefer a custom name for named companions (e.g., tamed cats)
+        display_name = slot.get("cat_name")
+        if not display_name:
+            display_name = slot["item_name"]
+
+        self.hotbar_name_display_text = display_name
         self.hotbar_name_display_until = pygame.time.get_ticks() + duration_ms
 
     def draw_hotbar(self, screen):
@@ -7756,6 +7761,31 @@ class Inventory():
         self.dragged_from_hotbar = False
         self.recalc_weight()
 
+    def complete_world_drop(self):
+        """
+        Finish a drag after dropping the item into the world.
+        Unlike cancel_drag, this does NOT restore the dragged item
+        to its original slot; it is assumed to have been converted
+        into a world item already.
+        """
+        if not self.dragging:
+            return
+
+        # Keep selection focused on the original slot, which is now empty.
+        if self.dragged_from_hotbar:
+            self.selected_hotbar_slot = self.dragged_from_slot
+            self.selection_mode = "hotbar"
+            self.selected_inventory_slot = None
+        else:
+            self.selected_inventory_slot = self.dragged_from_slot
+            self.selection_mode = "inventory"
+
+        self.dragging = False
+        self.dragged_item = None
+        self.dragged_from_slot = None
+        self.dragged_from_hotbar = False
+        self.recalc_weight()
+
     def draw_dragged_item(self, screen):
         if not self.dragging or self.dragged_item is None:
             return
@@ -7849,6 +7879,8 @@ class Inventory():
                 self.selected_hotbar_slot = slot_index
                 self.selection_mode = "hotbar"
                 self.selected_inventory_slot = None
+                # Show the name of the clicked hotbar item under the bar
+                self.show_selected_hotbar_name()
             else:
                 self.selected_inventory_slot = slot_index
                 self.selection_mode = "inventory"

@@ -39,7 +39,7 @@ class SoundManager:
             elif name in self.default_volumes:
                 channel.set_volume(self.default_volumes[name])
 
-    def play_music(self, path, loop=True, volume=0.4, fade_in=0):
+    def play_music(self, path, loop=True, volume=0.3, fade_in=0):
         if path != self.current_music:
             pygame.mixer.music.stop()
             pygame.mixer.music.load(path)

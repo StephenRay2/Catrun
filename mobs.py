@@ -296,7 +296,7 @@ class Player(pygame.sprite.Sprite):
         self.extreme_temp_timer = 0
         self.temp_weight_increase = 1
         self.weight_leveler = 1
-        self.max_weight = 400 * self.weight_leveler * self.temp_weight_increase
+        self.max_weight = 100 * self.weight_leveler * self.temp_weight_increase
         self.weight = 0
         self.glow = False
         self.glow_time = 0
@@ -352,6 +352,7 @@ class Player(pygame.sprite.Sprite):
         self.lava_damage_rate = 40  # damage per second in lava
         self.lava_damage_timer = 0
         self.current_liquid = None
+        self.ground_slow_factor = 1.0
 
     def is_in_spawn_protection(self):
         return False
@@ -446,6 +447,8 @@ class Player(pygame.sprite.Sprite):
                         old_health = mob.health
                         # Flat damage plus strength upgrades
                         mob.health -= self.attack
+                        if hasattr(mob, "register_attack"):
+                            mob.register_attack(self)
                         if mob.health < 0:
                             mob.health = 0
                         try:
@@ -628,7 +631,10 @@ class Player(pygame.sprite.Sprite):
             weight_multiplier = 0.5
         else:
             weight_multiplier = 1
-        return speed * weight_multiplier
+        speed = speed * weight_multiplier
+        # Banks (e.g., snowbanks) slightly slow the player while walking on them.
+        speed *= getattr(self, "ground_slow_factor", 1.0)
+        return speed
 
     def regain_health(self, dt):
         if 1 <= self.health <= self.max_health:
@@ -949,6 +955,9 @@ class Mob(pygame.sprite.Sprite):
         self.death_experience = 50
         self.death_time = None
         self.harvest_grace_ms = 200
+        self.attackers = set()
+        self.last_attacker = None
+        self.ground_slow_factor = 1.0
         
         self.swimming = False
         self.in_lava = False
@@ -984,24 +993,59 @@ class Mob(pygame.sprite.Sprite):
         self.lava_damage_timer = 0
         self.current_liquid = None
 
+    def register_attack(self, attacker):
+        """Track eligible attackers for XP sharing and remember the last hitter."""
+        if attacker is None:
+            return
+        is_player = attacker.__class__.__name__ == "Player"
+        is_tamed_cat = attacker.__class__.__name__ == "Cat" and getattr(attacker, "tamed", False)
+        if is_tamed_cat and (not getattr(attacker, "is_alive", True) or getattr(attacker, "destroyed", False)):
+            return
+        if not (is_player or is_tamed_cat):
+            return
+        self.attackers.add(attacker)
+        self.last_attacker = attacker
+
     def give_experience(self, player):
-        if self.health < 1:
-            exp_gain = self.death_experience
-            player.experience += exp_gain
-            player.exp_total += exp_gain
+        if self.health >= 1 or self.death_experience <= 0:
+            return
 
-            # Tamed cats get 10% of any EXP the player gains from this source.
-            try:
-                from mob_placement import cats as world_cats
-                share = max(0, exp_gain * 0.1)
-                if share > 0:
-                    for cat in world_cats:
-                        if getattr(cat, "tamed", False):
-                            cat.gain_experience(share)
-            except Exception:
-                pass
+        def is_valid_attacker(attacker):
+            if attacker is None:
+                return False
+            if attacker is player:
+                return True
+            if attacker.__class__.__name__ == "Cat" and getattr(attacker, "tamed", False):
+                return getattr(attacker, "is_alive", True) and not getattr(attacker, "destroyed", False)
+            return False
 
+        def award(attacker, amount):
+            if amount <= 0 or attacker is None:
+                return
+            if attacker is player:
+                player.experience += amount
+                player.exp_total += amount
+            elif getattr(attacker, "tamed", False) and hasattr(attacker, "gain_experience"):
+                attacker.gain_experience(amount)
+
+        eligible_attackers = [att for att in self.attackers if is_valid_attacker(att)]
+        if not eligible_attackers:
             self.death_experience = 0
+            return
+
+        primary_attacker = self.last_attacker if is_valid_attacker(self.last_attacker) else None
+        if primary_attacker is None and eligible_attackers:
+            primary_attacker = eligible_attackers[-1]
+
+        exp_gain = self.death_experience
+        bonus_gain = exp_gain * 0.2
+
+        award(primary_attacker, exp_gain)
+        for attacker in eligible_attackers:
+            if attacker is not primary_attacker:
+                award(attacker, bonus_gain)
+
+        self.death_experience = 0
 
     def keep_in_screen(self, screen_height):
         if self.rect.top < 0:
@@ -1013,7 +1057,20 @@ class Mob(pygame.sprite.Sprite):
         return pygame.Rect(rect.x - cam_x, rect.y, rect.width, rect.height)
 
     def check_collision(self, direction, nearby_objects, nearby_mobs):
-        solid_objects = [obj for obj in nearby_objects if not hasattr(obj, 'liquid_type')]
+        # Treat banks (e.g., snowbanks) as non-solid so entities can walk
+        # through them, but still allow them to affect movement speed.
+        try:
+            from world import Bank
+        except Exception:
+            Bank = None
+
+        solid_objects = []
+        for obj in nearby_objects:
+            if hasattr(obj, 'liquid_type'):
+                continue
+            if Bank is not None and isinstance(obj, Bank):
+                continue
+            solid_objects.append(obj)
         all_nearby = solid_objects + nearby_mobs
 
         def get_obj_collision_rect(obj):
@@ -1049,6 +1106,8 @@ class Mob(pygame.sprite.Sprite):
         if getattr(self, "snowball_slow_stacks", 0) > 0:
             slow_mult = max(0.2, 1 - 0.12 * self.snowball_slow_stacks)
             speed *= slow_mult
+        # Banks (snowbanks, etc.) apply a mild ground slow.
+        speed *= getattr(self, "ground_slow_factor", 1.0)
         return speed
 
     def draw(self, screen, cam_x):
@@ -1081,7 +1140,10 @@ class Mob(pygame.sprite.Sprite):
         if not self.is_alive:
             self.direction.xy = (0, 0)
             return
-        
+
+        # Default ground-slow each frame; terrain like banks can override it.
+        self.ground_slow_factor = 1.0
+
         if self.snowball_slow_timer > 0:
             self.snowball_slow_timer = max(0.0, self.snowball_slow_timer - dt)
             if self.snowball_slow_timer == 0:
@@ -1114,6 +1176,22 @@ class Mob(pygame.sprite.Sprite):
                 self.move_timer -= 1
 
         if self.direction.length_squared() > 0:
+            # Banks (e.g., snowbanks) slightly slow walking speed when
+            # standing on them, but no longer block movement.
+            if nearby_objects:
+                try:
+                    from world import Bank
+                except Exception:
+                    Bank = None
+                if Bank is not None:
+                    collision_rect = self.get_collision_rect(0)
+                    for obj in nearby_objects:
+                        if isinstance(obj, Bank):
+                            obj_rect = obj.get_collision_rect(0) if hasattr(obj, "get_collision_rect") else obj.rect
+                            if collision_rect.colliderect(obj_rect):
+                                self.ground_slow_factor = 0.75
+                                break
+
             can_move_x, can_move_y = self.check_collision(self.direction, nearby_objects or [], nearby_mobs or [])
             
             actual_speed = self.get_speed() * dt
@@ -1534,17 +1612,10 @@ class Cat(Mob):
         if self.target_enemy and getattr(self.target_enemy, "is_alive", True):
             if not self.attack_has_hit and self.attack_timer <= self.attack_duration * 0.5:
                 self.target_enemy.health -= self.attack
+                if hasattr(self.target_enemy, "register_attack"):
+                    self.target_enemy.register_attack(self)
                 if self.target_enemy.health <= 0:
                     self.target_enemy.health = 0
-                    # Award cat XP for helping kill this enemy.
-                    xp_reward = 0
-                    if hasattr(self.target_enemy, "death_experience"):
-                        try:
-                            xp_reward = max(0, float(self.target_enemy.death_experience) * 0.1)
-                        except Exception:
-                            xp_reward = 0
-                    if xp_reward > 0:
-                        self.gain_experience(xp_reward)
                     if hasattr(self.target_enemy, "is_alive"):
                         self.target_enemy.is_alive = False
                 self.attack_has_hit = True
@@ -1873,16 +1944,28 @@ class Enemy(Mob):
         self.attacking = False
         self.death_experience = int(500  * (1 + (self.level * .0001)))
         self.level = 1
+        self.aggro_timer = 0.0
+        self.aggro_timeout = 6.0
 
     def handle_player_proximity(self, dt, player_world_x, player_world_y, player=None, nearby_objects=None, nearby_mobs=None):
         dx = player_world_x - self.rect.centerx
         dy = player_world_y - self.rect.centery
         distance_sq = dx*dx + dy*dy
         if self.is_alive:
-            if 50 * 50 < distance_sq < 200*200:
+            # Shorter aggro range and finite chase duration.
+            if 50 * 50 < distance_sq < 140 * 140:
                 self.chasing = True
-            elif distance_sq > 400*400:
+                self.aggro_timer = self.aggro_timeout
+            elif distance_sq > 260 * 260:
                 self.chasing = False
+                self.aggro_timer = 0.0
+
+            # Count down existing aggro; drop target if timer runs out.
+            if self.chasing and self.aggro_timer > 0:
+                self.aggro_timer -= dt
+                if self.aggro_timer <= 0:
+                    self.chasing = False
+                    self.aggro_timer = 0.0
 
             if self.chasing and not self.fleeing:
                 direction = pygame.Vector2(dx, dy)
@@ -2193,6 +2276,7 @@ class Ashhound(Enemy):
 
 class Wolf(Enemy):
     pack_targets = {}
+    pack_alphas = {}
 
     def __init__(self, x, y, name, pack_id=None):
         super().__init__(x, y, name)
@@ -2234,14 +2318,95 @@ class Wolf(Enemy):
         self.death_experience = int(600 * (1 + (self.level * 0.04)))
         self.level = 1
         self.pack_id = pack_id if pack_id is not None else random.randint(1, 10_000_000)
+        self.is_alpha = False
         self.prey_target = None
         self.attack_animation_speed = 0.035
         self.attack_duration = 54
+        self.eat_heal_fraction = 0.25  # heal 25% of max health per full carcass
+        self.eat_progress = 0.0        # time spent eating current carcass
+        self.eat_time_required = 1.5   # seconds required to fully consume a carcass
+        
+        self.vel_x = 0.0
+        self.vel_y = 0.0
+        self.follow_offset = (random.randint(-40, 40), random.randint(-40, 40))
+        self.decision_timer = random.uniform(0.5, 1.5)
+        self.pack_state = "idle"
+        self.pack_chase_timeout = 0.0
 
     def get_collision_rect(self, cam_x):
         rect = self.rect
         return pygame.Rect(rect.x - cam_x + 6, rect.y + 30, rect.width - 12, rect.height - 36)
+    
+    def get_pack_collision_rect(self, cam_x):
+        """Return a small collision box for pack-to-pack interactions (15w x 5h)."""
+        rect = self.rect
+        center_x = rect.centerx - cam_x
+        center_y = rect.centery
+        return pygame.Rect(center_x - 7, center_y - 2, 15, 5)
 
+    def check_collision(self, direction, nearby_objects, nearby_mobs):
+        """Override to use smaller collision box for pack members."""
+        try:
+            from world import Bank
+        except Exception:
+            Bank = None
+
+        solid_objects = []
+        for obj in nearby_objects:
+            if hasattr(obj, 'liquid_type'):
+                continue
+            if Bank is not None and isinstance(obj, Bank):
+                continue
+            solid_objects.append(obj)
+        
+        packmates = [m for m in nearby_mobs if isinstance(m, Wolf) and m.pack_id == self.pack_id and m is not self]
+        other_mobs = [m for m in nearby_mobs if m not in packmates]
+        all_nearby = solid_objects + other_mobs
+
+        def get_obj_collision_rect(obj):
+            if hasattr(obj, 'get_collision_rect'):
+                return obj.get_collision_rect(0)
+            elif isinstance(obj, dict) and 'rect' in obj:
+                return obj['rect']
+            else:
+                return obj.rect
+
+        collision_rect = self.get_collision_rect(0)
+
+        left_check = pygame.Rect(collision_rect.left - 1, collision_rect.top + 5, 1, collision_rect.height - 10)
+        right_check = pygame.Rect(collision_rect.right, collision_rect.top + 5, 1, collision_rect.height - 10)
+        top_check = pygame.Rect(collision_rect.left + 5, collision_rect.top - 1, collision_rect.width - 10, 1)
+        bottom_check = pygame.Rect(collision_rect.left + 5, collision_rect.bottom, collision_rect.width - 10, 1)
+
+        left_collision = any(left_check.colliderect(get_obj_collision_rect(obj)) for obj in all_nearby)
+        right_collision = any(right_check.colliderect(get_obj_collision_rect(obj)) for obj in all_nearby)
+        up_collision = any(top_check.colliderect(get_obj_collision_rect(obj)) for obj in all_nearby)
+        down_collision = any(bottom_check.colliderect(get_obj_collision_rect(obj)) for obj in all_nearby)
+
+        pack_collision_rect = self.get_pack_collision_rect(0)
+        pack_left_check = pygame.Rect(pack_collision_rect.left - 1, pack_collision_rect.top, 1, pack_collision_rect.height)
+        pack_right_check = pygame.Rect(pack_collision_rect.right, pack_collision_rect.top, 1, pack_collision_rect.height)
+        pack_top_check = pygame.Rect(pack_collision_rect.left, pack_collision_rect.top - 1, pack_collision_rect.width, 1)
+        pack_bottom_check = pygame.Rect(pack_collision_rect.left, pack_collision_rect.bottom, pack_collision_rect.width, 1)
+
+        def get_packmate_collision_rect(packmate):
+            return packmate.get_pack_collision_rect(0)
+
+        pack_left_collision = any(pack_left_check.colliderect(get_packmate_collision_rect(pm)) for pm in packmates)
+        pack_right_collision = any(pack_right_check.colliderect(get_packmate_collision_rect(pm)) for pm in packmates)
+        pack_up_collision = any(pack_top_check.colliderect(get_packmate_collision_rect(pm)) for pm in packmates)
+        pack_down_collision = any(pack_bottom_check.colliderect(get_packmate_collision_rect(pm)) for pm in packmates)
+
+        left_collision = left_collision or pack_left_collision
+        right_collision = right_collision or pack_right_collision
+        up_collision = up_collision or pack_up_collision
+        down_collision = down_collision or pack_down_collision
+
+        can_move_x = not ((direction.x > 0 and right_collision) or (direction.x < 0 and left_collision))
+        can_move_y = not ((direction.y > 0 and down_collision) or (direction.y < 0 and up_collision))
+
+        return can_move_x, can_move_y
+    
     def _valid_target(self, target):
         if target is None:
             return False
@@ -2253,6 +2418,55 @@ class Wolf(Enemy):
 
     def _is_enemy(self, obj):
         return getattr(obj, "enemy", False)
+
+    def _can_eat(self, obj):
+        """Return True if this object is a valid carcass the wolf can eat."""
+        if obj is None:
+            return False
+        if getattr(obj, "destroyed", False):
+            return False
+        # Only eat dead mobs that provide meat.
+        if not hasattr(obj, "is_alive") or getattr(obj, "is_alive", True):
+            return False
+        if not hasattr(obj, "meat_resource"):
+            return False
+        return True
+
+    def _eat_carcass(self, corpse):
+        """Consume a dead animal to heal and remove the carcass."""
+        if not self._can_eat(corpse):
+            return
+        # Heal the wolf by a fraction of its max health.
+        heal_amount = max(10, int(self.full_health * self.eat_heal_fraction))
+        self.health = min(self.full_health, self.health + heal_amount)
+        # Remove the corpse from the world so it can't be harvested anymore.
+        corpse.destroyed = True
+        # Stop chasing/attacking once we've eaten.
+        self.chasing = False
+        self.attacking = False
+        self.direction.xy = (0, 0)
+    
+    def _apply_light_separation(self, packmates):
+        """Apply gentle separation to prevent overlap within the pack."""
+        separation_radius = 25
+        for other in packmates:
+            dx = self.rect.centerx - other.rect.centerx
+            dy = self.rect.centery - other.rect.centery
+            dist = math.hypot(dx, dy)
+            
+            if dist < separation_radius and dist > 0:
+                self.vel_x += (dx / dist) * 0.05
+                self.vel_y += (dy / dist) * 0.05
+    
+    def _update_smooth_velocity(self, desired_dx, desired_dy, smoothing=0.8):
+        """Smoothly blend velocity toward desired direction."""
+        length = math.hypot(desired_dx, desired_dy)
+        if length > 0:
+            desired_dx /= length
+            desired_dy /= length
+        
+        self.vel_x = self.vel_x * smoothing + desired_dx * (1.0 - smoothing)
+        self.vel_y = self.vel_y * smoothing + desired_dy * (1.0 - smoothing)
 
     def _choose_target(self, player_world_x, player_world_y, player, nearby_mobs):
         # Wolves prefer nearby non-enemy mobs; fall back to player.
@@ -2367,16 +2581,39 @@ class Wolf(Enemy):
         self.image = frames[int(self.frame_index)]
 
     def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
-        # Acquire or share pack target
+        # Handle player proximity with normal Enemy aggro logic (50-140px range, 6-second timeout)
+        player_world_x = getattr(player, "world_x", player.rect.centerx if player else self.rect.centerx)
+        player_world_y = getattr(player, "world_y", player.rect.centery if player else self.rect.centery)
+        if player:
+            self.handle_player_proximity(dt, player_world_x, player_world_y, player, nearby_objects, nearby_mobs)
+
+        # Pack-wide state management: if ANY wolf detects danger, activate pack chase
+        self.pack_chase_timeout -= dt
+        if getattr(self, "chasing", False) and self.pack_chase_timeout < 2.0:
+            Wolf.pack_targets[self.pack_id] = getattr(self, "prey_target", player)
+            self.pack_state = "chase"
+            self.pack_chase_timeout = 6.0
+
+        # Acquire or share pack target (only for non-player targets)
         current_pack_target = Wolf.pack_targets.get(self.pack_id)
-        if not self._valid_target(current_pack_target):
+        if not self._valid_target(current_pack_target) or isinstance(current_pack_target, Player):
             Wolf.pack_targets.pop(self.pack_id, None)
             current_pack_target = None
+            self.pack_state = "idle"
 
         packmates = [m for m in (nearby_mobs or []) if isinstance(m, Wolf) and m.pack_id == self.pack_id and m is not self]
 
-        player_world_x = getattr(player, "world_x", player.rect.centerx if player else self.rect.centerx)
-        player_world_y = getattr(player, "world_y", player.rect.centery if player else self.rect.centery)
+        # Ensure there is a designated alpha for this pack.
+        alpha = Wolf.pack_alphas.get(self.pack_id)
+        if not alpha or getattr(alpha, "destroyed", False) or not getattr(alpha, "is_alive", True):
+            candidates = [w for w in packmates + [self] if not getattr(w, "destroyed", False) and getattr(w, "is_alive", True)]
+            if candidates:
+                alpha = min(candidates, key=lambda w: id(w))
+                Wolf.pack_alphas[self.pack_id] = alpha
+            else:
+                alpha = None
+                Wolf.pack_alphas.pop(self.pack_id, None)
+        self.is_alpha = (alpha is self)
 
         if current_pack_target and self._valid_target(current_pack_target):
             target_obj = current_pack_target
@@ -2389,7 +2626,7 @@ class Wolf(Enemy):
                 player,
                 nearby_mobs,
             )
-            if self._valid_target(target_obj):
+            if self._valid_target(target_obj) and not isinstance(target_obj, Player):
                 Wolf.pack_targets[self.pack_id] = target_obj
 
         # Cohesion: stay near pack center
@@ -2411,64 +2648,147 @@ class Wolf(Enemy):
                 else:
                     cohesion_weight = 0.35
 
-        # Set chasing based on target distance
+        # Set chasing based on target distance and current aggro state
         dx = target_x - self.rect.centerx
         dy = target_y - self.rect.centery
         distance_sq = dx * dx + dy * dy
-        # Always treat chasing the player as a chase state so we use run speed/animations.
-        chasing_player = isinstance(target_obj, Player)
-        self.chasing = chasing_player or distance_sq < (500 * 500)
-        if self.chasing and not self.fleeing:
-            target_vec = pygame.Vector2(dx, dy)
-            if target_vec.length_squared() > 0:
-                target_vec = target_vec.normalize()
-            # Blend target pursuit with pack cohesion to keep wolves together
-            pursuit_weight = max(0.0, 1.0 - cohesion_weight)
-            direction = (target_vec * pursuit_weight) + (coh_vector * cohesion_weight)
-            if direction.length_squared() > 0:
-                direction = direction.normalize()
-            else:
-                if target_vec.length_squared() > 0:
-                    direction = target_vec
-                else:
-                    direction = pygame.Vector2(0, 0)
-            if self.attacking:
-                if direction.length_squared() > 0:
-                    if abs(direction.x) >= abs(direction.y):
-                        self.last_direction = "right" if direction.x >= 0 else "left"
-                    else:
-                        self.last_direction = "down" if direction.y >= 0 else "up"
-                direction = pygame.Vector2(0, 0)
-            self.direction = direction
-            # Run speed during a chase; keeps up with the player and shows run animations
-            self.speed = 1.9
+        base_chasing = getattr(self, "chasing", False)
+        if isinstance(target_obj, Player):
+            # Player chasing is controlled by handle_player_proximity (range + timeout)
+            pass
         else:
-            self.speed = 1.0
-            super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
-            return
+            # For non-player targets, activate chasing if in range
+            self.chasing = base_chasing or distance_sq < (260 * 260)
 
-        # Move toward target
-        if self.direction.length_squared() > 0:
-            can_move_x, can_move_y = self.check_collision(self.direction, nearby_objects or [], nearby_mobs or [])
+        alpha = Wolf.pack_alphas.get(self.pack_id)
+        
+        if not self.is_alpha and alpha and alpha is not self and getattr(alpha, "is_alive", True) and not getattr(alpha, "destroyed", False):
+            alpha_dx = alpha.rect.centerx - self.rect.centerx
+            alpha_dy = alpha.rect.centery - self.rect.centery
+            dist_alpha_sq = alpha_dx * alpha_dx + alpha_dy * alpha_dy
+            
+            if dist_alpha_sq > (400 * 400):
+                target_x = alpha.rect.centerx + self.follow_offset[0]
+                target_y = alpha.rect.centery + self.follow_offset[1]
+            else:
+                target_x = alpha.rect.centerx + self.follow_offset[0]
+                target_y = alpha.rect.centery + self.follow_offset[1]
+                self.chasing = getattr(alpha, "chasing", False) or self.pack_state == "chase"
+
+        desired_dx = target_x - self.rect.centerx
+        desired_dy = target_y - self.rect.centery
+        
+        if self.chasing and not self.fleeing:
+            self._update_smooth_velocity(desired_dx, desired_dy, smoothing=0.8)
+            self.speed = 1.9
+        elif self.pack_state == "chase":
+            self._update_smooth_velocity(desired_dx, desired_dy, smoothing=0.85)
+            self.speed = 1.5
+        else:
+            self._update_smooth_velocity(desired_dx, desired_dy, smoothing=0.9)
+            self.speed = 1.0
+
+        self._apply_light_separation(packmates)
+
+        if abs(self.vel_x) > 0.01 or abs(self.vel_y) > 0.01:
+            can_move_x, can_move_y = self.check_collision(
+                pygame.Vector2(self.vel_x, self.vel_y),
+                nearby_objects or [],
+                nearby_mobs or []
+            )
             actual_speed = self.get_speed() * dt
-            movement = self.direction * actual_speed
-            new_x = self.rect.x + movement.x if can_move_x else self.rect.x
-            new_y = self.rect.y + movement.y if can_move_y else self.rect.y
-            self.rect.topleft = (new_x, new_y)
-            if movement.x > 0:
+            movement_x = self.vel_x * actual_speed if can_move_x else 0
+            movement_y = self.vel_y * actual_speed if can_move_y else 0
+            
+            self.rect.x += movement_x
+            self.rect.y += movement_y
+            
+            if self.vel_x > 0.1:
                 self.last_direction = "right"
-            elif movement.x < 0:
+            elif self.vel_x < -0.1:
                 self.last_direction = "left"
-            self.animate_walk()
+            
+            if self.chasing or self.pack_state == "chase":
+                self.animate_walk(animation_speed_multiplier=1.5)
+            else:
+                self.animate_walk()
         else:
             self.animate_stand()
+        
+        if self.attacking:
+            direction = pygame.Vector2(desired_dx, desired_dy)
+            if direction.length_squared() > 0:
+                direction = direction.normalize()
+                if abs(direction.x) >= abs(direction.y):
+                    self.last_direction = "right" if direction.x >= 0 else "left"
+                else:
+                    self.last_direction = "down" if direction.y >= 0 else "up"
 
-        # Attack if close
+        # If we've reached any nearby carcass, eat it instead of attacking.
+        eat_radius = 40
+        try:
+            wolf_rect = self.get_collision_rect(0)
+        except Exception:
+            wolf_rect = self.rect
+
+        eat_candidates = []
+        # Prefer a specific target if it's a carcass, but also allow other nearby carcasses.
+        if self._can_eat(target_obj):
+            eat_candidates.append(target_obj)
+        for mob in nearby_mobs or []:
+            if mob is target_obj:
+                continue
+            if self._can_eat(mob):
+                eat_candidates.append(mob)
+
+        eating_now = False
+        for corpse in eat_candidates:
+            try:
+                if hasattr(corpse, "get_collision_rect"):
+                    corpse_rect = corpse.get_collision_rect(0)
+                else:
+                    corpse_rect = corpse.rect
+                expanded_corpse = corpse_rect.inflate(eat_radius * 2, eat_radius * 2)
+                intersects = wolf_rect.colliderect(expanded_corpse)
+            except Exception:
+                dx_eat = corpse.rect.centerx - self.rect.centerx
+                dy_eat = corpse.rect.centery - self.rect.centery
+                intersects = (dx_eat * dx_eat + dy_eat * dy_eat) <= (eat_radius * eat_radius)
+
+            if intersects:
+                eating_now = True
+                self.eat_progress += dt
+                # Pause movement/attacks while eating
+                self.direction.xy = (0, 0)
+                if self.eat_progress >= self.eat_time_required:
+                    self._eat_carcass(corpse)
+                    self.eat_progress = 0.0
+                    if not self.is_alive:
+                        self.direction.xy = (0, 0)
+                    return
+                # Only work on one carcass at a time
+                break
+
+        if not eating_now:
+            # Reset progress if we moved away from all carcasses
+            self.eat_progress = 0.0
+
+        # Attack if close - use actual target position, not formation position
         listener_pos = (player_world_x, player_world_y) if player else None
-        self.attack(target_x, target_y, target_obj, listener_pos=listener_pos)
+        actual_target_x = getattr(target_obj, "world_x", target_obj.rect.centerx) if target_obj else target_x
+        actual_target_y = getattr(target_obj, "world_y", target_obj.rect.centery) if target_obj else target_y
+        self.attack(actual_target_x, actual_target_y, target_obj, listener_pos=listener_pos)
+
+        # Update decision timer for idle formation changes
+        if not self.chasing and self.pack_state != "chase":
+            self.decision_timer -= dt
+            if self.decision_timer <= 0:
+                self.follow_offset = (random.randint(-40, 40), random.randint(-40, 40))
+                self.decision_timer = random.uniform(0.5, 1.5)
 
         if not self.is_alive:
-            self.direction.xy = (0, 0)
+            self.vel_x = 0
+            self.vel_y = 0
             self.image = self.dead_image_right if self.last_direction == "right" else self.dead_image_left
 
 
@@ -3570,6 +3890,8 @@ class Crow(Mob):
         self.full_health = 30 + (random.randint(5, 10) * self.level)
         self.health = self.full_health
         self.resource = "Feathers"
+        # Crows have a small amount of meat that predators can eat.
+        self.meat_resource = "Raw Small Meat"
         self.special_drops = [{'item': 'Raw Small Meat', 'chance': 0.6, 'min': 2, 'max': 4}]
         self.resource_amount = 4
         self.death_experience = int(100 * (1 + (self.level * 0.01)))
