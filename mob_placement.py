@@ -76,6 +76,22 @@ def _spawn_wolf():
             break
         attempts += 1
 
+def _spawn_gila():
+    if not weighted_gila_tiles:
+        return
+    tile_x, tile_image = random.choice(weighted_gila_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    gilas.append(Gila(x, y, "Gila"))
+
+def _spawn_salamander():
+    if not weighted_salamander_tiles:
+        return
+    tile_x, tile_image = random.choice(weighted_salamander_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    salamanders.append(Salamander(x, y, "Salamander"))
+
 def process_respawns():
     """Spawn any pending animals whose timers have expired."""
     if not pending_respawns:
@@ -99,6 +115,10 @@ def process_respawns():
             _spawn_deer()
         elif kind == "wolf":
             _spawn_wolf()
+        elif kind == "gila":
+            _spawn_gila()
+        elif kind == "salamander":
+            _spawn_salamander()
         # Unknown kinds are ignored.
     pending_respawns[:] = remaining
 
@@ -113,6 +133,7 @@ num_crows = 75
 num_wolves = 50
 num_glowbirds = 75
 num_gilas = 50
+num_salamanders = 50
 num_black_bears = 50
 num_brown_bears = 30
 num_polar_bears = 20
@@ -636,6 +657,40 @@ for _ in range(num_gilas):
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
     gilas.append(Gila(x, y, "Gila"))
+
+allowed_salamander_tiles = [bg_compact]
+
+salamander_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_salamander_tiles]
+
+salamander_spawn_weights = {
+    bg_grass: 0,
+    bg_dirt: 0,
+    bg_compact: 6,
+    bg_sand: 0,
+    bg_savannah: 0,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 0,
+    bg_lavastone: 0,
+    bg_snow: 0,
+    bg_wasteland: 0,
+    bg_blackstone: 0,
+    bg_redrock: 0
+}
+
+weighted_salamander_tiles = []
+for tile_x, tile_image in tiles:
+    weight = salamander_spawn_weights.get(tile_image, 0)
+    weighted_salamander_tiles.extend([(tile_x, tile_image)] * weight)
+
+salamanders = []
+for _ in range(num_salamanders):
+    if not weighted_salamander_tiles:
+        break
+    tile_x, tile_image = random.choice(weighted_salamander_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    salamanders.append(Salamander(x, y, "Salamander"))
 
 allowed_crow_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock]
 

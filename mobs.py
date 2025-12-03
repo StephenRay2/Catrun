@@ -150,6 +150,14 @@ pock_throw_right_images = ["assets/sprites/mobs/PockThrowRight1.png", "assets/sp
 pock_dead_image_left = pygame.image.load("assets/sprites/mobs/PockDead.png").convert_alpha()
 pock_dead_image_right = pygame.transform.flip(pock_dead_image_left, True, False)
 
+pock_rock_projectiles = []
+try:
+    pock_stone_sprite = pygame.transform.scale(
+        pygame.image.load("assets/sprites/items/Stone.png").convert_alpha(), (32, 32)
+    )
+except Exception:
+    pock_stone_sprite = None
+
 
 deer_idle_images = ["assets/sprites/mobs/DeerIdle1.png", "assets/sprites/mobs/DeerIdle2.png", "assets/sprites/mobs/DeerIdle3.png", "assets/sprites/mobs/DeerIdle4.png", "assets/sprites/mobs/DeerIdle5.png", "assets/sprites/mobs/DeerIdle6.png", "assets/sprites/mobs/DeerIdle7.png", "assets/sprites/mobs/DeerIdle8.png"]
 deer_walk_left_images = ["assets/sprites/mobs/DeerWalkLeft1.png", "assets/sprites/mobs/DeerWalkLeft2.png", "assets/sprites/mobs/DeerWalkLeft3.png", "assets/sprites/mobs/DeerWalkLeft4.png", "assets/sprites/mobs/DeerWalkLeft5.png", "assets/sprites/mobs/DeerWalkLeft6.png", "assets/sprites/mobs/DeerWalkLeft7.png", "assets/sprites/mobs/DeerWalkLeft8.png"]
@@ -181,6 +189,10 @@ gila_idle_images = ["assets/sprites/mobs/GilaIdle1.png", "assets/sprites/mobs/Gi
 gila_walk_left_images = ["assets/sprites/mobs/GilaWalkLeft1.png", "assets/sprites/mobs/GilaWalkLeft2.png", "assets/sprites/mobs/GilaWalkLeft3.png"]
 gila_attack_left_images = ["assets/sprites/mobs/GilaAttackLeft1.png", "assets/sprites/mobs/GilaAttackLeft2.png", "assets/sprites/mobs/GilaAttackLeft3.png"]
 gila_dead_image = pygame.image.load("assets/sprites/mobs/GilaDead.png").convert_alpha()
+salamander_idle_images = ["assets/sprites/mobs/SalamanderIdle1.png", "assets/sprites/mobs/SalamanderIdle2.png"]
+salamander_walk_left_images = ["assets/sprites/mobs/SalamanderWalkLeft1.png", "assets/sprites/mobs/SalamanderWalkLeft2.png", "assets/sprites/mobs/SalamanderWalkLeft3.png"]
+salamander_attack_left_images = ["assets/sprites/mobs/SalamanderAttackLeft1.png", "assets/sprites/mobs/SalamanderAttackLeft2.png", "assets/sprites/mobs/SalamanderAttackLeft3.png"]
+salamander_dead_image = pygame.image.load("assets/sprites/mobs/SalamanderDead.png").convert_alpha()
 
 crow_walk_left_images = ["assets/sprites/mobs/CrowWalkLeft1.png", "assets/sprites/mobs/CrowWalkLeft2.png", "assets/sprites/mobs/CrowWalkLeft3.png", "assets/sprites/mobs/CrowWalkLeft4.png", "assets/sprites/mobs/CrowWalkLeft5.png"]
 crow_fly_left_images = ["assets/sprites/mobs/CrowFlyLeft1.png", "assets/sprites/mobs/CrowFlyLeft2.png", "assets/sprites/mobs/CrowFlyLeft3.png", "assets/sprites/mobs/CrowFlyLeft4.png"]
@@ -3171,6 +3183,90 @@ class AggressiveMob(Mob):
             self.aggressive = True
             self.enemy = True
 
+class PockRock:
+    """Simple projectile for pock throws; mirrors player stones."""
+    def __init__(self, x, y, target_x, target_y, damage):
+        self.pos = pygame.Vector2(x, y)
+        direction = pygame.Vector2(target_x - x, target_y - y)
+        if direction.length_squared() == 0:
+            direction = pygame.Vector2(1, 0)
+        distance = direction.length()
+        direction = direction.normalize()
+        # Keep speed similar to player throws; clamp for short/long throws.
+        self.speed = max(6.0, min(10.0, distance / 30.0))
+        self.vel = direction
+        self.max_distance = 500
+        self.damage = damage
+        self.distance_traveled = 0.0
+        self.sprite = pock_stone_sprite
+        self.sprite_size = self.sprite.get_width() if self.sprite else 16
+        self.rect = pygame.Rect(
+            x - self.sprite_size // 2, y - self.sprite_size // 2, self.sprite_size, self.sprite_size
+        )
+        self.destroyed = False
+
+    def update_rect(self):
+        self.rect.topleft = (self.pos.x - self.sprite_size // 2, self.pos.y - self.sprite_size // 2)
+
+    def update(self, dt):
+        if self.destroyed:
+            return
+        step = self.speed * max(1.0, dt * 60.0)
+        move = self.vel * step
+        self.distance_traveled += move.length()
+        if self.distance_traveled >= self.max_distance:
+            self.destroyed = True
+            return
+        self.pos += move
+        self.update_rect()
+
+    def draw(self, screen, cam_x):
+        if self.destroyed:
+            return
+        if self.sprite:
+            screen.blit(self.sprite, (int(self.pos.x - cam_x - self.sprite_size // 2), int(self.pos.y - self.sprite_size // 2)))
+        else:
+            pygame.draw.circle(screen, (150, 140, 130), (int(self.pos.x - cam_x), int(self.pos.y)), max(2, self.sprite_size // 2))
+
+
+def spawn_pock_rock(x, y, target_x, target_y, damage):
+    pock_rock_projectiles.append(PockRock(x, y, target_x, target_y, damage))
+
+
+def update_pock_rocks(dt, player_world_x, player_world_y, player, mobs):
+    player_rect = pygame.Rect(player_world_x - player.rect.width // 2,
+                              player_world_y - player.rect.height // 2,
+                              player.rect.width,
+                              player.rect.height)
+    small_targets = [m for m in mobs if isinstance(m, (Cat, Squirrel, Chicken, Crow, Glowbird))]
+
+    for rock in list(pock_rock_projectiles):
+        rock.update(dt)
+        if rock.destroyed:
+            pock_rock_projectiles.remove(rock)
+            continue
+
+        # Hit player
+        if rock.rect.colliderect(player_rect):
+            player.health -= rock.damage
+            rock.destroyed = True
+            sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+            pock_rock_projectiles.remove(rock)
+            continue
+
+        # Hit small critters
+        hit_any = False
+        for mob in small_targets:
+            if mob.rect.colliderect(rock.rect):
+                if hasattr(mob, "health"):
+                    mob.health = max(0, mob.health - rock.damage)
+                if hasattr(mob, "register_attack"):
+                    mob.register_attack(None)
+                hit_any = True
+                break
+        if hit_any:
+            rock.destroyed = True
+            pock_rock_projectiles.remove(rock)
 
 class Pock(Enemy):
     def __init__(self, x, y, name):
@@ -3196,6 +3292,11 @@ class Pock(Enemy):
         self.throwing = False
         self.throw_timer = 0
         self.throw_duration = 30
+        self.rock_spawned = False
+        self.throw_min_range_sq = 40 * 40
+        self.throw_max_range_sq = 500 * 500
+        self.throw_cooldown = 0
+        self.throw_cooldown_duration = 90
 
         self.attack_damage = 5
         self.base_speed = 120
@@ -3207,16 +3308,30 @@ class Pock(Enemy):
         self.death_experience = int(500  * (1 + (self.level * 0.05)))
         self.level = 1
 
-    def attack(self, player_world_x, player_world_y, player):
-        dx = player_world_x - self.rect.centerx
-        dy = player_world_y - self.rect.centery
+    def attack(self, target_world_x, target_world_y, target_entity):
+        if target_entity is None or getattr(target_entity, "destroyed", False) or not getattr(target_entity, "is_alive", True):
+            return
+
+        if self.throw_cooldown > 0:
+            self.throw_cooldown -= 1
+
+        dx = target_world_x - self.rect.centerx
+        dy = target_world_y - self.rect.centery
         distance_sq = dx*dx + dy*dy
 
-        if self.is_alive and distance_sq < (100 * 100):
+        if self.is_alive and self.throw_min_range_sq < distance_sq < self.throw_max_range_sq and self.throw_cooldown <= 0:
             if not self.throwing:
                 self.throwing = True
                 self.throw_timer = self.throw_duration
                 self.frame_index = 0.0
+                self.rock_spawned = False
+                self.last_direction = "right" if dx >= 0 else "left"
+                self.direction.xy = (0, 0)
+        elif not self.throwing and distance_sq >= self.throw_min_range_sq:
+            # Walk toward the target between throws to close the gap.
+            direction = pygame.Vector2(dx, dy)
+            if direction.length_squared() > 0:
+                self.direction = direction.normalize()
 
         if self.throwing:
             frames = self.throw_right_images if self.last_direction == "right" else self.throw_left_images
@@ -3225,18 +3340,24 @@ class Pock(Enemy):
 
             self.throw_timer -= 1
 
-            if self.throw_timer == self.throw_duration // 2 and distance_sq < (100 * 100):
-                player.health -= self.attack_damage
-                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
-                
+            if not self.rock_spawned and self.throw_timer <= self.throw_duration // 2:
+                spawn_pock_rock(self.rect.centerx, self.rect.centery - 8, target_world_x, target_world_y, self.attack_damage)
+                self.rock_spawned = True
 
             if self.throw_timer <= 0:
                 self.throwing = False
                 self.frame_index = 0.0
                 self.image = (self.stand_right_images[0] if self.last_direction == "right"
                             else self.stand_left_images[0])
+                self.throw_cooldown = self.throw_cooldown_duration
 
     def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
+        if self.throwing:
+            # Lock movement/AI while throwing to keep animation visible.
+            if not self.is_alive:
+                self.image = pock_dead_image_right if self.last_direction == "right" else pock_dead_image_left
+            return
+
         super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
 
         if not self.is_alive:
@@ -3732,13 +3853,27 @@ class BrownBear(AggressiveMob):
         distance_sq = dx*dx + dy*dy
         
         if self.is_alive:
+            target_dx = dx
+            target_dy = dy
+            
             if 50 * 50 < distance_sq < 250*250:
                 self.chasing = True
             elif distance_sq > 400*400:
                 self.chasing = False
             
+            if self.chasing and getattr(self, "attackers", set()):
+                for attacker in list(self.attackers):
+                    if getattr(attacker, "is_alive", True) and not getattr(attacker, "destroyed", False):
+                        adx = attacker.rect.centerx - self.rect.centerx
+                        ady = attacker.rect.centery - self.rect.centery
+                        adist_sq = adx * adx + ady * ady
+                        if adist_sq < distance_sq:
+                            target_dx = adx
+                            target_dy = ady
+                            break
+            
             if self.chasing and not self.attacking:
-                direction = pygame.Vector2(dx, dy)
+                direction = pygame.Vector2(target_dx, target_dy)
                 if direction.length_squared() > 0:
                     direction = direction.normalize()
                 self.direction = direction
@@ -3757,6 +3892,21 @@ class BrownBear(AggressiveMob):
         dy = player_world_y - self.rect.centery
         distance_sq = dx*dx + dy*dy
         
+        target_x = player_world_x
+        target_y = player_world_y
+        
+        if getattr(self, "attackers", set()):
+            for attacker in list(self.attackers):
+                if getattr(attacker, "is_alive", True) and not getattr(attacker, "destroyed", False):
+                    adx = attacker.rect.centerx - self.rect.centerx
+                    ady = attacker.rect.centery - self.rect.centery
+                    adist_sq = adx * adx + ady * ady
+                    if adist_sq < distance_sq:
+                        target_x = attacker.rect.centerx
+                        target_y = attacker.rect.centery
+                        distance_sq = adist_sq
+                        break
+        
         if self.is_alive and distance_sq < (70 * 70):
             if not self.attacking:
                 self.attacking = True
@@ -3771,8 +3921,14 @@ class BrownBear(AggressiveMob):
             self.attack_timer -= 1
             
             if self.attack_timer == self.attack_duration // 2 and distance_sq < (70 * 70):
-                player.health -= self.attack_damage
-                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                if player is not None and int(target_x) == int(player_world_x) and int(target_y) == int(player_world_y):
+                    player.health -= self.attack_damage
+                    sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                else:
+                    for attacker in list(getattr(self, "attackers", set())):
+                        if attacker.rect.centerx == int(target_x) and attacker.rect.centery == int(target_y):
+                            attacker.health -= self.attack_damage
+                            break
             
             if self.attack_timer <= 0:
                 self.attacking = False
@@ -3885,13 +4041,27 @@ class PolarBear(AggressiveMob):
         distance_sq = dx*dx + dy*dy
         
         if self.is_alive:
+            target_dx = dx
+            target_dy = dy
+            
             if 50 * 50 < distance_sq < 250*250:
                 self.chasing = True
             elif distance_sq > 400*400:
                 self.chasing = False
             
+            if self.chasing and getattr(self, "attackers", set()):
+                for attacker in list(self.attackers):
+                    if getattr(attacker, "is_alive", True) and not getattr(attacker, "destroyed", False):
+                        adx = attacker.rect.centerx - self.rect.centerx
+                        ady = attacker.rect.centery - self.rect.centery
+                        adist_sq = adx * adx + ady * ady
+                        if adist_sq < distance_sq:
+                            target_dx = adx
+                            target_dy = ady
+                            break
+            
             if self.chasing and not self.attacking:
-                direction = pygame.Vector2(dx, dy)
+                direction = pygame.Vector2(target_dx, target_dy)
                 if direction.length_squared() > 0:
                     direction = direction.normalize()
                 self.direction = direction
@@ -3910,6 +4080,21 @@ class PolarBear(AggressiveMob):
         dy = player_world_y - self.rect.centery
         distance_sq = dx*dx + dy*dy
         
+        target_x = player_world_x
+        target_y = player_world_y
+        
+        if getattr(self, "attackers", set()):
+            for attacker in list(self.attackers):
+                if getattr(attacker, "is_alive", True) and not getattr(attacker, "destroyed", False):
+                    adx = attacker.rect.centerx - self.rect.centerx
+                    ady = attacker.rect.centery - self.rect.centery
+                    adist_sq = adx * adx + ady * ady
+                    if adist_sq < distance_sq:
+                        target_x = attacker.rect.centerx
+                        target_y = attacker.rect.centery
+                        distance_sq = adist_sq
+                        break
+        
         if self.is_alive and distance_sq < (70 * 70):
             if not self.attacking:
                 self.attacking = True
@@ -3924,8 +4109,14 @@ class PolarBear(AggressiveMob):
             self.attack_timer -= 1
             
             if self.attack_timer == self.attack_duration // 2 and distance_sq < (70 * 70):
-                player.health -= self.attack_damage
-                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                if player is not None and int(target_x) == int(player_world_x) and int(target_y) == int(player_world_y):
+                    player.health -= self.attack_damage
+                    sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                else:
+                    for attacker in list(getattr(self, "attackers", set())):
+                        if attacker.rect.centerx == int(target_x) and attacker.rect.centery == int(target_y):
+                            attacker.health -= self.attack_damage
+                            break
             
             if self.attack_timer <= 0:
                 self.attacking = False
@@ -4086,6 +4277,8 @@ class Gila(AggressiveMob):
         self.walk_right_images = [pygame.transform.flip(img, True, False) for img in self.walk_left_images]
         self.stand_right_images = [pygame.transform.flip(img, True, False) for img in self.stand_left_images]
         self.attack_right_images = [pygame.transform.flip(img, True, False) for img in self.attack_left_images]
+        self.dead_left_image = gila_dead_image
+        self.dead_right_image = pygame.transform.flip(self.dead_left_image, True, False)
         
         self.image = self.stand_left_images[0]
         self.rect = self.image.get_rect(center=(x, y))
@@ -4184,10 +4377,7 @@ class Gila(AggressiveMob):
         
         if not self.is_alive:
             self.direction.xy = (0, 0)
-            if self.last_direction == "right":
-                self.image = pygame.transform.flip(gila_dead_image, True, False)
-            else:
-                self.image = gila_dead_image
+            self.image = self.dead_right_image if self.last_direction == "right" else self.dead_left_image
             return
         
         if self.chasing and self.aggressive:
@@ -4205,6 +4395,25 @@ class Gila(AggressiveMob):
                 self.animate_stand()
         else:
             super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
+
+
+class Salamander(Gila):
+    def __init__(self, x, y, name):
+        super().__init__(x, y, name)
+        
+        self.stand_left_images = [pygame.image.load(img).convert_alpha() for img in salamander_idle_images]
+        self.walk_left_images = [pygame.image.load(img).convert_alpha() for img in salamander_walk_left_images]
+        self.attack_left_images = [pygame.image.load(img).convert_alpha() for img in salamander_attack_left_images]
+
+        self.walk_right_images = [pygame.transform.flip(img, True, False) for img in self.walk_left_images]
+        self.stand_right_images = [pygame.transform.flip(img, True, False) for img in self.stand_left_images]
+        self.attack_right_images = [pygame.transform.flip(img, True, False) for img in self.attack_left_images]
+        self.dead_left_image = salamander_dead_image
+        self.dead_right_image = pygame.transform.flip(self.dead_left_image, True, False)
+
+        # Reset the base image and rect to use the salamander sprites.
+        self.image = self.stand_left_images[0]
+        self.rect = self.image.get_rect(center=(x, y))
 
 
 class Crow(Mob):

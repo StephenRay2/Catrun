@@ -1090,6 +1090,7 @@ def world_rect_collides(collision_rect):
         polar_bears,
         pandas,
         gilas,
+        salamanders,
         crows,
         duskwretches,
         fire_dragons,
@@ -1116,6 +1117,7 @@ def world_rect_collides(collision_rect):
         + polar_bears
         + pandas
         + gilas
+        + salamanders
         + crows
         + glowbirds
         + duskwretches
@@ -1656,6 +1658,7 @@ while running:
             black_bears.clear()
             brown_bears.clear()
             gilas.clear()
+            salamanders.clear()
             crows.clear()
             glowbirds.clear()
             duskwretches.clear()
@@ -1787,6 +1790,14 @@ while running:
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
                 gilas.append(Gila(x, y, "Gila"))
+
+            for _ in range(num_salamanders):
+                if not weighted_salamander_tiles:
+                    break
+                tile_x, tile_image = random.choice(weighted_salamander_tiles)
+                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                y = random.randint(0, height - 64)
+                salamanders.append(Salamander(x, y, "Salamander"))
 
             for _ in range(num_crows):
                 tile_x, tile_image = random.choice(weighted_crow_tiles)
@@ -3298,7 +3309,7 @@ while running:
                 
                 collision_detected = False
                 collision_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants + ponds + lavas + banks
-                collision_mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + wastedogs + wolves + pocks + deers + black_bears + brown_bears + polar_bears + pandas + gilas + crows + glowbirds + duskwretches
+                collision_mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + wastedogs + wolves + pocks + deers + black_bears + brown_bears + polar_bears + pandas + gilas + salamanders + crows + glowbirds + duskwretches
                 
                 for obj in collision_objects:
                     obj_rect = obj.get_collision_rect(0) if hasattr(obj, 'get_collision_rect') else obj.rect
@@ -3495,6 +3506,12 @@ while running:
                 mob_placement.schedule_respawn("gila", enemy_respawn_delay_ms)
         gilas[:] = [gila for gila in gilas if not gila.destroyed]
         
+        destroyed_salamanders = [salamander for salamander in salamanders if salamander.destroyed]
+        if destroyed_salamanders:
+            for _ in destroyed_salamanders:
+                mob_placement.schedule_respawn("salamander", enemy_respawn_delay_ms)
+        salamanders[:] = [salamander for salamander in salamanders if not salamander.destroyed]
+        
         destroyed_crows = [crow for crow in crows if crow.destroyed]
         if destroyed_crows:
             for _ in destroyed_crows:
@@ -3557,7 +3574,7 @@ while running:
         collectibles = sticks + stones + grasses + savannah_grasses + mushrooms + dropped_items + marsh_reeds
         all_objects_no_liquids = rocks + trees + boulders + gemstone_rocks + metal_ore_rocks + metal_vein_rocks + gold_ore_rocks + gold_vein_rocks + berry_bushes + dead_bushes + ferns + fruit_plants + banks
         all_objects = all_objects_no_liquids + ponds + lavas
-        mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + wastedogs + wolves + duskwretches + pocks + deers + black_bears + brown_bears + polar_bears + pandas + gilas + crows + glowbirds + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
+        mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + wastedogs + wolves + duskwretches + pocks + deers + black_bears + brown_bears + polar_bears + pandas + gilas + salamanders + crows + glowbirds + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
         all_mobs = mobs
 
         visibility_cam_x = sleeping_tent_x if (sleeping_in_tent or tent_hide_active) else cam_x
@@ -3565,6 +3582,7 @@ while running:
         visible_liquids = [obj for obj in (ponds + lavas) if obj.rect.x - cam_x > -256 and obj.rect.x - cam_x < width + 256 and obj.rect.y > -256 and obj.rect.y < height + 256]
         visible_objects = [obj for obj in all_objects_no_liquids if obj.rect.x - cam_x > -256 and obj.rect.x - cam_x < width + 256 and obj.rect.y > -256 and obj.rect.y < height + 256]
         visible_mobs = [mob for mob in mobs if mob.rect.x - visibility_cam_x > -256 and mob.rect.x - visibility_cam_x < width + 256 and mob.rect.y > -256 and mob.rect.y < height + 256]
+        visible_projectiles = [rock for rock in pock_rock_projectiles if rock.rect.x - cam_x > -256 and rock.rect.x - cam_x < width + 256 and rock.rect.y > -256 and rock.rect.y < height + 256]
 
         # Add visible placed structures
         visible_structures = []
@@ -3593,6 +3611,7 @@ while running:
         visible_objects.extend(visible_mobs)
         visible_objects.extend(visible_collectibles)
         visible_objects.extend(visible_structures)
+        visible_objects.extend(visible_projectiles)
         visible_objects.sort(key=lambda obj: (obj.rect.y + obj.rect.height) if hasattr(obj, 'rect') else obj['y'] + 32)
 
         for mob in list(visible_mobs):
@@ -4407,17 +4426,32 @@ while running:
                 
             
                 if hasattr(mob, "enemy"):
-                    # Pick nearest target between player and any tamed cats
-                    potential_targets = [
-                        (player_world_x, player_world_y, player)
-                    ]
+                    # Pick nearest target between player, tamed cats, and (for Pocks) small animals.
+                    potential_targets = [(player_world_x, player_world_y, player)]
                     for cat in cats:
                         if getattr(cat, "tamed", False) and not getattr(cat, "destroyed", False) and getattr(cat, "is_alive", True):
                             potential_targets.append((cat.rect.centerx, cat.rect.centery, cat))
-                    target_world_x, target_world_y, target_entity = min(
-                        potential_targets,
-                        key=lambda t: (t[0] - mob.rect.centerx) ** 2 + (t[1] - mob.rect.centery) ** 2
-                    )
+                    if isinstance(mob, Pock):
+                        small_animals = cats + squirrels + chickens + crows + glowbirds
+                        for critter in small_animals:
+                            if getattr(critter, "destroyed", False) or not getattr(critter, "is_alive", True):
+                                continue
+                            potential_targets.append((critter.rect.centerx, critter.rect.centery, critter))
+                    # If the player is outside a Pock's melee range, prioritize throwing at the player.
+                    if isinstance(mob, Pock):
+                        player_dist_sq = (player_world_x - mob.rect.centerx) ** 2 + (player_world_y - mob.rect.centery) ** 2
+                        if player_dist_sq > getattr(mob, "throw_min_range_sq", 0):
+                            target_world_x, target_world_y, target_entity = (player_world_x, player_world_y, player)
+                        else:
+                            target_world_x, target_world_y, target_entity = min(
+                                potential_targets,
+                                key=lambda t: (t[0] - mob.rect.centerx) ** 2 + (t[1] - mob.rect.centery) ** 2
+                            )
+                    else:
+                        target_world_x, target_world_y, target_entity = min(
+                            potential_targets,
+                            key=lambda t: (t[0] - mob.rect.centerx) ** 2 + (t[1] - mob.rect.centery) ** 2
+                        )
 
                     mob.handle_player_proximity(dt, target_world_x, target_world_y, target_entity,
                                                 nearby_objects=None, nearby_mobs=None)
@@ -4459,7 +4493,7 @@ while running:
                 if not mob_in_liquid:
                     mob.exit_liquid()
 
-
+            update_pock_rocks(time_dt, player_world_x, player_world_y, player, nearby_mobs)
             
             inventory.add(inventory_resources)
             inventory_resources = []
