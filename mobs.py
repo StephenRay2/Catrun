@@ -471,6 +471,10 @@ class Player(pygame.sprite.Sprite):
                         facing_object = True
 
                     if facing_object and 1 <= mob.health:
+                        # Do not damage latched redmites with player attacks; cats handle them.
+                        RedmiteCls = globals().get("Redmite")
+                        if RedmiteCls and isinstance(mob, RedmiteCls) and getattr(mob, "latched_to_player", False):
+                            continue
                         # Remember this as the current attack target so pets can assist
                         self.attacking_target = mob
                         old_health = mob.health
@@ -1535,6 +1539,55 @@ class Cat(Mob):
             self._update_attack_animation(dt)
             return
 
+        # Self-defense: if something is targeting or has attacked this cat, prioritize it.
+        if nearby_mobs:
+            threats = [
+                m for m in nearby_mobs
+                if m is not self
+                and getattr(m, "is_alive", True)
+                and (
+                    getattr(m, "target", None) is self
+                    or (hasattr(m, "attackers") and self in getattr(m, "attackers", set()))
+                )
+            ]
+            if threats:
+                self.target_enemy = min(
+                    threats,
+                    key=lambda m: (m.rect.centerx - self.rect.centerx) ** 2 + (m.rect.centery - self.rect.centery) ** 2,
+                )
+
+        # Wild cat behavior: hunt small prey (redmites and squirrels), but never attack the player.
+        if not self.tamed:
+            if not self.target_enemy or not getattr(self.target_enemy, "is_alive", True):
+                prey = [m for m in (nearby_mobs or []) if isinstance(m, (Redmite, Squirrel)) and getattr(m, "is_alive", True)]
+                if prey:
+                    nearest = min(prey, key=lambda m: (m.rect.centerx - self.rect.centerx) ** 2 + (m.rect.centery - self.rect.centery) ** 2)
+                    self.target_enemy = nearest
+                else:
+                    self.target_enemy = None
+
+            if self.target_enemy and getattr(self.target_enemy, "is_alive", True):
+                enemy_dx = self.target_enemy.rect.centerx - self.rect.centerx
+                enemy_dy = self.target_enemy.rect.centery - self.rect.centery
+                enemy_distance = (enemy_dx**2 + enemy_dy**2) ** 0.5
+
+                if enemy_distance > 80:
+                    if enemy_distance > 0:
+                        enemy_direction = pygame.Vector2(enemy_dx, enemy_dy).normalize()
+                        self.direction = enemy_direction
+                        self.speed = 1.2
+                    self.move_timer = 0
+                else:
+                    if not self.attacking:
+                        self.attacking = True
+                        self.attack_timer = self.attack_duration
+                        self.attack_has_hit = False
+                        self.frame_index = 0.0
+                        self.last_direction = "right" if enemy_dx >= 0 else "left"
+                        self.direction = pygame.Vector2(0, 0)
+                        return
+            # Fall through to base wandering if no prey nearby.
+
         # Tamed cat behavior - follow player and combat support
         if self.tamed and player and self.follow_player:
             # Prefer the player's world-space position if available.
@@ -1544,6 +1597,12 @@ class Cat(Mob):
             # First, decide what enemy (if any) we should be attacking.
             # Cats only become aggressive toward mobs once you're engaged with them.
             if nearby_mobs:
+                # Prefer nearby redmites or squirrels as prey.
+                preferred_targets = [m for m in nearby_mobs if isinstance(m, (Redmite, Squirrel)) and getattr(m, "is_alive", True)]
+                if preferred_targets:
+                    nearest = min(preferred_targets, key=lambda m: (m.rect.centerx - self.rect.centerx) ** 2 + (m.rect.centery - self.rect.centery) ** 2)
+                    self.target_enemy = nearest
+                # Otherwise fallback to player-engagement logic.
                 for mob in nearby_mobs:
                     if mob is self or not getattr(mob, "is_alive", True):
                         continue
@@ -1649,6 +1708,11 @@ class Cat(Mob):
         # Apply damage roughly halfway through the swing, once per attack.
         if self.target_enemy and getattr(self.target_enemy, "is_alive", True):
             if not self.attack_has_hit and self.attack_timer <= self.attack_duration * 0.5:
+                # If target is a player, do not apply damage.
+                if isinstance(self.target_enemy, Player):
+                    self.attacking = False
+                    self.target_enemy = None
+                    return
                 self.target_enemy.health -= self.attack
                 if hasattr(self.target_enemy, "register_attack"):
                     self.target_enemy.register_attack(self)
@@ -3375,7 +3439,10 @@ class Redmite(Enemy):
                 player.health -= 1
                 self.damage_timer = 0
             if player:
-                self.rect.center = (player.rect.centerx, player.rect.centery)
+                self.rect.center = (
+                    getattr(player, "world_x", player.rect.centerx),
+                    getattr(player, "world_y", player.rect.centery),
+                )
             return
 
         super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)

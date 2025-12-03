@@ -651,6 +651,9 @@ def handle_thrown_hit(thrown_item, mob, base_attack, attacker=None):
     item_data = thrown_item.get("item")
     if not item_data:
         return
+    from mobs import Redmite, Cat
+    if isinstance(mob, Redmite) and getattr(mob, "latched_to_player", False) and not isinstance(attacker, Cat):
+        return
     damage = calculate_thrown_damage(item_data, base_attack)
     if damage > 0:
         mob.health = max(0, mob.health - damage)
