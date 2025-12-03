@@ -1087,6 +1087,8 @@ def world_rect_collides(collision_rect):
         deers,
         black_bears,
         brown_bears,
+        polar_bears,
+        pandas,
         gilas,
         crows,
         duskwretches,
@@ -1111,6 +1113,8 @@ def world_rect_collides(collision_rect):
         + deers
         + black_bears
         + brown_bears
+        + polar_bears
+        + pandas
         + gilas
         + crows
         + glowbirds
@@ -3294,7 +3298,7 @@ while running:
                 
                 collision_detected = False
                 collision_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants + ponds + lavas + banks
-                collision_mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + wastedogs + wolves + pocks + deers + black_bears + brown_bears + gilas + crows + glowbirds + duskwretches
+                collision_mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + wastedogs + wolves + pocks + deers + black_bears + brown_bears + polar_bears + pandas + gilas + crows + glowbirds + duskwretches
                 
                 for obj in collision_objects:
                     obj_rect = obj.get_collision_rect(0) if hasattr(obj, 'get_collision_rect') else obj.rect
@@ -3417,15 +3421,42 @@ while running:
             for _ in destroyed_chickens:
                 mob_placement.schedule_respawn("chicken", respawn_delay_ms)
         chickens[:] = [chicken for chicken in chickens if not chicken.destroyed]
+        enemy_respawn_delay_ms = 120000  # 120 seconds for aggressive mobs
+        
+        destroyed_crawlers = [crawler for crawler in crawlers if crawler.destroyed]
+        if destroyed_crawlers:
+            for _ in destroyed_crawlers:
+                mob_placement.schedule_respawn("crawler", enemy_respawn_delay_ms)
         crawlers[:] = [crawler for crawler in crawlers if not crawler.destroyed]
+        
+        destroyed_ashhounds = [ashhound for ashhound in ashhounds if ashhound.destroyed]
+        if destroyed_ashhounds:
+            for _ in destroyed_ashhounds:
+                mob_placement.schedule_respawn("ashhound", enemy_respawn_delay_ms)
         ashhounds[:] = [ashhound for ashhound in ashhounds if not ashhound.destroyed]
+        
+        destroyed_wastedogs = [wastedog for wastedog in wastedogs if wastedog.destroyed]
+        if destroyed_wastedogs:
+            for _ in destroyed_wastedogs:
+                mob_placement.schedule_respawn("wastedog", enemy_respawn_delay_ms)
         wastedogs[:] = [wastedog for wastedog in wastedogs if not wastedog.destroyed]
+        
         destroyed_wolves = [wolf for wolf in wolves if wolf.destroyed]
         if destroyed_wolves:
             for _ in destroyed_wolves:
-                mob_placement.schedule_respawn("wolf", respawn_delay_ms)
+                mob_placement.schedule_respawn("wolf", enemy_respawn_delay_ms)
         wolves[:] = [wolf for wolf in wolves if not wolf.destroyed]
+        
+        destroyed_duskwretches = [duskwretch for duskwretch in duskwretches if duskwretch.destroyed]
+        if destroyed_duskwretches:
+            for _ in destroyed_duskwretches:
+                mob_placement.schedule_respawn("duskwretch", enemy_respawn_delay_ms)
         duskwretches[:] = [duskwretch for duskwretch in duskwretches if not duskwretch.destroyed]
+        
+        destroyed_pocks = [pock for pock in pocks if pock.destroyed]
+        if destroyed_pocks:
+            for _ in destroyed_pocks:
+                mob_placement.schedule_respawn("pock", enemy_respawn_delay_ms)
         pocks[:] = [pock for pock in pocks if not pock.destroyed]
 
         destroyed_deers = [deer for deer in deers if deer.destroyed]
@@ -3433,9 +3464,41 @@ while running:
             for _ in destroyed_deers:
                 mob_placement.schedule_respawn("deer", respawn_delay_ms)
         deers[:] = [deer for deer in deers if not deer.destroyed]
+        
+        destroyed_black_bears = [black_bear for black_bear in black_bears if black_bear.destroyed]
+        if destroyed_black_bears:
+            for _ in destroyed_black_bears:
+                mob_placement.schedule_respawn("black_bear", enemy_respawn_delay_ms)
         black_bears[:] = [black_bear for black_bear in black_bears if not black_bear.destroyed]
+        
+        destroyed_brown_bears = [brown_bear for brown_bear in brown_bears if brown_bear.destroyed]
+        if destroyed_brown_bears:
+            for _ in destroyed_brown_bears:
+                mob_placement.schedule_respawn("brown_bear", enemy_respawn_delay_ms)
         brown_bears[:] = [brown_bear for brown_bear in brown_bears if not brown_bear.destroyed]
+        
+        destroyed_polar_bears = [polar_bear for polar_bear in polar_bears if polar_bear.destroyed]
+        if destroyed_polar_bears:
+            for _ in destroyed_polar_bears:
+                mob_placement.schedule_respawn("polar_bear", enemy_respawn_delay_ms)
+        polar_bears[:] = [polar_bear for polar_bear in polar_bears if not polar_bear.destroyed]
+        
+        destroyed_pandas = [panda for panda in pandas if panda.destroyed]
+        if destroyed_pandas:
+            for _ in destroyed_pandas:
+                mob_placement.schedule_respawn("panda", respawn_delay_ms)
+        pandas[:] = [panda for panda in pandas if not panda.destroyed]
+        
+        destroyed_gilas = [gila for gila in gilas if gila.destroyed]
+        if destroyed_gilas:
+            for _ in destroyed_gilas:
+                mob_placement.schedule_respawn("gila", enemy_respawn_delay_ms)
         gilas[:] = [gila for gila in gilas if not gila.destroyed]
+        
+        destroyed_crows = [crow for crow in crows if crow.destroyed]
+        if destroyed_crows:
+            for _ in destroyed_crows:
+                mob_placement.schedule_respawn("crow", enemy_respawn_delay_ms)
         crows[:] = [crow for crow in crows if not crow.destroyed]
         glowbirds[:] = [glowbird for glowbird in glowbirds if not glowbird.destroyed]
         fire_dragons[:] = [dragon for dragon in fire_dragons if not dragon.destroyed]
@@ -3494,7 +3557,7 @@ while running:
         collectibles = sticks + stones + grasses + savannah_grasses + mushrooms + dropped_items + marsh_reeds
         all_objects_no_liquids = rocks + trees + boulders + gemstone_rocks + metal_ore_rocks + metal_vein_rocks + gold_ore_rocks + gold_vein_rocks + berry_bushes + dead_bushes + ferns + fruit_plants + banks
         all_objects = all_objects_no_liquids + ponds + lavas
-        mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + wastedogs + wolves + duskwretches + pocks + deers + black_bears + brown_bears + gilas + crows + glowbirds + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
+        mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + wastedogs + wolves + duskwretches + pocks + deers + black_bears + brown_bears + polar_bears + pandas + gilas + crows + glowbirds + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
         all_mobs = mobs
 
         visibility_cam_x = sleeping_tent_x if (sleeping_in_tent or tent_hide_active) else cam_x

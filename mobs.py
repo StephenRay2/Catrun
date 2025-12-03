@@ -168,6 +168,15 @@ black_bear_attack_left_images = ["assets/sprites/mobs/BlackBearAttack1.png", "as
 black_bear_dead_image = pygame.image.load("assets/sprites/mobs/BlackBearDead.png").convert_alpha()
 brown_bear_dead_image = pygame.image.load("assets/sprites/mobs/BrownBearDead.png").convert_alpha()
 
+polar_bear_idle_images = ["assets/sprites/mobs/PolarBearIdle1.png", "assets/sprites/mobs/PolarBearIdle2.png", "assets/sprites/mobs/PolarBearIdle3.png", "assets/sprites/mobs/PolarBearIdle4.png"]
+polar_bear_attack_left_images = ["assets/sprites/mobs/PolarBearAttack1.png", "assets/sprites/mobs/PolarBearAttack2.png", "assets/sprites/mobs/PolarBearAttack3.png"]
+polar_bear_walk_left_images = ["assets/sprites/mobs/PolarBearWalkLeft1.png", "assets/sprites/mobs/PolarBearWalkLeft2.png", "assets/sprites/mobs/PolarBearWalkLeft3.png", "assets/sprites/mobs/PolarBearWalkLeft4.png", "assets/sprites/mobs/PolarBearWalkLeft5.png", "assets/sprites/mobs/PolarBearWalkLeft6.png"]
+polar_bear_dead_image = pygame.image.load("assets/sprites/mobs/PolarBearDead.png").convert_alpha()
+
+panda_idle_images = ["assets/sprites/mobs/PandaBearIdle1.png", "assets/sprites/mobs/PandaBearIdle2.png", "assets/sprites/mobs/PandaBearIdle3.png", "assets/sprites/mobs/PandaBearIdle4.png"]
+panda_walk_left_images = ["assets/sprites/mobs/PandaBearWalkLeft1.png", "assets/sprites/mobs/PandaBearWalkLeft2.png", "assets/sprites/mobs/PandaBearWalkLeft3.png", "assets/sprites/mobs/PandaBearWalkLeft4.png", "assets/sprites/mobs/PandaBearWalkLeft5.png", "assets/sprites/mobs/PandaBearWalkLeft6.png"]
+panda_dead_image = pygame.image.load("assets/sprites/mobs/PandaBearDead.png").convert_alpha()
+
 gila_idle_images = ["assets/sprites/mobs/GilaIdle1.png", "assets/sprites/mobs/GilaIdle2.png"]
 gila_walk_left_images = ["assets/sprites/mobs/GilaWalkLeft1.png", "assets/sprites/mobs/GilaWalkLeft2.png", "assets/sprites/mobs/GilaWalkLeft3.png"]
 gila_attack_left_images = ["assets/sprites/mobs/GilaAttackLeft1.png", "assets/sprites/mobs/GilaAttackLeft2.png", "assets/sprites/mobs/GilaAttackLeft3.png"]
@@ -994,17 +1003,26 @@ class Mob(pygame.sprite.Sprite):
         self.current_liquid = None
 
     def register_attack(self, attacker):
-        """Track eligible attackers for XP sharing and remember the last hitter."""
+        """Track eligible attackers for XP sharing, retaliation, and remember the last hitter."""
         if attacker is None:
             return
         is_player = attacker.__class__.__name__ == "Player"
         is_tamed_cat = attacker.__class__.__name__ == "Cat" and getattr(attacker, "tamed", False)
+        is_enemy_mob = getattr(attacker, "enemy", False) or isinstance(attacker, (Wolf, Wastedog))
+        
         if is_tamed_cat and (not getattr(attacker, "is_alive", True) or getattr(attacker, "destroyed", False)):
             return
-        if not (is_player or is_tamed_cat):
+        if is_enemy_mob and (not getattr(attacker, "is_alive", True) or getattr(attacker, "destroyed", False)):
             return
+        if not (is_player or is_tamed_cat or is_enemy_mob):
+            return
+        
         self.attackers.add(attacker)
         self.last_attacker = attacker
+        
+        if is_enemy_mob and not isinstance(self, (Wolf, Wastedog)):
+            self.chasing = True
+            self.aggro_timer = getattr(self, "aggro_timeout", 6.0)
 
     def give_experience(self, player):
         if self.health >= 1 or self.death_experience <= 0:
@@ -1952,7 +1970,9 @@ class Enemy(Mob):
         dy = player_world_y - self.rect.centery
         distance_sq = dx*dx + dy*dy
         if self.is_alive:
-            # Shorter aggro range and finite chase duration.
+            target_dx = dx
+            target_dy = dy
+            
             if 50 * 50 < distance_sq < 140 * 140:
                 self.chasing = True
                 self.aggro_timer = self.aggro_timeout
@@ -1960,7 +1980,17 @@ class Enemy(Mob):
                 self.chasing = False
                 self.aggro_timer = 0.0
 
-            # Count down existing aggro; drop target if timer runs out.
+            if self.chasing and getattr(self, "attackers", set()):
+                for attacker in list(self.attackers):
+                    if getattr(attacker, "is_alive", True) and not getattr(attacker, "destroyed", False):
+                        adx = attacker.rect.centerx - self.rect.centerx
+                        ady = attacker.rect.centery - self.rect.centery
+                        adist_sq = adx * adx + ady * ady
+                        if adist_sq < distance_sq:
+                            target_dx = adx
+                            target_dy = ady
+                            break
+
             if self.chasing and self.aggro_timer > 0:
                 self.aggro_timer -= dt
                 if self.aggro_timer <= 0:
@@ -1968,7 +1998,7 @@ class Enemy(Mob):
                     self.aggro_timer = 0.0
 
             if self.chasing and not self.fleeing:
-                direction = pygame.Vector2(dx, dy)
+                direction = pygame.Vector2(target_dx, target_dy)
                 if direction.length_squared() > 0:
                     direction = direction.normalize()
                 self.direction = direction 
@@ -1999,6 +2029,19 @@ class Enemy(Mob):
             return False
         to_target_norm = to_target.normalize()
         return target_dir.dot(to_target_norm) > 0.4
+    
+    def get_attackers_in_range(self, attack_range_sq=3600):
+        """Return list of attackers within range for AOE attacks."""
+        in_range = []
+        for attacker in getattr(self, "attackers", set()):
+            if not getattr(attacker, "is_alive", True) or getattr(attacker, "destroyed", False):
+                continue
+            dx = attacker.rect.centerx - self.rect.centerx
+            dy = attacker.rect.centery - self.rect.centery
+            dist_sq = dx * dx + dy * dy
+            if dist_sq < attack_range_sq:
+                in_range.append(attacker)
+        return in_range
 
     def flee(self, player_world_x, player_world_y, dt, player_sleeping=False):
         dx = player_world_x - self.rect.centerx
@@ -2032,6 +2075,17 @@ class Enemy(Mob):
             
             sleep_multiplier = 40 if player_sleeping else 1
             animation_speed_multiplier = sleep_multiplier  # Use same multiplier for animations
+            
+            if not self.chasing and getattr(self, "attackers", set()):
+                for attacker in list(self.attackers):
+                    if getattr(attacker, "is_alive", True) and not getattr(attacker, "destroyed", False):
+                        dx = attacker.rect.centerx - self.rect.centerx
+                        dy = attacker.rect.centery - self.rect.centery
+                        dist_sq = dx * dx + dy * dy
+                        if dist_sq < (200 * 200):
+                            self.chasing = True
+                            self.aggro_timer = getattr(self, "aggro_timeout", 6.0)
+                            break
             
             if not self.chasing:
                 if self.move_timer <= 0:
@@ -2127,8 +2181,16 @@ class Crawler(Enemy):
             self.attack_timer -= 1
 
             if self.attack_timer == self.attack_duration // 2 and distance_sq < (50 * 50):
-                player.health -= self.attack_damage
-                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                if player and hasattr(player, "health"):
+                    player.health -= self.attack_damage
+                    sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                
+                attackers_in_range = self.get_attackers_in_range(2500)
+                for attacker in attackers_in_range:
+                    if hasattr(attacker, "health"):
+                        attacker.health = max(0, attacker.health - self.attack_damage)
+                        if hasattr(attacker, "register_attack"):
+                            attacker.register_attack(self)
 
             if self.attack_timer <= 0:
                 self.attacking = False
@@ -2172,7 +2234,7 @@ class Ashhound(Enemy):
         self.attacking = False
         self.attack_timer = 0
         self.attack_duration = 54
-        self.attack_animation_speed = 0.035
+        self.attack_animation_speed = 0.018
 
         self.attack_damage = 6
         self.base_speed = 170
@@ -2299,7 +2361,7 @@ class Wolf(Enemy):
         self.rect = self.image.get_rect(center=(x, y))
 
         self.frame_index = 0
-        self.animation_speed = 0.25
+        self.animation_speed = 0.15
         self.direction = pygame.Vector2(0, 0)
         self.move_timer = 0
 
@@ -2320,7 +2382,7 @@ class Wolf(Enemy):
         self.pack_id = pack_id if pack_id is not None else random.randint(1, 10_000_000)
         self.is_alpha = False
         self.prey_target = None
-        self.attack_animation_speed = 0.035
+        self.attack_animation_speed = 0.018
         self.attack_duration = 54
         self.eat_heal_fraction = 0.25  # heal 25% of max health per full carcass
         self.eat_progress = 0.0        # time spent eating current carcass
@@ -2553,9 +2615,18 @@ class Wolf(Enemy):
                         pass  # Don't damage the player inside the spawn protection bubble.
                     else:
                         target.health = max(0, target.health - self.attack_damage)
+                        if hasattr(target, "register_attack"):
+                            target.register_attack(self)
                 # Make sure player hit audio stays audible; use distance falloff otherwise.
                 volume_scale = 1.0 if listener_pos else self._attack_volume_scale(listener_pos)
                 sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]), volume_scale=volume_scale)
+                
+                attackers_in_range = self.get_attackers_in_range(3600)
+                for attacker in attackers_in_range:
+                    if hasattr(attacker, "health"):
+                        attacker.health = max(0, attacker.health - self.attack_damage)
+                        if hasattr(attacker, "register_attack"):
+                            attacker.register_attack(self)
 
             if self.attack_timer <= 0:
                 self.attacking = False
@@ -2709,7 +2780,7 @@ class Wolf(Enemy):
                 self.last_direction = "left"
             
             if self.chasing or self.pack_state == "chase":
-                self.animate_walk(animation_speed_multiplier=1.5)
+                self.animate_walk(animation_speed_multiplier=1.0)
             else:
                 self.animate_walk()
         else:
@@ -2826,7 +2897,7 @@ class Wastedog(Wolf):
         self.attack_duration = 54
 
         self.attack_damage = 6
-        self.base_speed = 170
+        self.base_speed = 210
         self.speed = 1
         self.full_health = 220 + (random.randint(10, 16) * self.level)
         self.health = self.full_health
@@ -3722,6 +3793,273 @@ class BrownBear(AggressiveMob):
             return
         
         if self.chasing and self.aggressive:
+            if self.direction.length_squared() > 0:
+                can_move_x, can_move_y = self.check_collision(self.direction, nearby_objects or [], nearby_mobs or [])
+                
+                actual_speed = self.get_speed() * dt
+                movement = self.direction * actual_speed
+                
+                new_x = self.rect.x + movement.x if can_move_x else self.rect.x
+                new_y = self.rect.y + movement.y if can_move_y else self.rect.y
+                self.rect.topleft = (new_x, new_y)
+                self.animate_walk()
+            else:
+                self.animate_stand()
+        else:
+            super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
+
+class PolarBear(AggressiveMob):
+    def __init__(self, x, y, name):
+        super().__init__(x, y, name)
+        
+        self.stand_left_images = [pygame.image.load(img).convert_alpha() for img in polar_bear_idle_images]
+        self.walk_left_images = [pygame.image.load(img).convert_alpha() for img in polar_bear_walk_left_images]
+        self.attack_left_images = [pygame.image.load(img).convert_alpha() for img in polar_bear_attack_left_images]
+        
+        self.walk_right_images = [pygame.transform.flip(img, True, False) for img in self.walk_left_images]
+        self.stand_right_images = [pygame.transform.flip(img, True, False) for img in self.stand_left_images]
+        self.attack_right_images = [pygame.transform.flip(img, True, False) for img in self.attack_left_images]
+        
+        self.image = self.stand_left_images[0]
+        self.rect = self.image.get_rect(center=(x, y))
+        self.base_speed = 85
+        self.speed = 1
+        self.full_health = 300 + (random.randint(8, 20) * self.level)
+        self.health = self.full_health
+        self.meat_resource = "Raw Bear Meat"
+        self.special_drops = [{'item': 'Fur', 'chance': 0.6, 'min': 2, 'max': 4}]
+        self.resource_amount = 8
+        
+        self.frame_index = 0
+        self.animation_speed = 0.1
+        self.direction = pygame.Vector2(0, 0)
+        self.move_timer = 0
+        self.last_direction = "left"
+        
+        self.attack_timer = 0
+        self.attack_duration = 30
+        self.attack_damage = 15
+        self.death_experience = int(800 * (1 + (self.level * 0.05)))
+        self.level = 1
+        
+        self.aggressive = False
+        self.enemy = False
+
+    def get_collision_rect(self, cam_x):
+        rect = self.rect
+        return pygame.Rect(rect.x - cam_x + 5, rect.y + 30, rect.width - 10, rect.height - 50)
+    
+    def handle_health(self, screen, cam_x, dt, player_sleeping=False):
+        max_health = self.full_health
+        health = self.health
+        bar_width = 25
+        bar_height = 4
+        x = self.rect.centerx - bar_width / 2 - cam_x
+        y = self.rect.top + 5
+        health_ratio = health / max_health
+        health_width = int(bar_width * health_ratio)
+        
+        if self.health < self.last_health and not self.aggressive:
+            self.aggressive = True
+            self.enemy = True
+        
+        if self.health < self.last_health:
+            self.bar_timer = 5
+        
+        if self.bar_timer > 0:
+            pygame.draw.rect(screen, (255, 20, 20), pygame.Rect(x, y, bar_width, bar_height), border_radius=2)
+            pygame.draw.rect(screen, (40, 250, 40), pygame.Rect(x, y, health_width, bar_height), border_radius=2)
+            pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=1, border_radius=2)
+            self.bar_timer -= dt
+        
+        self.last_health = self.health
+        if self.health <= 0:
+            self.is_alive = False
+    
+    def handle_player_proximity(self, dt, player_world_x, player_world_y, player=None, nearby_objects=None, nearby_mobs=None):
+        if not self.aggressive:
+            return
+        
+        dx = player_world_x - self.rect.centerx
+        dy = player_world_y - self.rect.centery
+        distance_sq = dx*dx + dy*dy
+        
+        if self.is_alive:
+            if 50 * 50 < distance_sq < 250*250:
+                self.chasing = True
+            elif distance_sq > 400*400:
+                self.chasing = False
+            
+            if self.chasing and not self.attacking:
+                direction = pygame.Vector2(dx, dy)
+                if direction.length_squared() > 0:
+                    direction = direction.normalize()
+                self.direction = direction
+                self.speed = 3.5
+            elif not self.attacking:
+                self.speed = 1.0
+    
+    def flee(self, player_world_x, player_world_y, dt, player_sleeping=False):
+        self.fleeing = False
+    
+    def attack(self, player_world_x, player_world_y, player):
+        if not self.aggressive:
+            return
+        
+        dx = player_world_x - self.rect.centerx
+        dy = player_world_y - self.rect.centery
+        distance_sq = dx*dx + dy*dy
+        
+        if self.is_alive and distance_sq < (70 * 70):
+            if not self.attacking:
+                self.attacking = True
+                self.attack_timer = self.attack_duration
+                self.frame_index = 0.0
+        
+        if self.attacking:
+            frames = self.attack_right_images if self.last_direction == "right" else self.attack_left_images
+            self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
+            self.image = frames[int(self.frame_index)]
+            
+            self.attack_timer -= 1
+            
+            if self.attack_timer == self.attack_duration // 2 and distance_sq < (70 * 70):
+                player.health -= self.attack_damage
+                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+            
+            if self.attack_timer <= 0:
+                self.attacking = False
+                self.frame_index = 0.0
+                self.image = (self.stand_right_images[0] if self.last_direction == "right"
+                            else self.stand_left_images[0])
+    
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
+        if self.attacking:
+            return
+        
+        if not self.is_alive:
+            self.direction.xy = (0, 0)
+            if self.last_direction == "right":
+                self.image = pygame.transform.flip(polar_bear_dead_image, True, False)
+            else:
+                self.image = polar_bear_dead_image
+            return
+        
+        if self.chasing and self.aggressive:
+            if self.direction.length_squared() > 0:
+                can_move_x, can_move_y = self.check_collision(self.direction, nearby_objects or [], nearby_mobs or [])
+                
+                actual_speed = self.get_speed() * dt
+                movement = self.direction * actual_speed
+                
+                new_x = self.rect.x + movement.x if can_move_x else self.rect.x
+                new_y = self.rect.y + movement.y if can_move_y else self.rect.y
+                self.rect.topleft = (new_x, new_y)
+                self.animate_walk()
+            else:
+                self.animate_stand()
+        else:
+            super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
+
+class PandaBear(AggressiveMob):
+    def __init__(self, x, y, name):
+        super().__init__(x, y, name)
+        
+        self.stand_left_images = [pygame.image.load(img).convert_alpha() for img in panda_idle_images]
+        self.walk_left_images = [pygame.image.load(img).convert_alpha() for img in panda_walk_left_images]
+        
+        self.walk_right_images = [pygame.transform.flip(img, True, False) for img in self.walk_left_images]
+        self.stand_right_images = [pygame.transform.flip(img, True, False) for img in self.stand_left_images]
+        
+        self.image = self.stand_left_images[0]
+        self.rect = self.image.get_rect(center=(x, y))
+        self.base_speed = 120
+        self.speed = 1
+        self.full_health = 150 + (random.randint(5, 10) * self.level)
+        self.health = self.full_health
+        self.meat_resource = "Raw Bear Meat"
+        self.special_drops = [{'item': 'Fur', 'chance': 0.5, 'min': 1, 'max': 2}]
+        self.resource_amount = 12
+        
+        self.frame_index = 0
+        self.animation_speed = 0.15
+        self.direction = pygame.Vector2(0, 0)
+        self.move_timer = 0
+        self.last_direction = "left"
+        
+        self.death_experience = int(400 * (1 + (self.level * 0.03)))
+        self.level = 1
+        
+        self.aggressive = False
+        self.enemy = False
+
+    def get_collision_rect(self, cam_x):
+        rect = self.rect
+        return pygame.Rect(rect.x - cam_x + 5, rect.y + 30, rect.width - 10, rect.height - 50)
+    
+    def handle_health(self, screen, cam_x, dt, player_sleeping=False):
+        max_health = self.full_health
+        health = self.health
+        bar_width = 25
+        bar_height = 4
+        x = self.rect.centerx - bar_width / 2 - cam_x
+        y = self.rect.top + 5
+        health_ratio = health / max_health
+        health_width = int(bar_width * health_ratio)
+        
+        if self.health < self.last_health:
+            self.bar_timer = 5
+            self.fleeing = True
+        
+        if self.bar_timer > 0:
+            pygame.draw.rect(screen, (255, 20, 20), pygame.Rect(x, y, bar_width, bar_height), border_radius=2)
+            pygame.draw.rect(screen, (40, 250, 40), pygame.Rect(x, y, health_width, bar_height), border_radius=2)
+            pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=1, border_radius=2)
+            self.bar_timer -= dt
+        
+        self.last_health = self.health
+        if self.health <= 0:
+            self.is_alive = False
+    
+    def handle_player_proximity(self, dt, player_world_x, player_world_y, player=None, nearby_objects=None, nearby_mobs=None):
+        return
+    
+    def flee(self, player_world_x, player_world_y, dt, player_sleeping=False):
+        dx = player_world_x - self.rect.centerx
+        dy = player_world_y - self.rect.centery
+        distance_sq = dx*dx + dy*dy
+        
+        if self.is_alive and distance_sq < 300*300:
+            if self.fleeing:
+                if self.move_timer <= 0:
+                    direction = pygame.Vector2(-dx, -dy)
+                    if direction.length_squared() > 0:
+                        direction = direction.normalize()
+                    
+                    self.speed = 1.8
+                    self.direction = direction
+                    self.move_timer = random.randint(30, 120)
+                
+                self.move_timer -= 1
+                
+                if distance_sq > 500*500:
+                    self.fleeing = False
+                    self.speed = 1.0
+                    self.direction = pygame.Vector2(0, 0)
+    
+    def attack(self, player_world_x, player_world_y, player):
+        pass
+    
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
+        if not self.is_alive:
+            self.direction.xy = (0, 0)
+            if self.last_direction == "right":
+                self.image = pygame.transform.flip(panda_dead_image, True, False)
+            else:
+                self.image = panda_dead_image
+            return
+        
+        if self.fleeing:
             if self.direction.length_squared() > 0:
                 can_move_x, can_move_y = self.check_collision(self.direction, nearby_objects or [], nearby_mobs or [])
                 
