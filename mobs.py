@@ -158,6 +158,12 @@ try:
 except Exception:
     pock_stone_sprite = None
 
+redmite_idle_left_images = [pygame.image.load(f"assets/sprites/mobs/RedmiteLeftIdle{i}.png").convert_alpha() for i in range(1, 4)]
+redmite_walk_left_images = [pygame.image.load(f"assets/sprites/mobs/RedmiteLeftWalk{i}.png").convert_alpha() for i in range(1, 4)]
+redmite_latch_left_images = [pygame.image.load(f"assets/sprites/mobs/RedmiteLeftLatch{i}.png").convert_alpha() for i in range(1, 4)]
+redmite_latched_left_image = pygame.image.load("assets/sprites/mobs/RedmiteLeftLatched.png").convert_alpha()
+redmite_latched_up_image = pygame.image.load("assets/sprites/mobs/RedmiteUpLatched.png").convert_alpha()
+
 
 deer_idle_images = ["assets/sprites/mobs/DeerIdle1.png", "assets/sprites/mobs/DeerIdle2.png", "assets/sprites/mobs/DeerIdle3.png", "assets/sprites/mobs/DeerIdle4.png", "assets/sprites/mobs/DeerIdle5.png", "assets/sprites/mobs/DeerIdle6.png", "assets/sprites/mobs/DeerIdle7.png", "assets/sprites/mobs/DeerIdle8.png"]
 deer_walk_left_images = ["assets/sprites/mobs/DeerWalkLeft1.png", "assets/sprites/mobs/DeerWalkLeft2.png", "assets/sprites/mobs/DeerWalkLeft3.png", "assets/sprites/mobs/DeerWalkLeft4.png", "assets/sprites/mobs/DeerWalkLeft5.png", "assets/sprites/mobs/DeerWalkLeft6.png", "assets/sprites/mobs/DeerWalkLeft7.png", "assets/sprites/mobs/DeerWalkLeft8.png"]
@@ -366,6 +372,8 @@ class Player(pygame.sprite.Sprite):
         self.attack_cooldown = pygame.time.get_ticks()
         self.attack_delay = 300
         self.mob_noise_delay = 3
+        # Up to four redmites can latch onto player legs.
+        self.redmite_slots = [None, None, None, None]
         
         self.swimming = False
         self.in_lava = False
@@ -3268,6 +3276,130 @@ def update_pock_rocks(dt, player_world_x, player_world_y, player, mobs):
             rock.destroyed = True
             pock_rock_projectiles.remove(rock)
 
+class Redmite(Enemy):
+    def __init__(self, x, y, name):
+        super().__init__(x, y, name)
+        self.stand_left_images = [pygame.transform.scale(img, (16, 16)) for img in redmite_idle_left_images]
+        self.walk_left_images = [pygame.transform.scale(img, (16, 16)) for img in redmite_walk_left_images]
+        self.latch_left_images = [pygame.transform.scale(img, (16, 16)) for img in redmite_latch_left_images]
+        self.walk_right_images = [pygame.transform.flip(img, True, False) for img in self.walk_left_images]
+        self.stand_right_images = [pygame.transform.flip(img, True, False) for img in self.stand_left_images]
+        self.latch_right_images = [pygame.transform.flip(img, True, False) for img in self.latch_left_images]
+
+        self.latched_left_image = pygame.transform.scale(redmite_latched_left_image, (16, 16))
+        self.latched_right_image = pygame.transform.flip(self.latched_left_image, True, False)
+        self.latched_up_image = pygame.transform.scale(redmite_latched_up_image, (16, 16))
+
+        self.image = self.stand_left_images[0]
+        self.rect = self.image.get_rect(center=(x, y))
+        self.frame_index = 0
+        self.animation_speed = 0.18
+        self.direction = pygame.Vector2(0, 0)
+        self.move_timer = 0
+        self.last_direction = "left"
+
+        self.attacking = False
+        self.throwing = False
+        self.throw_timer = 0
+        self.latching = False
+        self.latched_to_player = False
+        self.latched_slot = None
+        self.damage_timer = 0
+        self.damage_interval = 1.0
+        self.latched_offset = (0, 0)
+
+        self.attack_damage = 2
+        self.base_speed = 200
+        self.speed = 1
+        self.full_health = 20 + random.randint(0, 10)
+        self.health = self.full_health
+        self.resource = "Chitin"
+        self.special_drops = []
+        self.resource_amount = 1
+        self.death_experience = int(120 * (1 + (self.level * 0.02)))
+        self.level = 1
+        self.enemy = True
+        self.aggressive = True
+
+    def latch_to_player(self, player):
+        if getattr(player, "redmite_slots", None) is None:
+            player.redmite_slots = [None, None, None, None]
+        for idx, slot in enumerate(player.redmite_slots):
+            if slot is None:
+                player.redmite_slots[idx] = self
+                self.latched_slot = idx
+                self.latched_to_player = True
+                self.latching = False
+                self.direction.xy = (0, 0)
+                return True
+        return False
+
+    def detach(self, player=None):
+        if player and getattr(player, "redmite_slots", None):
+            if self.latched_slot is not None and 0 <= self.latched_slot < len(player.redmite_slots):
+                if player.redmite_slots[self.latched_slot] is self:
+                    player.redmite_slots[self.latched_slot] = None
+        self.latched_slot = None
+        self.latched_to_player = False
+        self.latching = False
+
+    def get_collision_rect(self, cam_x):
+        rect = self.rect
+        return pygame.Rect(rect.x - cam_x + 4, rect.y + 6, rect.width - 8, rect.height - 12)
+
+    def attack(self, target_world_x, target_world_y, target_entity):
+        if not isinstance(target_entity, Player):
+            return
+        if self.latched_to_player:
+            return
+        dx = target_world_x - self.rect.centerx
+        dy = target_world_y - self.rect.centery
+        distance_sq = dx * dx + dy * dy
+        if self.is_alive and distance_sq < (28 * 28):
+            if self.latch_to_player(target_entity):
+                self.frame_index = 0.0
+                self.latching = True
+
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
+        if not self.is_alive:
+            self.direction.xy = (0, 0)
+            return
+
+        if self.latched_to_player:
+            if player is not None and not getattr(player, "is_alive", True):
+                self.detach(player)
+                return
+            self.direction.xy = (0, 0)
+            self.damage_timer += dt
+            if self.damage_timer >= self.damage_interval and player:
+                player.health -= 1
+                self.damage_timer = 0
+            if player:
+                self.rect.center = (player.rect.centerx, player.rect.centery)
+            return
+
+        super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
+
+    def animate_stand(self, animation_speed_multiplier=1.0):
+        if self.latched_to_player:
+            return
+        super().animate_stand(animation_speed_multiplier)
+
+    def animate_walk(self, animation_speed_multiplier=1.0):
+        if self.latched_to_player:
+            return
+        super().animate_walk(animation_speed_multiplier)
+
+    def draw(self, screen, cam_x):
+        if self.latched_to_player:
+            # Latched mites are drawn with the player overlay.
+            return
+        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
+
+    def handle_health(self, screen, cam_x, dt, player_sleeping=False):
+        super().handle_health(screen, cam_x, dt, player_sleeping)
+        if self.health <= 0 and self.latched_to_player:
+            self.detach()
 class Pock(Enemy):
     def __init__(self, x, y, name):
         super().__init__(x, y, name)

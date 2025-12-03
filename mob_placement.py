@@ -76,6 +76,14 @@ def _spawn_wolf():
             break
         attempts += 1
 
+def _spawn_redmite():
+    if not weighted_redmite_tiles:
+        return
+    tile_x, tile_image = random.choice(weighted_redmite_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 32)
+    y = random.randint(0, height - 32)
+    redmites.append(Redmite(x, y, "Redmite"))
+
 def _spawn_gila():
     if not weighted_gila_tiles:
         return
@@ -119,6 +127,8 @@ def process_respawns():
             _spawn_gila()
         elif kind == "salamander":
             _spawn_salamander()
+        elif kind == "redmite":
+            _spawn_redmite()
         # Unknown kinds are ignored.
     pending_respawns[:] = remaining
 
@@ -134,6 +144,7 @@ num_wolves = 50
 num_glowbirds = 75
 num_gilas = 50
 num_salamanders = 50
+num_redmites = 120
 num_black_bears = 50
 num_brown_bears = 30
 num_polar_bears = 20
@@ -691,6 +702,37 @@ for _ in range(num_salamanders):
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
     salamanders.append(Salamander(x, y, "Salamander"))
+
+allowed_redmite_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah]
+
+redmite_spawn_weights = {
+    bg_grass: 2,
+    bg_dirt: 2,
+    bg_compact: 2,
+    bg_savannah: 1,
+    bg_riverrock: 0,
+    bg_bigrock: 0,
+    bg_duskstone: 0,
+    bg_lavastone: 0,
+    bg_snow: 0,
+    bg_wasteland: 0,
+    bg_blackstone: 0,
+    bg_redrock: 0
+}
+
+weighted_redmite_tiles = []
+for tile_x, tile_image in tiles:
+    weight = redmite_spawn_weights.get(tile_image, 0)
+    weighted_redmite_tiles.extend([(tile_x, tile_image)] * weight)
+
+redmites = []
+for _ in range(num_redmites):
+    if not weighted_redmite_tiles:
+        break
+    tile_x, tile_image = random.choice(weighted_redmite_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 32)
+    y = random.randint(0, height - 32)
+    redmites.append(Redmite(x, y, "Redmite"))
 
 allowed_crow_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock]
 

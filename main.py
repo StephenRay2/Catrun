@@ -1091,6 +1091,7 @@ def world_rect_collides(collision_rect):
         pandas,
         gilas,
         salamanders,
+        redmites,
         crows,
         duskwretches,
         fire_dragons,
@@ -1118,6 +1119,7 @@ def world_rect_collides(collision_rect):
         + pandas
         + gilas
         + salamanders
+        + redmites
         + crows
         + glowbirds
         + duskwretches
@@ -1645,6 +1647,7 @@ while running:
             need_pickaxe_message_timer = 0
             player.full_timer = 60
             player.thirst_full_timer = 60
+            player.redmite_slots = [None, None, None, None]
             cats.clear()
             squirrels.clear()
             cows.clear()
@@ -1658,6 +1661,7 @@ while running:
             black_bears.clear()
             brown_bears.clear()
             gilas.clear()
+            redmites.clear()
             salamanders.clear()
             crows.clear()
             glowbirds.clear()
@@ -1790,6 +1794,14 @@ while running:
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
                 gilas.append(Gila(x, y, "Gila"))
+
+            for _ in range(num_redmites):
+                if not weighted_redmite_tiles:
+                    break
+                tile_x, tile_image = random.choice(weighted_redmite_tiles)
+                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 32)
+                y = random.randint(0, height - 32)
+                redmites.append(Redmite(x, y, "Redmite"))
 
             for _ in range(num_salamanders):
                 if not weighted_salamander_tiles:
@@ -3309,7 +3321,7 @@ while running:
                 
                 collision_detected = False
                 collision_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants + ponds + lavas + banks
-                collision_mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + wastedogs + wolves + pocks + deers + black_bears + brown_bears + polar_bears + pandas + gilas + salamanders + crows + glowbirds + duskwretches
+                collision_mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + wastedogs + wolves + pocks + deers + black_bears + brown_bears + polar_bears + pandas + gilas + salamanders + redmites + crows + glowbirds + duskwretches
                 
                 for obj in collision_objects:
                     obj_rect = obj.get_collision_rect(0) if hasattr(obj, 'get_collision_rect') else obj.rect
@@ -3506,6 +3518,12 @@ while running:
                 mob_placement.schedule_respawn("gila", enemy_respawn_delay_ms)
         gilas[:] = [gila for gila in gilas if not gila.destroyed]
         
+        destroyed_redmites = [rm for rm in redmites if rm.destroyed]
+        if destroyed_redmites:
+            for _ in destroyed_redmites:
+                mob_placement.schedule_respawn("redmite", enemy_respawn_delay_ms)
+        redmites[:] = [rm for rm in redmites if not rm.destroyed]
+        
         destroyed_salamanders = [salamander for salamander in salamanders if salamander.destroyed]
         if destroyed_salamanders:
             for _ in destroyed_salamanders:
@@ -3574,7 +3592,7 @@ while running:
         collectibles = sticks + stones + grasses + savannah_grasses + mushrooms + dropped_items + marsh_reeds
         all_objects_no_liquids = rocks + trees + boulders + gemstone_rocks + metal_ore_rocks + metal_vein_rocks + gold_ore_rocks + gold_vein_rocks + berry_bushes + dead_bushes + ferns + fruit_plants + banks
         all_objects = all_objects_no_liquids + ponds + lavas
-        mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + wastedogs + wolves + duskwretches + pocks + deers + black_bears + brown_bears + polar_bears + pandas + gilas + salamanders + crows + glowbirds + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
+        mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + wastedogs + wolves + duskwretches + pocks + deers + black_bears + brown_bears + polar_bears + pandas + gilas + salamanders + redmites + crows + glowbirds + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
         all_mobs = mobs
 
         visibility_cam_x = sleeping_tent_x if (sleeping_in_tent or tent_hide_active) else cam_x
@@ -3629,6 +3647,53 @@ while running:
         player_redraw_image = None
         player_redraw_x = 0
         player_redraw_y = 0
+
+        def get_redmite_slot_offset(direction, slot_index):
+            offsets = {
+                "down": [],
+                "up": [(-6, -12), (-6, -4), (-2, -12), (-2, -4)],
+                "left": [(8, -12), (8, -4), (8, -12), (8, -4)],
+                "right": [(-18, -12), (-18, -4), (-18, -12), (-18, -4)],
+            }
+            slot_list = offsets.get(direction)
+            if not slot_list:
+                slot_list = offsets.get("up") or offsets.get("left") or offsets.get("right") or [(0, 0)]
+            return slot_list[slot_index % len(slot_list)]
+
+        def draw_latched_redmites():
+            if not redmites:
+                return
+            latched = [rm for rm in redmites if getattr(rm, "latched_to_player", False)]
+            if not latched:
+                return
+            if player.last_direction == "down":
+                return
+            # Editable per-frame wobble offsets while moving left/right.
+            latch_walk_offsets = {
+                "left": [(0, -1), (0, 0), (0, 1), (0, 0), (0, -1), (0, 0), (0, 1), (0, 0)],
+                "right": [(0, -1), (0, 0), (0, 1), (0, 0), (0, -1), (0, 0), (0, 1), (0, 0)],
+            }
+            base_x = player_pos.x - size // 2
+            base_y = player_pos.y - size // 2 - 12
+            for rm in latched:
+                slot = rm.latched_slot if rm.latched_slot is not None else 0
+                offset = get_redmite_slot_offset(player.last_direction, slot)
+                # Apply optional per-frame wobble when walking left/right.
+                walk_offsets = latch_walk_offsets.get(player.last_direction, None)
+                is_moving = keys[pygame.K_w] or keys[pygame.K_a] or keys[pygame.K_s] or keys[pygame.K_d]
+                if walk_offsets and is_moving:
+                    idx = int(player_frame_index) % len(walk_offsets)
+                    wobble = walk_offsets[idx]
+                    offset = (offset[0] + wobble[0], offset[1] + wobble[1])
+                if player.last_direction == "up":
+                    img = rm.latched_up_image
+                elif player.last_direction == "right":
+                    img = rm.latched_right_image
+                else:
+                    img = rm.latched_left_image
+                draw_x = int(base_x + offset[0])
+                draw_y = int(base_y + offset[1])
+                screen.blit(img, (draw_x, draw_y))
 
         for obj in visible_liquids:
             obj.update_animation(dt)
@@ -3969,6 +4034,7 @@ while running:
                     if player.last_direction in ["right", "down"]:
                         draw_held_item()
 
+                draw_latched_redmites()
                 player_drawn = True
 
             draw_shadow_for_obj(obj)
