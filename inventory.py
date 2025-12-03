@@ -8298,7 +8298,14 @@ class Inventory():
         if item_data is None:
             return (False, [], None)
 
-        thrown_instance = copy.deepcopy(slot)
+        thrown_instance = {}
+        for key, value in slot.items():
+            if isinstance(value, pygame.Surface):
+                continue
+            try:
+                thrown_instance[key] = copy.deepcopy(value)
+            except Exception:
+                thrown_instance[key] = value
         thrown_instance["quantity"] = 1
         # Cat objects should never reach here, but guard against it
         thrown_instance.pop("cat_object", None)

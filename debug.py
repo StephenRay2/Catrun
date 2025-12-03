@@ -1,10 +1,12 @@
 # Compute next_level_exp per level for the provided leveling rule.
 # Start next_level_exp at 100, req_multiplier at 0.5. Apply bracketed decrements.
 import pygame
+from pathlib import Path
+
 pygame.font.init()
 
-font = pygame.font.Font("assets\Fonts\GFSDidot-Regular.ttf", 16)
-font_path = "assets\Fonts\GFSDidot-Regular.ttf"
+font_path = Path(__file__).resolve().parent / "assets" / "Fonts" / "GFSDidot-Regular.ttf"
+font = pygame.font.Font(str(font_path), 16)
 
 
 # next_level_exp = 100.0

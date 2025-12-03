@@ -7,9 +7,7 @@ SPAWN_PROTECTION_RADIUS = 900  # pixels
 SPAWN_PROTECTION_RADIUS_SQ = SPAWN_PROTECTION_RADIUS ** 2
 
 def is_in_spawn_protection(x, y):
-    dx = x - SPAWN_PROTECTION_CENTER[0]
-    dy = y - SPAWN_PROTECTION_CENTER[1]
-    return (dx * dx + dy * dy) < SPAWN_PROTECTION_RADIUS_SQ
+    return False
 
 
 num_deers = 50
@@ -18,18 +16,18 @@ num_cats = 250
 num_cows = 50
 num_chickens = 50
 num_crows = 75
-num_ashhounds = 40
-num_wastedogs = 40
-num_wolves = 60
+
+num_wolves = 20
 num_glowbirds = 75
 num_gilas = 50
 num_black_bears = 50
 num_brown_bears = 30
 
-
-num_crawlers = 0
-num_pocks = 0
-num_duskwretches = 0
+num_ashhounds = 20
+num_wastedogs = 20
+num_crawlers = 20
+num_pocks = 20
+num_duskwretches = 20
 
 num_fire_dragons = 50
 num_ice_dragons = 50

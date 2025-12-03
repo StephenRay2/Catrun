@@ -354,9 +354,7 @@ class Player(pygame.sprite.Sprite):
         self.current_liquid = None
 
     def is_in_spawn_protection(self):
-        dx = self.rect.centerx - self.spawn_protection_center.x
-        dy = self.rect.centery - self.spawn_protection_center.y
-        return (dx * dx + dy * dy) < self.spawn_protection_radius_sq
+        return False
 
     def status_effects(self, dt):
         if self.poison == True:
@@ -1892,6 +1890,33 @@ class Enemy(Mob):
                     direction = direction.normalize()
                 self.direction = direction 
 
+    def _target_is_moving(self, target):
+        if target is None:
+            return False
+        direction = getattr(target, "direction", None)
+        if direction is None:
+            return False
+        try:
+            return direction.length_squared() > 0
+        except Exception:
+            return False
+
+    def _target_moving_away(self, target_x, target_y, target):
+        if target is None:
+            return False
+        direction = getattr(target, "direction", None)
+        if direction is None or direction.length_squared() == 0:
+            return False
+        to_target = pygame.Vector2(target_x - self.rect.centerx, target_y - self.rect.centery)
+        if to_target.length_squared() == 0:
+            return False
+        try:
+            target_dir = direction.normalize()
+        except Exception:
+            return False
+        to_target_norm = to_target.normalize()
+        return target_dir.dot(to_target_norm) > 0.4
+
     def flee(self, player_world_x, player_world_y, dt, player_sleeping=False):
         dx = player_world_x - self.rect.centerx
         dy = player_world_y - self.rect.centery
@@ -2056,14 +2081,15 @@ class Ashhound(Enemy):
         self.rect = self.image.get_rect(center=(x, y))
 
         self.frame_index = 0
-        self.animation_speed = 0.2
+        self.animation_speed = 0.14
         self.direction = pygame.Vector2(0, 0)
         self.move_timer = 0
 
         self.last_direction = "right"
         self.attacking = False
         self.attack_timer = 0
-        self.attack_duration = 30
+        self.attack_duration = 54
+        self.attack_animation_speed = 0.035
 
         self.attack_damage = 6
         self.base_speed = 170
@@ -2101,7 +2127,7 @@ class Ashhound(Enemy):
             return
 
         if self.is_alive and distance_sq < (60 * 60):
-            if isinstance(target, Player) and hasattr(target, "is_in_spawn_protection") and target.is_in_spawn_protection():
+            if isinstance(player, Player) and hasattr(player, "is_in_spawn_protection") and player.is_in_spawn_protection():
                 self.attacking = False
                 return
             if not self.attacking:
@@ -2110,7 +2136,17 @@ class Ashhound(Enemy):
                 self.frame_index = 0.0
 
         if self.attacking:
-            frames = self.attack_right_images if self.last_direction == "right" else self.attack_left_images
+            target_moving = self._target_is_moving(player)
+            target_moving_away = self._target_moving_away(player_world_x, player_world_y, player)
+            if target_moving_away or (self.chasing and self.direction.length_squared() > 0):
+                frames = self.move_attack_right_images if self.last_direction == "right" else self.move_attack_left_images
+            elif not target_moving:
+                frames = self.attack_right_images if self.last_direction == "right" else self.attack_left_images
+            else:
+                if self.direction.length_squared() > 0:
+                    frames = self.move_attack_right_images if self.last_direction == "right" else self.move_attack_left_images
+                else:
+                    frames = self.attack_right_images if self.last_direction == "right" else self.attack_left_images
             self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
             self.image = frames[int(self.frame_index)]
 
@@ -2153,118 +2189,6 @@ class Ashhound(Enemy):
             self.image = ashhound_dead_image_right if self.last_direction == "right" else ashhound_dead_image_left
 
 
-class Wastedog(Enemy):
-    def __init__(self, x, y, name):
-        super().__init__(x, y, name)
-        self.name = name
-        variant_key, variant_frames = random.choice(list(wastedog_variant_frames.items()))
-        self.walk_left_images = [pygame.image.load(p).convert_alpha() for p in variant_frames["move"]]
-        self.stand_left_images = [pygame.image.load(p).convert_alpha() for p in variant_frames["idle"]]
-        # Prefer dedicated standing attack frames; fall back to move_attack if missing.
-        attack_source = variant_frames.get("attack") or variant_frames["move_attack"]
-        self.attack_left_images = [pygame.image.load(p).convert_alpha() for p in attack_source]
-        self.move_attack_left_images = [pygame.image.load(p).convert_alpha() for p in variant_frames["move_attack"]]
-
-        self.walk_right_images = [pygame.transform.flip(img, True, False) for img in self.walk_left_images]
-        self.stand_right_images = [pygame.transform.flip(img, True, False) for img in self.stand_left_images]
-        self.attack_right_images = [pygame.transform.flip(img, True, False) for img in self.attack_left_images]
-        self.move_attack_right_images = [pygame.transform.flip(img, True, False) for img in self.move_attack_left_images]
-
-        self.image = self.stand_right_images[0]
-        self.rect = self.image.get_rect(center=(x, y))
-
-        self.frame_index = 0
-        self.animation_speed = 0.2
-        self.direction = pygame.Vector2(0, 0)
-        self.move_timer = 0
-
-        self.last_direction = "right"
-        self.attacking = False
-        self.attack_timer = 0
-        self.attack_duration = 22
-
-        self.attack_damage = 6
-        self.base_speed = 170
-        self.speed = 1
-        self.full_health = 220 + (random.randint(10, 16) * self.level)
-        self.health = self.full_health
-        self.resource = "Monster Meat"
-        self.resource_amount = random.randint(3, 6)
-        self.death_experience = int(700 * (1 + (self.level * 0.04)))
-        self.level = 1
-
-    def get_collision_rect(self, cam_x):
-        rect = self.rect
-        return pygame.Rect(rect.x - cam_x + 8, rect.y + 32, rect.width - 16, rect.height - 40)
-
-    def attack(self, player_world_x, player_world_y, player):
-        dx = player_world_x - self.rect.centerx
-        dy = player_world_y - self.rect.centery
-        distance_sq = dx * dx + dy * dy
-        if self.chasing:
-            self.speed = 2.2
-        else:
-            self.speed = 1
-
-        if self.is_alive and (self.health / self.full_health) < 0.15:
-            if not self.fleeing:
-                self.fleeing = True
-                self.flee_timer = 8
-            self.attacking = False
-            return
-
-        if self.fleeing:
-            self.attacking = False
-            return
-
-        if self.is_alive and distance_sq < (60 * 60):
-            if not self.attacking:
-                self.attacking = True
-                self.attack_timer = self.attack_duration
-                self.frame_index = 0.0
-
-        if self.attacking:
-            frames = self.attack_right_images if self.last_direction == "right" else self.attack_left_images
-            self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
-            self.image = frames[int(self.frame_index)]
-
-            self.attack_timer -= 1
-
-            if self.attack_timer == self.attack_duration // 2 and distance_sq < (60 * 60):
-                player.health -= self.attack_damage
-                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
-
-            if self.attack_timer <= 0:
-                self.attacking = False
-                self.frame_index = 0.0
-                self.image = (self.stand_right_images[0] if self.last_direction == "right"
-                            else self.stand_left_images[0])
-
-    def animate_walk(self, animation_speed_multiplier=1.0):
-        if self.direction.x > 0:
-            self.last_direction = "right"
-        elif self.direction.x < 0:
-            self.last_direction = "left"
-        if getattr(self, "chasing", False):
-            frames = self.move_attack_right_images if self.last_direction == "right" else self.move_attack_left_images
-        else:
-            frames = self.walk_right_images if self.last_direction == "right" else self.walk_left_images
-        effective_animation_speed = self.animation_speed * animation_speed_multiplier
-        self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
-        self.image = frames[int(self.frame_index)]
-
-    def animate_stand(self, animation_speed_multiplier=1.0):
-        frames = self.stand_right_images if self.last_direction == "right" else self.stand_left_images
-        effective_animation_speed = self.animation_speed * animation_speed_multiplier * 0.5
-        self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
-        self.image = frames[int(self.frame_index)]
-
-    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
-        super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
-
-        if not self.is_alive:
-            self.direction.xy = (0, 0)
-            self.image = self.stand_right_images[0] if self.last_direction == "right" else self.stand_left_images[0]
 
 
 class Wolf(Enemy):
@@ -2311,6 +2235,8 @@ class Wolf(Enemy):
         self.level = 1
         self.pack_id = pack_id if pack_id is not None else random.randint(1, 10_000_000)
         self.prey_target = None
+        self.attack_animation_speed = 0.035
+        self.attack_duration = 54
 
     def get_collision_rect(self, cam_x):
         rect = self.rect
@@ -2363,17 +2289,6 @@ class Wolf(Enemy):
         attenuation = 1.0 - (dist - falloff_start) / max(1.0, (falloff_end - falloff_start))
         return max(0.6, min(1.0, attenuation))
 
-    def _target_is_moving(self, target):
-        """Determine if the target is currently moving (used for animation choice)."""
-        if target is None:
-            return False
-        if hasattr(target, "direction"):
-            try:
-                return target.direction.length_squared() > 0
-            except Exception:
-                pass
-        return False
-
     def attack(self, target_x, target_y, target, listener_pos=None):
         dx = target_x - self.rect.centerx
         dy = target_y - self.rect.centery
@@ -2402,12 +2317,17 @@ class Wolf(Enemy):
 
         if self.attacking:
             target_moving = self._target_is_moving(target)
-            use_run_attack = target_moving or self.chasing or self.direction.length_squared() > 0
-            if use_run_attack:
+            target_moving_away = self._target_moving_away(target_x, target_y, target)
+            if target_moving_away:
                 frames = self.run_attack_right_images if self.last_direction == "right" else self.run_attack_left_images
-            else:
+            elif not target_moving:
                 frames = self.attack_right_images if self.last_direction == "right" else self.attack_left_images
-            attack_anim_speed = self.animation_speed * 0.7
+            else:
+                if self.chasing or self.direction.length_squared() > 0:
+                    frames = self.run_attack_right_images if self.last_direction == "right" else self.run_attack_left_images
+                else:
+                    frames = self.attack_right_images if self.last_direction == "right" else self.attack_left_images
+            attack_anim_speed = self.attack_animation_speed
             self.frame_index = (self.frame_index + attack_anim_speed) % len(frames)
             self.image = frames[int(self.frame_index)]
 
@@ -2460,7 +2380,8 @@ class Wolf(Enemy):
 
         if current_pack_target and self._valid_target(current_pack_target):
             target_obj = current_pack_target
-            target_x, target_y = target_obj.rect.centerx, target_obj.rect.centery
+            target_x = getattr(target_obj, "world_x", target_obj.rect.centerx)
+            target_y = getattr(target_obj, "world_y", target_obj.rect.centery)
         else:
             target_x, target_y, target_obj = self._choose_target(
                 player_world_x,
@@ -2507,7 +2428,17 @@ class Wolf(Enemy):
             if direction.length_squared() > 0:
                 direction = direction.normalize()
             else:
-                direction = target_vec
+                if target_vec.length_squared() > 0:
+                    direction = target_vec
+                else:
+                    direction = pygame.Vector2(0, 0)
+            if self.attacking:
+                if direction.length_squared() > 0:
+                    if abs(direction.x) >= abs(direction.y):
+                        self.last_direction = "right" if direction.x >= 0 else "left"
+                    else:
+                        self.last_direction = "down" if direction.y >= 0 else "up"
+                direction = pygame.Vector2(0, 0)
             self.direction = direction
             # Run speed during a chase; keeps up with the player and shows run animations
             self.speed = 1.9
@@ -2539,6 +2470,55 @@ class Wolf(Enemy):
         if not self.is_alive:
             self.direction.xy = (0, 0)
             self.image = self.dead_image_right if self.last_direction == "right" else self.dead_image_left
+
+
+class Wastedog(Wolf):
+    def __init__(self, x, y, name):
+        super().__init__(x, y, name)
+        self.name = name
+        variant_key, variant_frames = random.choice(list(wastedog_variant_frames.items()))
+        self.walk_left_images = [pygame.image.load(p).convert_alpha() for p in variant_frames["move"]]
+        self.run_left_images = self.walk_left_images
+        self.stand_left_images = [pygame.image.load(p).convert_alpha() for p in variant_frames["idle"]]
+        attack_source = variant_frames.get("attack") or variant_frames["move_attack"]
+        self.attack_left_images = [pygame.image.load(p).convert_alpha() for p in attack_source]
+        self.move_attack_left_images = [pygame.image.load(p).convert_alpha() for p in variant_frames["move_attack"]]
+
+        self.walk_right_images = [pygame.transform.flip(img, True, False) for img in self.walk_left_images]
+        self.run_right_images = [pygame.transform.flip(img, True, False) for img in self.run_left_images]
+        self.stand_right_images = [pygame.transform.flip(img, True, False) for img in self.stand_left_images]
+        self.attack_right_images = [pygame.transform.flip(img, True, False) for img in self.attack_left_images]
+        self.run_attack_left_images = self.move_attack_left_images
+        self.run_attack_right_images = [pygame.transform.flip(img, True, False) for img in self.run_attack_left_images]
+
+        self.dead_image_left = self.stand_left_images[0]
+        self.dead_image_right = self.stand_right_images[0]
+
+        self.image = self.stand_right_images[0]
+        self.rect = self.image.get_rect(center=(x, y))
+
+        self.frame_index = 0
+        self.animation_speed = 0.2
+        self.direction = pygame.Vector2(0, 0)
+        self.move_timer = 0
+
+        self.attack_timer = 0
+        self.attack_duration = 54
+
+        self.attack_damage = 6
+        self.base_speed = 170
+        self.speed = 1
+        self.full_health = 220 + (random.randint(10, 16) * self.level)
+        self.health = self.full_health
+        self.resource = "Monster Meat"
+        self.resource_amount = random.randint(3, 6)
+        self.death_experience = int(700 * (1 + (self.level * 0.04)))
+        self.level = 1
+        self.immune_to_lava = True
+
+    def get_collision_rect(self, cam_x):
+        rect = self.rect
+        return pygame.Rect(rect.x - cam_x + 8, rect.y + 32, rect.width - 16, rect.height - 40)
 
 class Duskwretch(Enemy):
     def __init__(self, x, y, name):

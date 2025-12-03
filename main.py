@@ -30,7 +30,7 @@ dungeon_depth = absolute_cam_x
 dungeon_depth_high = 0
 scroll = 0
 dungeon_traversal_speed = .1
-time_of_day = 4.00
+time_of_day = 8.00
 total_elapsed_time = 00.00
 time_of_day_start = time_of_day
 stamina_depleted_message_timer = 0
@@ -38,6 +38,7 @@ need_pickaxe_message_timer = 0
 need_shovel_message_timer = 0
 player_world_x = player_pos.x + cam_x
 player_world_y = player_pos.y
+prev_player_world_pos = pygame.Vector2(player_world_x, player_world_y)
 
 collection_messages = []
 
@@ -1875,21 +1876,21 @@ while running:
             thrown_items = []
 
             inventory.state = "inventory"
-            starter_items = [
-                "Arcane Crafter",
-                "Smelter",
-                "Workbench",
-                "Mortar And Pestle",
-                "Tent",
-                "Fire Dragon Scale Sword",
-                "Fire Dragon Scale Pickaxe",
-                "Chest",
-                "Chest"
-            ]
-            # Add 20 torches (will stack) plus other starter items
-            torch_stack = ["Torch"] * 10
-            beef_stack = ["Raw Beef"] * 20
-            inventory.add(torch_stack + starter_items + beef_stack)
+            # starter_items = [
+            #     "Arcane Crafter",
+            #     "Smelter",
+            #     "Workbench",
+            #     "Mortar And Pestle",
+            #     "Tent",
+            #     "Fire Dragon Scale Sword",
+            #     "Fire Dragon Scale Pickaxe",
+            #     "Chest",
+            #     "Chest"
+            # ]
+            # # Add 20 torches (will stack) plus other starter items
+            # torch_stack = ["Torch"] * 10
+            # beef_stack = ["Raw Beef"] * 20
+            # inventory.add(torch_stack + starter_items + beef_stack)
             
             from world import gemstone_rocks, GemstoneRock
             gemstone_rocks.append(GemstoneRock(int(player_pos.x + cam_x + 100), int(player_pos.y + 50)))
@@ -4179,6 +4180,13 @@ while running:
             else:
                 player_world_x = player_pos.x + cam_x
                 player_world_y = player_pos.y
+            current_player_world_pos = pygame.Vector2(player_world_x, player_world_y)
+            movement_delta = current_player_world_pos - prev_player_world_pos
+            if movement_delta.length_squared() > 0:
+                player.direction = movement_delta.normalize()
+            else:
+                player.direction = pygame.Vector2(0, 0)
+            prev_player_world_pos = current_player_world_pos
             player.attacking(nearby_mobs, player_world_x, player_world_y, mouse_over_hotbar)
             for mob in nearby_mobs:
                 mob.handle_health(screen, cam_x, dt, sleeping_in_tent or tent_hide_active)
