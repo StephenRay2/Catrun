@@ -17,6 +17,8 @@ from alchemy_bench import AlchemyBench
 from world import DroppedItem, dropped_items, Bank, banks
 from debug import font_path, font
 from mobs import hud_font, apply_wild_mob_level_scaling
+from player import *
+from cats import Cat
 
 clock = pygame.time.Clock()
 from inventory import *

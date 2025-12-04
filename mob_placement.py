@@ -1,6 +1,8 @@
 import pygame
 from mobs import *
 from mobs import apply_wild_mob_level_scaling
+from player import Player
+from cats import Cat
 
 player = Player(width/2, height/2, "Glenjamin")
 
