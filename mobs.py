@@ -19,6 +19,96 @@ def draw_text_with_background(screen, text_surface, x, y, padding=4):
     screen.blit(bg_surface, bg_rect.topleft)
     screen.blit(text_surface, (x, y))
 
+
+def draw_mob_name_and_level(mob, screen, cam_x, y_offset=-14):
+    """Draw mob's name and level label above its head, if available."""
+    try:
+        display_name = getattr(mob, "name", None)
+        level_value = getattr(mob, "level", None)
+        if not display_name or level_value is None:
+            return
+        name_font = pygame.font.Font(font_path, 12)
+        label = f"{display_name} Lv{int(level_value)}"
+        name_text = name_font.render(label, True, (255, 255, 255))
+        text_x = int(mob.rect.centerx - cam_x - name_text.get_width() / 2)
+        text_y = int(mob.rect.top + y_offset)
+        draw_text_with_background(screen, name_text, text_x, text_y)
+    except Exception:
+        # Never let name drawing break gameplay.
+        pass
+
+
+def apply_wild_mob_level_scaling(mob):
+    """
+    Apply level-based stat scaling for wild mobs.
+    Similar to tamed cats gaining one stat point per level, but:
+      - Points are auto-spent into random stats for wild mobs.
+      - Each upgrade is 90% of the tamed cat upgrade amounts.
+    This should be called once after the mob's level has been set.
+    """
+    # Do not touch player-controlled characters or already-tamed cats.
+    if mob.__class__.__name__ == "Player":
+        return
+    # Cat is defined later in this module; once imported, we can safely
+    # use isinstance checks at runtime.
+    try:
+        from mobs import Cat  # type: ignore
+        if isinstance(mob, Cat) and getattr(mob, "tamed", False):
+            return
+    except Exception:
+        # If Cat isn't available for any reason, fall through and treat
+        # this as a generic wild mob.
+        pass
+
+    level = int(getattr(mob, "level", 1) or 1)
+    extra_levels = max(0, level - 1)
+    if extra_levels <= 0:
+        return
+
+    # Determine which stats this mob actually has.
+    possible_stats = []
+    if any(hasattr(mob, attr) for attr in ("full_health", "max_health", "health")):
+        possible_stats.append("health")
+    # Only treat attack as upgradable if there's a numeric field, not just
+    # an attack() method.
+    has_numeric_attack = hasattr(mob, "attack_damage") or (
+        hasattr(mob, "attack") and not callable(getattr(mob, "attack"))
+    )
+    if has_numeric_attack:
+        possible_stats.append("attack")
+    if hasattr(mob, "defense"):
+        possible_stats.append("defense")
+
+    if not possible_stats:
+        return
+
+    # 90% of cat's per-point increases.
+    HEALTH_INC = 10 * 0.9   # cat: +10 max health
+    ATTACK_INC = 2 * 0.9    # cat: +2 attack
+    DEFENSE_INC = 2 * 0.9   # cat: +2 defense
+
+    for _ in range(extra_levels):
+        stat = random.choice(possible_stats)
+        if stat == "health":
+            inc = HEALTH_INC
+            if hasattr(mob, "max_health"):
+                mob.max_health = getattr(mob, "max_health", getattr(mob, "full_health", getattr(mob, "health", 0))) + inc
+                mob.health = min(mob.health + inc, mob.max_health)
+            elif hasattr(mob, "full_health"):
+                mob.full_health += inc
+                mob.health = min(mob.health + inc, mob.full_health)
+            elif hasattr(mob, "health"):
+                mob.health += inc
+        elif stat == "attack":
+            inc = ATTACK_INC
+            if hasattr(mob, "attack_damage"):
+                mob.attack_damage = getattr(mob, "attack_damage", 0) + inc
+            elif hasattr(mob, "attack") and not callable(getattr(mob, "attack")):
+                mob.attack = getattr(mob, "attack", 0) + inc
+        elif stat == "defense" and hasattr(mob, "defense"):
+            inc = DEFENSE_INC
+            mob.defense = getattr(mob, "defense", 0) + inc
+
 ############ PLAYER IMAGES #################
 
 
@@ -1288,7 +1378,7 @@ class Mob(pygame.sprite.Sprite):
         x = self.rect.centerx - bar_width / 2 - cam_x
         y = self.rect.top + 5
 
-        health_ratio = health / max_health
+        health_ratio = health / max_health if max_health > 0 else 0
         health_width = int(bar_width * health_ratio)
 
         if self.health < self.last_health:
@@ -1301,6 +1391,11 @@ class Mob(pygame.sprite.Sprite):
             pygame.draw.rect(screen, (40, 250, 40), pygame.Rect(x, y, health_width, bar_height), border_radius=2)
             pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=1, border_radius=2)
             self.bar_timer -= dt
+
+        # Draw name + level above this mob, unless it's a special case
+        # like a latched redmite that is handled elsewhere.
+        if not getattr(self, "latched_to_player", False):
+            draw_mob_name_and_level(self, screen, cam_x)
 
         self.last_health = self.health
 
@@ -3710,6 +3805,8 @@ class Deer(AggressiveMob):
             pygame.draw.rect(screen, (40, 250, 40), pygame.Rect(x, y, health_width, bar_height), border_radius=2)
             pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=1, border_radius=2)
             self.bar_timer -= dt
+
+        draw_mob_name_and_level(self, screen, cam_x)
         
         self.last_health = self.health
         if self.health <= 0:
@@ -3889,6 +3986,8 @@ class BlackBear(AggressiveMob):
             pygame.draw.rect(screen, (40, 250, 40), pygame.Rect(x, y, health_width, bar_height), border_radius=2)
             pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=1, border_radius=2)
             self.bar_timer -= dt
+
+        draw_mob_name_and_level(self, screen, cam_x)
         
         self.last_health = self.health
         if self.health <= 0:
@@ -4092,6 +4191,8 @@ class BrownBear(AggressiveMob):
             pygame.draw.rect(screen, (40, 250, 40), pygame.Rect(x, y, health_width, bar_height), border_radius=2)
             pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=1, border_radius=2)
             self.bar_timer -= dt
+
+        draw_mob_name_and_level(self, screen, cam_x)
         
         self.last_health = self.health
         if self.health <= 0:
@@ -4280,6 +4381,8 @@ class PolarBear(AggressiveMob):
             pygame.draw.rect(screen, (40, 250, 40), pygame.Rect(x, y, health_width, bar_height), border_radius=2)
             pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=1, border_radius=2)
             self.bar_timer -= dt
+
+        draw_mob_name_and_level(self, screen, cam_x)
         
         self.last_health = self.health
         if self.health <= 0:
@@ -4460,6 +4563,8 @@ class PandaBear(AggressiveMob):
             pygame.draw.rect(screen, (40, 250, 40), pygame.Rect(x, y, health_width, bar_height), border_radius=2)
             pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=1, border_radius=2)
             self.bar_timer -= dt
+
+        draw_mob_name_and_level(self, screen, cam_x)
         
         self.last_health = self.health
         if self.health <= 0:
@@ -4585,6 +4690,8 @@ class Gila(AggressiveMob):
             pygame.draw.rect(screen, (40, 250, 40), pygame.Rect(x, y, health_width, bar_height), border_radius=2)
             pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=1, border_radius=2)
             self.bar_timer -= dt
+
+        draw_mob_name_and_level(self, screen, cam_x)
         
         self.last_health = self.health
         if self.health <= 0:
@@ -4736,6 +4843,8 @@ class Crow(Mob):
             pygame.draw.rect(screen, (40, 250, 40), pygame.Rect(x, y, health_width, bar_height), border_radius=2)
             pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=1, border_radius=2)
             self.bar_timer -= dt
+
+        draw_mob_name_and_level(self, screen, cam_x)
         
         self.last_health = self.health
         if self.health <= 0:
@@ -4883,6 +4992,8 @@ class Glowbird(Mob):
             pygame.draw.rect(screen, (40, 250, 40), pygame.Rect(x, y, health_width, bar_height), border_radius=2)
             pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=1, border_radius=2)
             self.bar_timer -= dt
+
+        draw_mob_name_and_level(self, screen, cam_x)
         
         self.last_health = self.health
         if self.health <= 0:
@@ -5099,11 +5210,9 @@ class Dragon(Enemy):
             pygame.draw.rect(screen, (40, 250, 40), pygame.Rect(x, y, health_width, bar_height), border_radius=2)
             pygame.draw.rect(screen, (0, 0, 0), pygame.Rect(x, y, bar_width, bar_height), width=1, border_radius=2)
             self.bar_timer -= dt
-        
-        level_font = pygame.font.Font(font_path, 12)
-        level_text = level_font.render(f"Lv{self.level}", True, (255, 255, 255))
-        level_rect = level_text.get_rect(center=(int(self.rect.centerx - cam_x), int(y + 15)))
-        draw_text_with_background(screen, level_text, level_rect.topleft[0], level_rect.topleft[1])
+
+        # Dragons also get the unified name+level label.
+        draw_mob_name_and_level(self, screen, cam_x)
         
         self.last_health = self.health
         if self.health <= 0:

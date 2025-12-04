@@ -15,7 +15,7 @@ from chest import ChestUI
 from alchemy_bench import AlchemyBench
 from world import DroppedItem, dropped_items, Bank, banks
 from debug import font_path, font
-from mobs import hud_font
+from mobs import hud_font, apply_wild_mob_level_scaling
 
 clock = pygame.time.Clock()
 from inventory import *
@@ -1675,49 +1675,90 @@ while running:
             poison_dragons.clear()
             dusk_dragons.clear()
 
+            # Helper: scale mob level based on distance from spawn point.
+            def random_level_for_position(x, y, base_min=1, base_max=3):
+                center_x = width / 2
+                center_y = height / 2
+                dx = x - center_x
+                dy = y - center_y
+                dist = math.hypot(dx, dy)
+                # Every 6000 px away from spawn increases difficulty.
+                distance_factor = int(dist // 6000)
+                min_lvl = base_min + distance_factor
+                max_lvl = base_max + distance_factor * 2
+                # Clamp into [1, 100] and ensure min <= max.
+                min_lvl = max(1, min(min_lvl, 100))
+                max_lvl = max(1, min(max_lvl, 100))
+                if max_lvl < min_lvl:
+                    max_lvl = min_lvl
+                return random.randint(min_lvl, max_lvl)
+
             for _ in range(num_cats):
                 tile_x, tile_image = random.choice(weighted_cat_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
-                cats.append(Cat(x, y, "Cat"))
+                cat = Cat(x, y, "Cat")
+                cat.level = random_level_for_position(x, y, 1, 3)
+                # Wild cats get level-based stat scaling; once tamed they
+                # use the dedicated cat leveling system.
+                apply_wild_mob_level_scaling(cat)
+                cats.append(cat)
 
             for _ in range(num_squirrels):
                 tile_x, tile_image = random.choice(weighted_squirrel_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
-                squirrels.append(Squirrel(x, y, "Squirrel"))
+                squirrel = Squirrel(x, y, "Squirrel")
+                squirrel.level = random_level_for_position(x, y, 1, 2)
+                apply_wild_mob_level_scaling(squirrel)
+                squirrels.append(squirrel)
 
             for _ in range(num_cows):
                 tile_x, tile_image = random.choice(weighted_cow_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
-                cows.append(Cow(x, y, "Cow"))
+                cow = Cow(x, y, "Cow")
+                cow.level = random_level_for_position(x, y, 2, 4)
+                apply_wild_mob_level_scaling(cow)
+                cows.append(cow)
 
             for _ in range(num_chickens):
                 tile_x, tile_image = random.choice(weighted_chicken_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
-                chickens.append(Chicken(x, y, "Chicken"))
+                chicken = Chicken(x, y, "Chicken")
+                chicken.level = random_level_for_position(x, y, 1, 2)
+                apply_wild_mob_level_scaling(chicken)
+                chickens.append(chicken)
 
             for _ in range(num_crawlers):
                 tile_x, tile_image = random.choice(weighted_crawler_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
-                crawlers.append(Crawler(x, y, "Crawler"))
+                crawler = Crawler(x, y, "Crawler")
+                crawler.level = random_level_for_position(x, y, 3, 6)
+                apply_wild_mob_level_scaling(crawler)
+                crawlers.append(crawler)
 
             for _ in range(num_ashhounds):
                 if weighted_ashhound_tiles:
                     tile_x, tile_image = random.choice(weighted_ashhound_tiles)
                     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                     y = random.randint(0, height - 64)
-                    ashhounds.append(Ashhound(x, y, "Ashhound"))
+                    ashhound = Ashhound(x, y, "Ashhound")
+                    ashhound.level = random_level_for_position(x, y, 5, 9)
+                    apply_wild_mob_level_scaling(ashhound)
+                    ashhounds.append(ashhound)
 
             for _ in range(num_wastedogs):
                 if weighted_wastedog_tiles:
                     tile_x, tile_image = random.choice(weighted_wastedog_tiles)
                     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                     y = random.randint(0, height - 64)
-                    wastedogs.append(Wastedog(x, y, "Wastedog"))
+                    wastedog = Wastedog(x, y, "Wastedog")
+                    wastedog.level = random_level_for_position(x, y, 4, 8)
+                    apply_wild_mob_level_scaling(wastedog)
+                    wastedogs.append(wastedog)
 
             pack_sizes = []
             remaining_wolves = num_wolves
@@ -1766,37 +1807,56 @@ while running:
                     offset_y = random.randint(-32, 32)
                     x = base_x + offset_x
                     y = base_y + offset_y
-                    wolves.append(Wolf(x, y, "Wolf", pack_id=pack_id + 1))
+                    wolf = Wolf(x, y, "Wolf", pack_id=pack_id + 1)
+                    wolf.level = random_level_for_position(x, y, 4, 10)
+                    apply_wild_mob_level_scaling(wolf)
+                    wolves.append(wolf)
 
             for _ in range(num_pocks):
                 tile_x, tile_image = random.choice(weighted_pock_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
-                pocks.append(Pock(x, y, "Pock"))
+                pock = Pock(x, y, "Pock")
+                pock.level = random_level_for_position(x, y, 3, 9)
+                apply_wild_mob_level_scaling(pock)
+                pocks.append(pock)
 
             for _ in range(num_deers):
                 tile_x, tile_image = random.choice(weighted_deer_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
-                deers.append(Deer(x, y, "Deer"))
+                deer = Deer(x, y, "Deer")
+                deer.level = random_level_for_position(x, y, 2, 7)
+                 # Deer use AggressiveMob/Enemy behaviors; treat as wild.
+                apply_wild_mob_level_scaling(deer)
+                deers.append(deer)
 
             for _ in range(num_black_bears):
                 tile_x, tile_image = random.choice(weighted_black_bear_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
-                black_bears.append(BlackBear(x, y, "Black Bear"))
+                black_bear = BlackBear(x, y, "Black Bear")
+                black_bear.level = random_level_for_position(x, y, 6, 14)
+                apply_wild_mob_level_scaling(black_bear)
+                black_bears.append(black_bear)
 
             for _ in range(num_brown_bears):
                 tile_x, tile_image = random.choice(weighted_brown_bear_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
-                brown_bears.append(BrownBear(x, y, "Brown Bear"))
+                brown_bear = BrownBear(x, y, "Brown Bear")
+                brown_bear.level = random_level_for_position(x, y, 6, 14)
+                apply_wild_mob_level_scaling(brown_bear)
+                brown_bears.append(brown_bear)
 
             for _ in range(num_gilas):
                 tile_x, tile_image = random.choice(weighted_gila_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
-                gilas.append(Gila(x, y, "Gila"))
+                gila = Gila(x, y, "Gila")
+                gila.level = random_level_for_position(x, y, 4, 10)
+                apply_wild_mob_level_scaling(gila)
+                gilas.append(gila)
 
             for _ in range(num_redmites):
                 if not weighted_redmite_tiles:
@@ -1804,7 +1864,10 @@ while running:
                 tile_x, tile_image = random.choice(weighted_redmite_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 32)
                 y = random.randint(0, height - 32)
-                redmites.append(Redmite(x, y, "Redmite"))
+                redmite = Redmite(x, y, "Redmite")
+                redmite.level = random_level_for_position(x, y, 2, 6)
+                apply_wild_mob_level_scaling(redmite)
+                redmites.append(redmite)
 
             for _ in range(num_salamanders):
                 if not weighted_salamander_tiles:
@@ -1812,77 +1875,88 @@ while running:
                 tile_x, tile_image = random.choice(weighted_salamander_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
-                salamanders.append(Salamander(x, y, "Salamander"))
+                salamander = Salamander(x, y, "Salamander")
+                salamander.level = random_level_for_position(x, y, 5, 11)
+                apply_wild_mob_level_scaling(salamander)
+                salamanders.append(salamander)
 
             for _ in range(num_crows):
                 tile_x, tile_image = random.choice(weighted_crow_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
-                crows.append(Crow(x, y, "Crow"))
+                crow = Crow(x, y, "Crow")
+                crow.level = random_level_for_position(x, y, 1, 4)
+                apply_wild_mob_level_scaling(crow)
+                crows.append(crow)
 
             for _ in range(num_glowbirds):
                 if weighted_glowbird_tiles:
                     tile_x, tile_image = random.choice(weighted_glowbird_tiles)
                     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                     y = random.randint(0, height - 64)
-                    glowbirds.append(Glowbird(x, y, "Glowbird"))
+                    glowbird = Glowbird(x, y, "Glowbird")
+                    glowbird.level = random_level_for_position(x, y, 1, 5)
+                    apply_wild_mob_level_scaling(glowbird)
+                    glowbirds.append(glowbird)
 
             for _ in range(num_duskwretches):
                 tile_x, tile_image = random.choice(weighted_duskwretch_tiles)
                 x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                 y = random.randint(0, height - 64)
-                duskwretches.append(Duskwretch(x, y, "Duskwretch"))
+                duskwretch = Duskwretch(x, y, "Duskwretch")
+                duskwretch.level = random_level_for_position(x, y, 5, 12)
+                apply_wild_mob_level_scaling(duskwretch)
+                duskwretches.append(duskwretch)
 
             for _ in range(num_fire_dragons):
                 if weighted_fire_dragon_tiles:
                     tile_x, tile_image = random.choice(weighted_fire_dragon_tiles)
                     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                     y = random.randint(0, height - 64)
-                    fire_dragons.append(Dragon(x, y, "Fire Dragon", "fire", random.randint(1, 100)))
+                    lvl = random_level_for_position(x, y, 10, 40)
+                    dragon = Dragon(x, y, "Fire Dragon", "fire", lvl)
+                    apply_wild_mob_level_scaling(dragon)
+                    fire_dragons.append(dragon)
 
             for _ in range(num_ice_dragons):
                 if weighted_ice_dragon_tiles:
                     tile_x, tile_image = random.choice(weighted_ice_dragon_tiles)
                     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                     y = random.randint(0, height - 64)
-                    ice_dragons.append(Dragon(x, y, "Ice Dragon", "ice", random.randint(1, 100)))
+                    lvl = random_level_for_position(x, y, 10, 40)
+                    dragon = Dragon(x, y, "Ice Dragon", "ice", lvl)
+                    apply_wild_mob_level_scaling(dragon)
+                    ice_dragons.append(dragon)
 
             for _ in range(num_electric_dragons):
                 if weighted_electric_dragon_tiles:
                     tile_x, tile_image = random.choice(weighted_electric_dragon_tiles)
                     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                     y = random.randint(0, height - 64)
-                    electric_dragons.append(Dragon(x, y, "Electric Dragon", "electric", random.randint(1, 100)))
+                    lvl = random_level_for_position(x, y, 10, 40)
+                    dragon = Dragon(x, y, "Electric Dragon", "electric", lvl)
+                    apply_wild_mob_level_scaling(dragon)
+                    electric_dragons.append(dragon)
 
             for _ in range(num_poison_dragons):
                 if weighted_poison_dragon_tiles:
                     tile_x, tile_image = random.choice(weighted_poison_dragon_tiles)
                     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                     y = random.randint(0, height - 64)
-                    poison_dragons.append(Dragon(x, y, "Poison Dragon", "poison", random.randint(1, 100)))
+                    lvl = random_level_for_position(x, y, 10, 40)
+                    dragon = Dragon(x, y, "Poison Dragon", "poison", lvl)
+                    apply_wild_mob_level_scaling(dragon)
+                    poison_dragons.append(dragon)
 
             for _ in range(num_dusk_dragons):
                 if weighted_dusk_dragon_tiles:
                     tile_x, tile_image = random.choice(weighted_dusk_dragon_tiles)
                     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
                     y = random.randint(0, height - 64)
-                    dusk_dragons.append(Dragon(x, y, "Dusk Dragon", "dusk", random.randint(1, 100)))
-
-            lavastone_start = 180 * BACKGROUND_SIZE
-            debug_fire = Dragon(lavastone_start + 500, height // 2, "Fire Dragon", "fire", random.randint(1, 100))
-            fire_dragons.append(debug_fire)
-            
-            snow_start = 24 * BACKGROUND_SIZE
-            debug_ice = Dragon(snow_start + 500, height // 2, "Ice Dragon", "ice", random.randint(1, 100))
-            ice_dragons.append(debug_ice)
-            
-            duskstone_start = 132 * BACKGROUND_SIZE
-            debug_electric = Dragon(duskstone_start + 500, height // 2, "Electric Dragon", "electric", random.randint(1, 100))
-            electric_dragons.append(debug_electric)
-            
-            wasteland_start = 108 * BACKGROUND_SIZE
-            debug_poison = Dragon(wasteland_start + 500, height // 2, "Poison Dragon", "poison", random.randint(1, 100))
-            poison_dragons.append(debug_poison)
+                    lvl = random_level_for_position(x, y, 10, 40)
+                    dragon = Dragon(x, y, "Dusk Dragon", "dusk", lvl)
+                    apply_wild_mob_level_scaling(dragon)
+                    dusk_dragons.append(dragon)
 
             dungeon_depth = 0
             dungeon_depth_high = 0
@@ -3669,8 +3743,6 @@ while running:
             latched = [rm for rm in redmites if getattr(rm, "latched_to_player", False)]
             if not latched:
                 return
-            if player.last_direction == "down":
-                return
             # Editable per-frame wobble offsets while moving left/right.
             latch_walk_offsets = {
                 "left": [(0, -1), (0, 0), (0, 1), (0, 0), (0, -1), (0, 0), (0, 1), (0, 0)],
@@ -3678,25 +3750,51 @@ while running:
             }
             base_x = player_pos.x - size // 2
             base_y = player_pos.y - size // 2 - 12
+            # Draw latched sprites at their anchored positions, except when facing down.
+            if player.last_direction != "down":
+                for rm in latched:
+                    slot = rm.latched_slot if rm.latched_slot is not None else 0
+                    offset = get_redmite_slot_offset(player.last_direction, slot)
+                    # Apply optional per-frame wobble when walking left/right.
+                    walk_offsets = latch_walk_offsets.get(player.last_direction, None)
+                    is_moving = keys[pygame.K_w] or keys[pygame.K_a] or keys[pygame.K_s] or keys[pygame.K_d]
+                    if walk_offsets and is_moving:
+                        idx = int(player_frame_index) % len(walk_offsets)
+                        wobble = walk_offsets[idx]
+                        offset = (offset[0] + wobble[0], offset[1] + wobble[1])
+                    if player.last_direction == "up":
+                        img = rm.latched_up_image
+                    elif player.last_direction == "right":
+                        img = rm.latched_right_image
+                    else:
+                        img = rm.latched_left_image
+                    draw_x = int(base_x + offset[0])
+                    draw_y = int(base_y + offset[1])
+                    screen.blit(img, (draw_x, draw_y))
+            # Draw a stacked list of latched redmite names/levels above the player.
+            name_entries = []
             for rm in latched:
-                slot = rm.latched_slot if rm.latched_slot is not None else 0
-                offset = get_redmite_slot_offset(player.last_direction, slot)
-                # Apply optional per-frame wobble when walking left/right.
-                walk_offsets = latch_walk_offsets.get(player.last_direction, None)
-                is_moving = keys[pygame.K_w] or keys[pygame.K_a] or keys[pygame.K_s] or keys[pygame.K_d]
-                if walk_offsets and is_moving:
-                    idx = int(player_frame_index) % len(walk_offsets)
-                    wobble = walk_offsets[idx]
-                    offset = (offset[0] + wobble[0], offset[1] + wobble[1])
-                if player.last_direction == "up":
-                    img = rm.latched_up_image
-                elif player.last_direction == "right":
-                    img = rm.latched_right_image
-                else:
-                    img = rm.latched_left_image
-                draw_x = int(base_x + offset[0])
-                draw_y = int(base_y + offset[1])
-                screen.blit(img, (draw_x, draw_y))
+                rm_name = getattr(rm, "name", None)
+                rm_level = getattr(rm, "level", None)
+                if rm_name and rm_level is not None:
+                    label = f"{rm_name} Lv{int(rm_level)}"
+                    text_surface = hud_font.render(label, True, (255, 255, 255))
+                    name_entries.append(text_surface)
+            if name_entries:
+                # Start well above the player's head and stack upward.
+                stack_center_x = int(player_pos.x)
+                current_y = int(player_pos.y - size - 40)
+                line_spacing = 2
+                for text_surface in name_entries:
+                    text_rect = text_surface.get_rect()
+                    text_x = stack_center_x - text_rect.width // 2
+                    text_y = current_y - text_rect.height
+                    bg_rect = pygame.Rect(text_x - 3, text_y - 2, text_rect.width + 6, text_rect.height + 4)
+                    bg_surface = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
+                    bg_surface.fill((0, 0, 0, 150))
+                    screen.blit(bg_surface, bg_rect.topleft)
+                    screen.blit(text_surface, (text_x, text_y))
+                    current_y = text_y - line_spacing
 
         for obj in visible_liquids:
             obj.update_animation(dt)
