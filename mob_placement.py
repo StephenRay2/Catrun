@@ -1,5 +1,6 @@
 import pygame
 from mobs import *
+from mobs import apply_wild_mob_level_scaling
 
 player = Player(width/2, height/2, "Glenjamin")
 
@@ -23,13 +24,34 @@ def schedule_respawn(kind, delay_ms=30000):
     pending_respawns.append({"kind": kind, "spawn_time": spawn_time})
 
 
+def _random_level_for_position(x, y, base_min=1, base_max=3):
+    """Depth-agnostic level helper: farther from spawn = higher level."""
+    cx, cy = SPAWN_PROTECTION_CENTER
+    dx = x - cx
+    dy = y - cy
+    dist = (dx * dx + dy * dy) ** 0.5
+    # Every 6000 px away from spawn increases difficulty.
+    distance_factor = int(dist // 6000)
+    min_lvl = base_min + distance_factor
+    max_lvl = base_max + distance_factor * 2
+    # Clamp into [1, 100] and ensure min <= max.
+    min_lvl = max(1, min(min_lvl, 100))
+    max_lvl = max(1, min(max_lvl, 100))
+    if max_lvl < min_lvl:
+        max_lvl = min_lvl
+    return random.randint(min_lvl, max_lvl)
+
+
 def _spawn_squirrel():
     if not weighted_squirrel_tiles:
         return
     tile_x, tile_image = random.choice(weighted_squirrel_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    squirrels.append(Squirrel(x, y, "Squirrel"))
+    mob = Squirrel(x, y, "Squirrel")
+    mob.level = _random_level_for_position(x, y, 1, 2)
+    apply_wild_mob_level_scaling(mob)
+    squirrels.append(mob)
 
 def _spawn_cat():
     if not weighted_cat_tiles:
@@ -37,7 +59,9 @@ def _spawn_cat():
     tile_x, tile_image = random.choice(weighted_cat_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    cats.append(Cat(x, y, "Cat"))
+    mob = Cat(x, y, "Cat")
+    mob.level = _random_level_for_position(x, y, 1, 3)
+    cats.append(mob)
 
 def _spawn_cow():
     if not weighted_cow_tiles:
@@ -45,7 +69,10 @@ def _spawn_cow():
     tile_x, tile_image = random.choice(weighted_cow_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    cows.append(Cow(x, y, "Cow"))
+    mob = Cow(x, y, "Cow")
+    mob.level = _random_level_for_position(x, y, 2, 4)
+    apply_wild_mob_level_scaling(mob)
+    cows.append(mob)
 
 def _spawn_chicken():
     if not weighted_chicken_tiles:
@@ -53,7 +80,10 @@ def _spawn_chicken():
     tile_x, tile_image = random.choice(weighted_chicken_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    chickens.append(Chicken(x, y, "Chicken"))
+    mob = Chicken(x, y, "Chicken")
+    mob.level = _random_level_for_position(x, y, 1, 2)
+    apply_wild_mob_level_scaling(mob)
+    chickens.append(mob)
 
 def _spawn_deer():
     if not weighted_deer_tiles:
@@ -61,7 +91,10 @@ def _spawn_deer():
     tile_x, tile_image = random.choice(weighted_deer_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    deers.append(Deer(x, y, "Deer"))
+    mob = Deer(x, y, "Deer")
+    mob.level = _random_level_for_position(x, y, 2, 7)
+    apply_wild_mob_level_scaling(mob)
+    deers.append(mob)
 
 def _spawn_wolf():
     if not weighted_wolf_tiles:
@@ -72,7 +105,10 @@ def _spawn_wolf():
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
         if not is_in_spawn_protection(x, y):
-            wolves.append(Wolf(x, y, "Wolf"))
+            mob = Wolf(x, y, "Wolf")
+            mob.level = _random_level_for_position(x, y, 4, 10)
+            apply_wild_mob_level_scaling(mob)
+            wolves.append(mob)
             break
         attempts += 1
 
@@ -82,7 +118,10 @@ def _spawn_redmite():
     tile_x, tile_image = random.choice(weighted_redmite_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 32)
     y = random.randint(0, height - 32)
-    redmites.append(Redmite(x, y, "Redmite"))
+    mob = Redmite(x, y, "Redmite")
+    mob.level = _random_level_for_position(x, y, 2, 6)
+    apply_wild_mob_level_scaling(mob)
+    redmites.append(mob)
 
 def _spawn_gila():
     if not weighted_gila_tiles:
@@ -90,7 +129,10 @@ def _spawn_gila():
     tile_x, tile_image = random.choice(weighted_gila_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    gilas.append(Gila(x, y, "Gila"))
+    mob = Gila(x, y, "Gila")
+    mob.level = _random_level_for_position(x, y, 4, 10)
+    apply_wild_mob_level_scaling(mob)
+    gilas.append(mob)
 
 def _spawn_salamander():
     if not weighted_salamander_tiles:
@@ -98,7 +140,10 @@ def _spawn_salamander():
     tile_x, tile_image = random.choice(weighted_salamander_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    salamanders.append(Salamander(x, y, "Salamander"))
+    mob = Salamander(x, y, "Salamander")
+    mob.level = _random_level_for_position(x, y, 5, 11)
+    apply_wild_mob_level_scaling(mob)
+    salamanders.append(mob)
 
 def process_respawns():
     """Spawn any pending animals whose timers have expired."""
@@ -193,7 +238,9 @@ for _ in range(num_squirrels):
     tile_x, tile_image = random.choice(weighted_squirrel_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    squirrels.append(Squirrel(x, y, "Squirrel"))
+    mob = Squirrel(x, y, "Squirrel")
+    mob.level = _random_level_for_position(x, y, 1, 2)
+    squirrels.append(mob)
 
 allowed_cat_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_sand, bg_duskstone, bg_lavastone, bg_snow, bg_wasteland, bg_blackstone, bg_redrock]
 
@@ -226,7 +273,9 @@ for _ in range(num_cats):
     tile_x, tile_image = random.choice(weighted_cat_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    cats.append(Cat(x, y, "Cat"))
+    mob = Cat(x, y, "Cat")
+    mob.level = _random_level_for_position(x, y, 1, 3)
+    cats.append(mob)
 
 allowed_cow_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah]
 
@@ -258,7 +307,9 @@ for _ in range(num_cows):
     tile_x, tile_image = random.choice(weighted_cow_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    cows.append(Cow(x, y, "Cow"))
+    mob = Cow(x, y, "Cow")
+    mob.level = _random_level_for_position(x, y, 2, 4)
+    cows.append(mob)
 
 allowed_chicken_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah]
 
@@ -290,7 +341,9 @@ for _ in range(num_chickens):
     tile_x, tile_image = random.choice(weighted_chicken_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    chickens.append(Chicken(x, y, "Chicken"))
+    mob = Chicken(x, y, "Chicken")
+    mob.level = _random_level_for_position(x, y, 1, 2)
+    chickens.append(mob)
 
 allowed_crawler_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_snow, bg_wasteland]
 
@@ -322,7 +375,9 @@ for _ in range(num_crawlers):
     tile_x, tile_image = random.choice(weighted_crawler_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    crawlers.append(Crawler(x, y, "Crawler"))
+    mob = Crawler(x, y, "Crawler")
+    mob.level = _random_level_for_position(x, y, 3, 6)
+    crawlers.append(mob)
 
 
 allowed_ashhound_tiles = [bg_lavastone]
@@ -356,7 +411,9 @@ for _ in range(num_ashhounds):
         tile_x, tile_image = random.choice(weighted_ashhound_tiles)
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
-        ashhounds.append(Ashhound(x, y, "Ashhound"))
+        mob = Ashhound(x, y, "Ashhound")
+        mob.level = _random_level_for_position(x, y, 5, 9)
+        ashhounds.append(mob)
 
 
 allowed_wastedog_tiles = [bg_wasteland]
@@ -388,7 +445,9 @@ for _ in range(num_wastedogs):
         tile_x, tile_image = random.choice(weighted_wastedog_tiles)
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
-        wastedogs.append(Wastedog(x, y, "Wastedog"))
+        mob = Wastedog(x, y, "Wastedog")
+        mob.level = _random_level_for_position(x, y, 4, 8)
+        wastedogs.append(mob)
 
 allowed_wolf_tiles = [bg_grass, bg_dirt]
 
@@ -414,8 +473,6 @@ for tile_x, tile_image in tiles:
     weighted_wolf_tiles.extend([(tile_x, tile_image)] * weight)
 
 wolves = []
-
-
 allowed_duskwretch_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_snow, bg_wasteland]
 
 duskwretch_spawn_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image in allowed_duskwretch_tiles]
@@ -446,7 +503,9 @@ for _ in range(num_duskwretches):
     tile_x, tile_image = random.choice(weighted_duskwretch_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    duskwretches.append(Duskwretch(x, y, "Duskwretch"))
+    mob = Duskwretch(x, y, "Duskwretch")
+    mob.level = _random_level_for_position(x, y, 5, 12)
+    duskwretches.append(mob)
 
 allowed_pock_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_lavastone, bg_snow, bg_wasteland, bg_blackstone, bg_redrock]
 
@@ -477,7 +536,9 @@ for _ in range(num_pocks):
     tile_x, tile_image = random.choice(weighted_pock_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    pocks.append(Pock(x, y, "Pock"))
+    mob = Pock(x, y, "Pock")
+    mob.level = _random_level_for_position(x, y, 3, 9)
+    pocks.append(mob)
 
 allowed_deer_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah]
 
@@ -508,7 +569,9 @@ for _ in range(num_deers):
     tile_x, tile_image = random.choice(weighted_deer_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    deers.append(Deer(x, y, "Deer"))
+    mob = Deer(x, y, "Deer")
+    mob.level = _random_level_for_position(x, y, 2, 7)
+    deers.append(mob)
 
 allowed_black_bear_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock]
 
@@ -539,7 +602,9 @@ for _ in range(num_black_bears):
     tile_x, tile_image = random.choice(weighted_black_bear_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    black_bears.append(BlackBear(x, y, "Black Bear"))
+    mob = BlackBear(x, y, "Black Bear")
+    mob.level = _random_level_for_position(x, y, 6, 14)
+    black_bears.append(mob)
 
 allowed_brown_bear_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_duskstone, bg_snow]
 
@@ -570,7 +635,9 @@ for _ in range(num_brown_bears):
     tile_x, tile_image = random.choice(weighted_brown_bear_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    brown_bears.append(BrownBear(x, y, "Brown Bear"))
+    mob = BrownBear(x, y, "Brown Bear")
+    mob.level = _random_level_for_position(x, y, 6, 14)
+    brown_bears.append(mob)
 
 allowed_polar_bear_tiles = [bg_snow]
 
@@ -603,7 +670,9 @@ for _ in range(num_polar_bears):
         tile_x, tile_image = random.choice(weighted_polar_bear_tiles)
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
-        polar_bears.append(PolarBear(x, y, "Polar Bear"))
+        mob = PolarBear(x, y, "Polar Bear")
+        mob.level = _random_level_for_position(x, y, 7, 15)
+        polar_bears.append(mob)
 
 allowed_panda_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock]
 
@@ -635,7 +704,9 @@ for _ in range(num_pandas):
         tile_x, tile_image = random.choice(weighted_panda_tiles)
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
-        pandas.append(PandaBear(x, y, "Panda"))
+        mob = PandaBear(x, y, "Panda")
+        mob.level = _random_level_for_position(x, y, 5, 12)
+        pandas.append(mob)
 
 allowed_gila_tiles = [bg_sand, bg_wasteland, bg_redrock]
 
@@ -667,7 +738,9 @@ for _ in range(num_gilas):
     tile_x, tile_image = random.choice(weighted_gila_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    gilas.append(Gila(x, y, "Gila"))
+    mob = Gila(x, y, "Gila")
+    mob.level = _random_level_for_position(x, y, 4, 10)
+    gilas.append(mob)
 
 allowed_salamander_tiles = [bg_compact]
 
@@ -701,7 +774,9 @@ for _ in range(num_salamanders):
     tile_x, tile_image = random.choice(weighted_salamander_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    salamanders.append(Salamander(x, y, "Salamander"))
+    mob = Salamander(x, y, "Salamander")
+    mob.level = _random_level_for_position(x, y, 5, 11)
+    salamanders.append(mob)
 
 allowed_redmite_tiles = [bg_redrock]
 
@@ -721,7 +796,9 @@ for _ in range(num_redmites):
     tile_x, tile_image = random.choice(weighted_redmite_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 32)
     y = random.randint(0, height - 32)
-    redmites.append(Redmite(x, y, "Redmite"))
+    mob = Redmite(x, y, "Redmite")
+    mob.level = _random_level_for_position(x, y, 2, 6)
+    redmites.append(mob)
 
 allowed_crow_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock]
 
@@ -752,7 +829,9 @@ for _ in range(num_crows):
     tile_x, tile_image = random.choice(weighted_crow_tiles)
     x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
     y = random.randint(0, height - 64)
-    crows.append(Crow(x, y, "Crow"))
+    mob = Crow(x, y, "Crow")
+    mob.level = _random_level_for_position(x, y, 1, 4)
+    crows.append(mob)
 
 allowed_glowbird_tiles = [bg_duskstone, bg_blackstone]
 
@@ -785,7 +864,9 @@ for _ in range(num_glowbirds):
         tile_x, tile_image = random.choice(weighted_glowbird_tiles)
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
-        glowbirds.append(Glowbird(x, y, "Glowbird"))
+        mob = Glowbird(x, y, "Glowbird")
+        mob.level = _random_level_for_position(x, y, 1, 5)
+        glowbirds.append(mob)
 
 allowed_fire_dragon_tiles = [bg_lavastone, bg_sand, bg_wasteland, bg_redrock, bg_blackstone]
 
@@ -816,7 +897,8 @@ for _ in range(num_fire_dragons):
         tile_x, tile_image = random.choice(weighted_fire_dragon_tiles)
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
-        fire_dragons.append(Dragon(x, y, "Fire Dragon", "fire"))
+        lvl = _random_level_for_position(x, y, 10, 40)
+        fire_dragons.append(Dragon(x, y, "Fire Dragon", "fire", lvl))
 
 allowed_ice_dragon_tiles = [bg_snow, bg_riverrock, bg_bigrock, bg_compact]
 
@@ -847,7 +929,8 @@ for _ in range(num_ice_dragons):
         tile_x, tile_image = random.choice(weighted_ice_dragon_tiles)
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
-        ice_dragons.append(Dragon(x, y, "Ice Dragon", "ice"))
+        lvl = _random_level_for_position(x, y, 10, 40)
+        ice_dragons.append(Dragon(x, y, "Ice Dragon", "ice", lvl))
 
 allowed_electric_dragon_tiles = [bg_duskstone, bg_blackstone, bg_bigrock, bg_wasteland]
 
@@ -878,7 +961,8 @@ for _ in range(num_electric_dragons):
         tile_x, tile_image = random.choice(weighted_electric_dragon_tiles)
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
-        electric_dragons.append(Dragon(x, y, "Electric Dragon", "electric"))
+        lvl = _random_level_for_position(x, y, 10, 40)
+        electric_dragons.append(Dragon(x, y, "Electric Dragon", "electric", lvl))
 
 allowed_poison_dragon_tiles = [bg_wasteland, bg_compact, bg_redrock, bg_blackstone]
 
@@ -909,7 +993,8 @@ for _ in range(num_poison_dragons):
         tile_x, tile_image = random.choice(weighted_poison_dragon_tiles)
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
-        poison_dragons.append(Dragon(x, y, "Poison Dragon", "poison"))
+        lvl = _random_level_for_position(x, y, 10, 40)
+        poison_dragons.append(Dragon(x, y, "Poison Dragon", "poison", lvl))
 
 allowed_dusk_dragon_tiles = [bg_duskstone, bg_wasteland, bg_blackstone, bg_redrock, bg_dirt]
 
@@ -940,4 +1025,5 @@ for _ in range(num_dusk_dragons):
         tile_x, tile_image = random.choice(weighted_dusk_dragon_tiles)
         x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
         y = random.randint(0, height - 64)
-        dusk_dragons.append(Dragon(x, y, "Dusk Dragon", "dusk"))
+        lvl = _random_level_for_position(x, y, 10, 40)
+        dusk_dragons.append(Dragon(x, y, "Dusk Dragon", "dusk", lvl))
