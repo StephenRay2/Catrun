@@ -1259,7 +1259,7 @@ background_image = pygame.transform.scale(background_image, (width, height))
 BACKGROUND_SIZE = background_image.get_width()
 
 tiles = []
-for i in range(-1, 6):
+for i in range(0, 6):
     tiles.append((i * BACKGROUND_SIZE, bg_grass))
 for i in range(6, 20):
     tiles.append((i * BACKGROUND_SIZE, bg_dirt))
