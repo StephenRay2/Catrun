@@ -23,10 +23,17 @@ def draw_text_with_background(screen, text_surface, x, y, padding=4):
 def draw_mob_name_and_level(mob, screen, cam_x, y_offset=-14):
     """Draw mob's name and level label above its head, if available."""
     try:
-        display_name = getattr(mob, "name", None)
         level_value = getattr(mob, "level", None)
-        if not display_name or level_value is None:
+        if level_value is None:
             return
+        
+        display_name = getattr(mob, "cat_name", None)
+        if not display_name:
+            display_name = getattr(mob, "name", None)
+        
+        if not display_name:
+            return
+        
         name_font = pygame.font.Font(font_path, 12)
         label = f"{display_name} Lv{int(level_value)}"
         name_text = name_font.render(label, True, (255, 255, 255))

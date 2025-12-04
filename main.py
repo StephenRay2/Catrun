@@ -38,6 +38,10 @@ time_of_day_start = time_of_day
 stamina_depleted_message_timer = 0
 need_pickaxe_message_timer = 0
 need_shovel_message_timer = 0
+menu_pan_timer = 0.0
+menu_zoom_timer = 0.0
+bg_valley = pygame.image.load("assets/sprites/biomes/backgrounds/valleybackground.png").convert()
+bg_valley_prescaled = pygame.transform.smoothscale(bg_valley, (int(bg_valley.get_width() * 2.0), int(bg_valley.get_height() * 2.0)))
 player_world_x = player_pos.x + cam_x
 player_world_y = player_pos.y
 prev_player_world_pos = pygame.Vector2(player_world_x, player_world_y)
@@ -1532,14 +1536,32 @@ while running:
         if state == "menu":
             sound_manager.stop_music()
             sound_manager.play_music("assets/music/Settler's End.wav")
+            menu_zoom_timer = 0.0
         elif state == "game":
             sound_manager.stop_music()
             sound_manager.play_random_ambient_music(min_delay=200, max_delay=800, volume=0.2, fade_in=4000)
         previous_state = state
     
     if state == "menu":
-        # Static valley background for menu
-        screen.blit(bg_valley, (0, 0))
+        # Smooth zoom in/out valley background (loops) - uses pre-scaled image
+        menu_zoom_timer += dt
+        zoom_cycle = 240.0  # 120s zoom in, 120s zoom out
+        phase = (menu_zoom_timer % zoom_cycle) / zoom_cycle
+        
+        max_zoom = 2.0
+        if phase < 0.5:
+            zoom_t = phase * 2.0
+        else:
+            zoom_t = 2.0 - (phase * 2.0)
+        
+        current_scale = 1.0 + (max_zoom - 1.0) * zoom_t
+        
+        view_scale = 1.0 / current_scale
+        view_w = int(bg_valley_prescaled.get_width() * view_scale)
+        view_h = int(bg_valley_prescaled.get_height() * view_scale)
+        
+        scaled_view = pygame.transform.smoothscale(bg_valley_prescaled, (view_w, view_h))
+        screen.blit(pygame.transform.scale(scaled_view, (width, height)), (0, 0))
 
         catrun_title = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/catrun_title.png").convert_alpha(), (800, 200))
         screen.blit(catrun_title, (width/2 - catrun_title.get_width()/2, 100))
