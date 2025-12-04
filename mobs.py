@@ -1229,6 +1229,18 @@ class Mob(pygame.sprite.Sprite):
         can_move_x = not ((direction.x > 0 and right_collision) or (direction.x < 0 and left_collision))
         can_move_y = not ((direction.y > 0 and down_collision) or (direction.y < 0 and up_collision))
 
+        # Clamp movement to global world boundaries (prevents slipping past cliffs).
+        try:
+            import world as world_data
+            min_x = getattr(world_data, "spawn_min_x", None)
+            max_x = getattr(world_data, "spawn_max_x", None)
+            if min_x is not None and direction.x < 0 and collision_rect.left <= min_x:
+                can_move_x = False
+            if max_x is not None and direction.x > 0 and collision_rect.right >= max_x:
+                can_move_x = False
+        except Exception:
+            pass
+
         return can_move_x, can_move_y
 
     def get_speed(self):
@@ -2549,7 +2561,7 @@ class Wolf(Enemy):
         self.attack_timer = 0
         self.attack_duration = 22
 
-        self.attack_damage = 7
+        self.attack_damage = 4
         self.base_speed = 150
         self.speed = 1
         self.full_health = 180 + (random.randint(8, 14) * self.level)
@@ -2645,6 +2657,18 @@ class Wolf(Enemy):
 
         can_move_x = not ((direction.x > 0 and right_collision) or (direction.x < 0 and left_collision))
         can_move_y = not ((direction.y > 0 and down_collision) or (direction.y < 0 and up_collision))
+
+        # Clamp to world bounds so wolves respect cliff edges too.
+        try:
+            import world as world_data
+            min_x = getattr(world_data, "spawn_min_x", None)
+            max_x = getattr(world_data, "spawn_max_x", None)
+            if min_x is not None and direction.x < 0 and collision_rect.left <= min_x:
+                can_move_x = False
+            if max_x is not None and direction.x > 0 and collision_rect.right >= max_x:
+                can_move_x = False
+        except Exception:
+            pass
 
         return can_move_x, can_move_y
     
@@ -4852,7 +4876,14 @@ class Crow(Mob):
     
     def check_collision(self, direction, nearby_objects, nearby_mobs):
         if self.state == "flying":
-            return True, True 
+            try:
+                from world import CliffSide
+                cliffs = [obj for obj in nearby_objects if isinstance(obj, CliffSide)]
+            except Exception:
+                cliffs = []
+            if not cliffs:
+                return True, True
+            return super().check_collision(direction, cliffs, [])
         return super().check_collision(direction, nearby_objects, nearby_mobs)
     
     def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):

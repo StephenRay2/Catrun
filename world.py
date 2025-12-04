@@ -78,6 +78,8 @@ gemstone_rocks = []
 dropped_items = []
 marsh_reeds = []
 banks = []
+spawn_min_x = 0
+spawn_max_x = 0
 
 
 pond_images = ["assets/sprites/biomes/grassland/pond1.png", "assets/sprites/biomes/grassland/pond2.png", "assets/sprites/biomes/grassland/pond3.png", "assets/sprites/biomes/grassland/pond4.png", "assets/sprites/biomes/grassland/pond5.png", "assets/sprites/biomes/grassland/pond6.png", "assets/sprites/biomes/grassland/pond7.png", "assets/sprites/biomes/grassland/pond8.png", "assets/sprites/biomes/grassland/pond9.png", "assets/sprites/biomes/grassland/pond10.png"]
@@ -443,6 +445,32 @@ class Solid(pygame.sprite.Sprite):
             except Exception:
                 pass
             return [self.resource] * resource_collected
+        return []
+    
+
+class CliffSide(pygame.sprite.Sprite):
+    def __init__(self, image, x):
+        super().__init__()
+        self.image = image
+        self.rect = self.image.get_rect(topleft=(x, 0))
+        self.destroyed = False
+
+        # Collision uses the full drawn area to guarantee a hard boundary.
+        self.collision_rect = self.rect.copy()
+    
+    def draw(self, screen, cam_x):
+        screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
+    
+    def get_collision_rect(self, cam_x):
+        return pygame.Rect(
+            self.collision_rect.x - cam_x,
+            self.collision_rect.y,
+            self.collision_rect.width,
+            self.collision_rect.height,
+        )
+    
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
+        # Cliffs are immovable boundaries; ignore harvest attempts.
         return []
     
 
@@ -1230,6 +1258,8 @@ bg_snow = pygame.image.load("assets/sprites/biomes/backgrounds/bg_snow.png").con
 bg_wasteland = pygame.image.load("assets/sprites/biomes/backgrounds/bg_wasteland.png").convert()
 bg_blackstone = pygame.image.load("assets/sprites/biomes/backgrounds/bg_blackstone.png").convert()
 bg_redrock = pygame.image.load("assets/sprites/biomes/backgrounds/bg_redrock.png").convert()
+bg_valley = pygame.image.load("assets/sprites/biomes/backgrounds/valleybackground.png").convert()
+bg_double_valley = pygame.image.load("assets/sprites/biomes/backgrounds/double_valley_background.png").convert()
 
 bg_dirt = pygame.transform.scale(bg_dirt, (width, height))
 bg_grass = pygame.transform.scale(bg_grass, (width, height))
@@ -1245,7 +1275,14 @@ bg_wasteland = pygame.transform.scale(bg_wasteland, (width, height))
 bg_snow = pygame.transform.scale(bg_snow, (width, height))
 bg_blackstone = pygame.transform.scale(bg_blackstone, (width, height))
 bg_redrock = pygame.transform.scale(bg_redrock, (width, height))
+bg_valley = pygame.transform.scale(bg_valley, (width, height))
+bg_double_valley = pygame.transform.scale(bg_double_valley, (width, height))
 bg_green.fill((0, 120, 0))
+
+cliff_side_left_raw = pygame.image.load("assets/sprites/biomes/backgrounds/CliffSideLeft.png").convert_alpha()
+cliff_side_left = pygame.transform.scale(cliff_side_left_raw, (cliff_side_left_raw.get_width(), height))
+cliff_side_right = pygame.transform.flip(cliff_side_left, True, False)
+CLIFF_SIDE_WIDTH = cliff_side_left.get_width()
 # Legacy aliases to avoid touching all downstream references
 bg_compact = bg_marsh
 bg_sand = bg_beach
@@ -1734,7 +1771,7 @@ for tile_x, tile_image in tiles:
 
 
 def generate_world():
-    global rocks, dead_bushes, grasses, stones, boulders, berry_bushes, trees, sticks, savannah_grasses, mushrooms, fruit_plants, ferns, ponds, lavas, gemstone_rocks, metal_ore_rocks, metal_vein_rocks, gold_ore_rocks, gold_vein_rocks, dropped_items, marsh_reeds
+    global rocks, dead_bushes, grasses, stones, boulders, berry_bushes, trees, sticks, savannah_grasses, mushrooms, fruit_plants, ferns, ponds, lavas, gemstone_rocks, metal_ore_rocks, metal_vein_rocks, gold_ore_rocks, gold_vein_rocks, dropped_items, marsh_reeds, spawn_min_x, spawn_max_x
     
     rocks.clear()
     dead_bushes.clear()
@@ -1759,9 +1796,36 @@ def generate_world():
     marsh_reeds.clear()
     banks.clear()
 
+    map_end_x = tiles[-1][0] + BACKGROUND_SIZE
+    half_cliff = CLIFF_SIDE_WIDTH // 2
+    left_cliff_x = -half_cliff - 10
+    right_cliff_x = map_end_x - half_cliff + 5
+    rocks.append(CliffSide(cliff_side_left, left_cliff_x))
+    rocks.append(CliffSide(cliff_side_right, right_cliff_x))
+
+    # Keep spawns away from the first/last 100px of the map.
+    spawn_min_x = 100
+    spawn_max_x = map_end_x - 100
+
+    def rand_x_for_tile(tile_x, margin=64):
+        min_x = max(tile_x, spawn_min_x)
+        max_x = min(tile_x + BACKGROUND_SIZE - margin, spawn_max_x)
+        if max_x < min_x:
+            return None
+        return random.randint(min_x, max_x)
+
+    def rand_x_global(margin=64):
+        min_x = spawn_min_x
+        max_x = spawn_max_x - margin
+        if max_x < min_x:
+            return None
+        return random.randint(min_x, max_x)
+
     for _ in range(num_rocks):
         tile_x, tile_image = random.choice(weighted_rock_tiles)
-        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        x = rand_x_for_tile(tile_x)
+        if x is None:
+            continue
         y = random.randint(0, height - 64)
         if tile_image == bg_snow:
             rocks.append(SnowyRock(x, y))
@@ -1770,21 +1834,11 @@ def generate_world():
         else:
             rocks.append(Rock(x, y))
 
-    rock_border_locations = [(0, i * 28) for i in range(28)] + [(512000, i * 28) for i in range(28)]
-
-    for i, pos in enumerate(rock_border_locations):
-        x, y = pos
-        chosen_image = random.choice(rock_images)
-        rock = Rock(x, y)
-        rock.image = pygame.image.load(chosen_image).convert_alpha()
-        rock.image = pygame.transform.scale(rock.image, (64, 64))
-        rock.rect = rock.image.get_rect(topleft=(x, y))
-        rocks.append(rock)
-    
-    
     for _ in range(num_boulders):
         tile_x, tile_image = random.choice(weighted_boulder_tiles)
-        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        x = rand_x_for_tile(tile_x, margin=128)
+        if x is None:
+            continue
         y = random.randint(0, height - 64)
         if tile_image == bg_snow:
             boulders.append(SnowyBoulder(x, y))
@@ -1794,37 +1848,49 @@ def generate_world():
             boulders.append(Boulder(x, y))
     
     for _ in range(num_gemstone_rocks):
-        x = random.randint(0, 512000 - 64)
+        x = rand_x_global()
+        if x is None:
+            continue
         y = random.randint(0, height - 64)
         gemstone_rocks.append(GemstoneRock(x, y))
     
     for _ in range(num_metal_ore_rocks):
         tile_x, tile_image = random.choice(weighted_rock_tiles)
-        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        x = rand_x_for_tile(tile_x)
+        if x is None:
+            continue
         y = random.randint(0, height - 64)
         metal_ore_rocks.append(MetalOreRock(x, y))
     
     for _ in range(num_metal_vein_rocks):
         tile_x, tile_image = random.choice(weighted_rock_tiles)
-        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        x = rand_x_for_tile(tile_x)
+        if x is None:
+            continue
         y = random.randint(0, height - 64)
         metal_vein_rocks.append(MetalVeinRock(x, y))
     
     for _ in range(num_gold_ore_rocks):
         tile_x, tile_image = random.choice(weighted_rock_tiles)
-        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        x = rand_x_for_tile(tile_x)
+        if x is None:
+            continue
         y = random.randint(0, height - 64)
         gold_ore_rocks.append(GoldOreRock(x, y))
     
     for _ in range(num_gold_vein_rocks):
         tile_x, tile_image = random.choice(weighted_rock_tiles)
-        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        x = rand_x_for_tile(tile_x)
+        if x is None:
+            continue
         y = random.randint(0, height - 64)
         gold_vein_rocks.append(GoldVeinRock(x, y))
     
     for _ in range(num_bushes):
         tile_x, tile_image = random.choice(weighted_berry_bush_tiles)
-        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        x = rand_x_for_tile(tile_x)
+        if x is None:
+            continue
         y = random.randint(0, height - 64)
         berry_bush_type = random.choice(berry_bush_types)
         berry_bushes.append(BerryBush(x, y, berry_bush_type))
@@ -1832,7 +1898,9 @@ def generate_world():
     def spawn_trees(tree_list, tree_types, weighted_tiles, num_trees, height):
         for _ in range(num_trees):
             tile_x, tile_image = random.choice(weighted_tiles)
-            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            x = rand_x_for_tile(tile_x)
+            if x is None:
+                continue
             y = random.randint(0, height - 80)
             tree_type = random.choice(tree_types)
             tree_list.append(Tree(x, y, tree_type))
@@ -1849,14 +1917,18 @@ def generate_world():
 
     for _ in range(num_sticks):
         tile_x, tile_image = random.choice(weighted_stick_tiles)
-        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        x = rand_x_for_tile(tile_x)
+        if x is None:
+            continue
         y = random.randint(0, height - 64)
         sticks.append(Stick(x, y))
     
   
     for _ in range(num_stones):
         tile_x, tile_image = random.choice(weighted_stone_tiles)
-        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        x = rand_x_for_tile(tile_x)
+        if x is None:
+            continue
         y = random.randint(0, height - 64)
         if tile_image == bg_snow:
             stones.append(SnowyStone(x, y))
@@ -1868,75 +1940,97 @@ def generate_world():
     
     for _ in range(num_grasses):
         tile_x, tile_image = random.choice(weighted_grass_tiles)
-        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        x = rand_x_for_tile(tile_x)
+        if x is None:
+            continue
         y = random.randint(0, height - 64)
         grasses.append(Grass(x, y))
    
     for _ in range(num_savannah_grasses):
         tile_x, tile_image = random.choice(weighted_savannah_grass_tiles)
-        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        x = rand_x_for_tile(tile_x)
+        if x is None:
+            continue
         y = random.randint(0, height - 64)
         savannah_grasses.append(SavannahGrass(x, y))
 
     weighted_compact_tiles = [(tile_x, tile_image) for tile_x, tile_image in tiles if tile_image == bg_compact]
     for _ in range(num_marsh_reeds):
         tile_x, tile_image = random.choice(weighted_compact_tiles)
-        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        x = rand_x_for_tile(tile_x)
+        if x is None:
+            continue
         y = random.randint(0, height - 64)
         marsh_reeds.append(MarshReed(x, y))
 
     for _ in range(num_mushrooms):
         tile_x, tile_image = random.choice(weighted_mushroom_tiles)
-        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        x = rand_x_for_tile(tile_x)
+        if x is None:
+            continue
         y = random.randint(0, height - 64)
         mushrooms.append(Mushroom(x, y))
     
     
     for _ in range(num_dead_bushes):
         tile_x, tile_image = random.choice(weighted_dead_bush_tiles)
-        x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+        x = rand_x_for_tile(tile_x)
+        if x is None:
+            continue
         y = random.randint(0, height - 64)
         dead_bushes.append(DeadBush(x, y))
 
     if weighted_clay_bank_tiles:
         for _ in range(num_clay_banks):
             tile_x, tile_image = random.choice(weighted_clay_bank_tiles)
-            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            x = rand_x_for_tile(tile_x)
+            if x is None:
+                continue
             y = random.randint(0, height - 64)
             banks.append(ClayBank(x, y))
 
     if weighted_salt_bank_tiles:
         for _ in range(num_salt_banks):
             tile_x, tile_image = random.choice(weighted_salt_bank_tiles)
-            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            x = rand_x_for_tile(tile_x)
+            if x is None:
+                continue
             y = random.randint(0, height - 64)
             banks.append(SaltBank(x, y))
 
     if weighted_beach_sand_bank_tiles:
         for _ in range(max(1, num_sand_banks // 2)):
             tile_x, tile_image = random.choice(weighted_beach_sand_bank_tiles)
-            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            x = rand_x_for_tile(tile_x)
+            if x is None:
+                continue
             y = random.randint(0, height - 64)
             banks.append(BeachSandBank(x, y))
 
     if weighted_desert_sand_bank_tiles:
         for _ in range(num_sand_banks - max(1, num_sand_banks // 2)):
             tile_x, tile_image = random.choice(weighted_desert_sand_bank_tiles)
-            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            x = rand_x_for_tile(tile_x)
+            if x is None:
+                continue
             y = random.randint(0, height - 64)
             banks.append(DesertSandBank(x, y))
 
     if weighted_snow_bank_tiles:
         for _ in range(num_snow_banks):
             tile_x, tile_image = random.choice(weighted_snow_bank_tiles)
-            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            x = rand_x_for_tile(tile_x)
+            if x is None:
+                continue
             y = random.randint(0, height - 64)
             banks.append(SnowBank(x, y))
 
     if weighted_fruit_plant_tiles:
         for _ in range(num_fruit_plants):
             tile_x, tile_image = random.choice(weighted_fruit_plant_tiles)
-            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            x = rand_x_for_tile(tile_x)
+            if x is None:
+                continue
             y = random.randint(0, height - 64)
             plant_type = random.choice(fruit_plant_types)
             fruit_plants.append(FruitPlant(x, y, plant_type))
@@ -1944,14 +2038,18 @@ def generate_world():
     if weighted_fire_fern_tiles:
         for _ in range(num_fire_ferns):
             tile_x, tile_image = random.choice(weighted_fire_fern_tiles)
-            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            x = rand_x_for_tile(tile_x)
+            if x is None:
+                continue
             y = random.randint(0, height - 64)
             ferns.append(Fern(x, y, fern_data[0]))
 
     if weighted_frost_fern_tiles:
         for _ in range(num_frost_ferns):
             tile_x, tile_image = random.choice(weighted_frost_fern_tiles)
-            x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+            x = rand_x_for_tile(tile_x)
+            if x is None:
+                continue
             y = random.randint(0, height - 64)
             ferns.append(Fern(x, y, fern_data[1]))
     
@@ -1960,14 +2058,22 @@ def generate_world():
     
     for _ in range(num_ponds):
         valid = False
+        x = None
         while not valid:
-            x = random.randint(0, 512000)
+            x = rand_x_global(margin=128)
+            if x is None:
+                break
             if not (lavastone_start <= x < lavastone_end):
                 valid = True
-        y = random.randint(0, height - 128)
-        ponds.append(Pond(x, y))
+        if x is not None and valid:
+            y = random.randint(0, height - 128)
+            ponds.append(Pond(x, y))
     for _ in range(num_lavaponds):
-        x = random.randint(int(lavastone_start), int(lavastone_end - 128))
+        min_x = max(int(lavastone_start), int(spawn_min_x))
+        max_x = min(int(lavastone_end - 128), int(spawn_max_x))
+        if max_x < min_x:
+            continue
+        x = random.randint(min_x, max_x)
         y = random.randint(0, height - 128)
         lavas.append(Lavapond(x, y))
     

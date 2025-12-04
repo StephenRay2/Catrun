@@ -2,6 +2,7 @@ import pygame
 import math
 import random
 pygame.init()
+import world
 from buttons import *
 from mob_placement import *
 import mob_placement
@@ -1537,49 +1538,8 @@ while running:
         previous_state = state
     
     if state == "menu":
-        menu_image = bg_grass
-        menu_screen = pygame.Rect(0, 0, width, height)
-        screen.blit(menu_image, (0, 0), menu_screen)
-
-        rocks = [rock for rock in rocks if not rock.destroyed]
-        boulders = [boulder for boulder in boulders if not boulder.destroyed]
-        trees = [tree for tree in trees if not tree.destroyed]
-        berry_bushes = [bush for bush in berry_bushes if not bush.destroyed]
-        dead_bushes = [bush for bush in dead_bushes if not bush.destroyed]
-        ferns = [fern for fern in ferns if not fern.destroyed]
-        fruit_plants = [plant for plant in fruit_plants if not plant.destroyed]
-        gemstone_rocks = [gr for gr in gemstone_rocks if not gr.destroyed]
-        metal_ore_rocks = [ore for ore in metal_ore_rocks if not ore.destroyed]
-        metal_vein_rocks = [vein for vein in metal_vein_rocks if not vein.destroyed]
-        gold_ore_rocks = [ore for ore in gold_ore_rocks if not ore.destroyed]
-        gold_vein_rocks = [vein for vein in gold_vein_rocks if not vein.destroyed]
-        banks = [bank for bank in banks if not bank.destroyed]
-        
-        collectibles = sticks + stones + grasses + savannah_grasses + mushrooms + dropped_items 
-        all_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants + ponds + lavas + banks
-
-        visible_collectibles = [col for col in collectibles if col.rect.x- cam_x > -1000 and col.rect.y - cam_x < width + 1000]
-        all_objects_no_liquids = rocks + trees + boulders + gemstone_rocks + metal_ore_rocks + metal_vein_rocks + gold_ore_rocks + gold_vein_rocks + berry_bushes + dead_bushes + ferns + fruit_plants + banks
-        visible_objects = [obj for obj in all_objects_no_liquids if obj.rect.x - cam_x > -1000 and obj.rect.x - cam_x < width + 1000]
-        
-        visible_liquids = [obj for obj in (ponds + lavas) if obj.rect.x - cam_x > -1000 and obj.rect.x - cam_x < width + 1000]
-        
-        visible_objects.extend(visible_collectibles)
-
-        player_drawn = False
-
-        for tile_x, tile_image in tiles:
-            screen_x = tile_x - cam_x
-            if -BACKGROUND_SIZE < screen_x < width:
-                screen.blit(tile_image, (screen_x, floor_y))
-
-        for obj in visible_liquids:
-            obj.update_animation(dt)
-            obj.draw(screen, cam_x)
-        
-        for obj in visible_objects:
-            object_mid_y = obj.rect.y + obj.rect.height / 2
-            obj.draw(screen, cam_x)
+        # Static valley background for menu
+        screen.blit(bg_valley, (0, 0))
 
         catrun_title = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/catrun_title.png").convert_alpha(), (800, 200))
         screen.blit(catrun_title, (width/2 - catrun_title.get_width()/2, 100))
@@ -1602,11 +1562,11 @@ while running:
             elif menu_quit_button.is_clicked(event):
                 running = False
         
-        cam_x += .5
         pygame.display.flip()
         dt = clock.tick(60) / 1000
 
     elif state == "game":
+        screen.blit(bg_double_valley, (0, 0))
         should_process_frame = not debug_step_mode or debug_should_step_frame
         if debug_should_step_frame:
             debug_should_step_frame = False
@@ -1693,9 +1653,19 @@ while running:
                     max_lvl = min_lvl
                 return random.randint(min_lvl, max_lvl)
 
+            # Helper to keep mob spawns inside the cliff boundaries.
+            def clamp_spawn_x(tile_x, margin=64):
+                min_x = max(tile_x, world.spawn_min_x)
+                max_x = min(tile_x + BACKGROUND_SIZE - margin, world.spawn_max_x - margin)
+                if max_x < min_x:
+                    return None
+                return random.randint(min_x, max_x)
+
             for _ in range(num_cats):
                 tile_x, tile_image = random.choice(weighted_cat_tiles)
-                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                x = clamp_spawn_x(tile_x)
+                if x is None:
+                    continue
                 y = random.randint(0, height - 64)
                 cat = Cat(x, y, "Cat")
                 cat.level = random_level_for_position(x, y, 1, 3)
@@ -1706,7 +1676,9 @@ while running:
 
             for _ in range(num_squirrels):
                 tile_x, tile_image = random.choice(weighted_squirrel_tiles)
-                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                x = clamp_spawn_x(tile_x)
+                if x is None:
+                    continue
                 y = random.randint(0, height - 64)
                 squirrel = Squirrel(x, y, "Squirrel")
                 squirrel.level = random_level_for_position(x, y, 1, 2)
@@ -1715,7 +1687,9 @@ while running:
 
             for _ in range(num_cows):
                 tile_x, tile_image = random.choice(weighted_cow_tiles)
-                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                x = clamp_spawn_x(tile_x)
+                if x is None:
+                    continue
                 y = random.randint(0, height - 64)
                 cow = Cow(x, y, "Cow")
                 cow.level = random_level_for_position(x, y, 2, 4)
@@ -1724,7 +1698,9 @@ while running:
 
             for _ in range(num_chickens):
                 tile_x, tile_image = random.choice(weighted_chicken_tiles)
-                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                x = clamp_spawn_x(tile_x)
+                if x is None:
+                    continue
                 y = random.randint(0, height - 64)
                 chicken = Chicken(x, y, "Chicken")
                 chicken.level = random_level_for_position(x, y, 1, 2)
@@ -1733,7 +1709,9 @@ while running:
 
             for _ in range(num_crawlers):
                 tile_x, tile_image = random.choice(weighted_crawler_tiles)
-                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                x = clamp_spawn_x(tile_x)
+                if x is None:
+                    continue
                 y = random.randint(0, height - 64)
                 crawler = Crawler(x, y, "Crawler")
                 crawler.level = random_level_for_position(x, y, 3, 6)
@@ -1743,7 +1721,9 @@ while running:
             for _ in range(num_ashhounds):
                 if weighted_ashhound_tiles:
                     tile_x, tile_image = random.choice(weighted_ashhound_tiles)
-                    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    x = clamp_spawn_x(tile_x)
+                    if x is None:
+                        continue
                     y = random.randint(0, height - 64)
                     ashhound = Ashhound(x, y, "Ashhound")
                     ashhound.level = random_level_for_position(x, y, 5, 9)
@@ -1753,7 +1733,9 @@ while running:
             for _ in range(num_wastedogs):
                 if weighted_wastedog_tiles:
                     tile_x, tile_image = random.choice(weighted_wastedog_tiles)
-                    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    x = clamp_spawn_x(tile_x)
+                    if x is None:
+                        continue
                     y = random.randint(0, height - 64)
                     wastedog = Wastedog(x, y, "Wastedog")
                     wastedog.level = random_level_for_position(x, y, 4, 8)
@@ -1791,7 +1773,9 @@ while running:
                 pack_center = None
                 attempts = 0
                 while attempts < 20:
-                    cx = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    cx = clamp_spawn_x(tile_x)
+                    if cx is None:
+                        break
                     cy = random.randint(0, height - 64)
                     if not is_in_spawn_protection(cx, cy):
                         pack_center = (cx, cy)
@@ -1805,7 +1789,7 @@ while running:
                 for _ in range(size):
                     offset_x = random.randint(-32, 32)
                     offset_y = random.randint(-32, 32)
-                    x = base_x + offset_x
+                    x = max(world.spawn_min_x, min(world.spawn_max_x - 64, base_x + offset_x))
                     y = base_y + offset_y
                     wolf = Wolf(x, y, "Wolf", pack_id=pack_id + 1)
                     wolf.level = random_level_for_position(x, y, 4, 10)
@@ -1814,7 +1798,9 @@ while running:
 
             for _ in range(num_pocks):
                 tile_x, tile_image = random.choice(weighted_pock_tiles)
-                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                x = clamp_spawn_x(tile_x)
+                if x is None:
+                    continue
                 y = random.randint(0, height - 64)
                 pock = Pock(x, y, "Pock")
                 pock.level = random_level_for_position(x, y, 3, 9)
@@ -1823,7 +1809,9 @@ while running:
 
             for _ in range(num_deers):
                 tile_x, tile_image = random.choice(weighted_deer_tiles)
-                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                x = clamp_spawn_x(tile_x)
+                if x is None:
+                    continue
                 y = random.randint(0, height - 64)
                 deer = Deer(x, y, "Deer")
                 deer.level = random_level_for_position(x, y, 2, 7)
@@ -1833,7 +1821,9 @@ while running:
 
             for _ in range(num_black_bears):
                 tile_x, tile_image = random.choice(weighted_black_bear_tiles)
-                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                x = clamp_spawn_x(tile_x)
+                if x is None:
+                    continue
                 y = random.randint(0, height - 64)
                 black_bear = BlackBear(x, y, "Black Bear")
                 black_bear.level = random_level_for_position(x, y, 6, 14)
@@ -1842,7 +1832,9 @@ while running:
 
             for _ in range(num_brown_bears):
                 tile_x, tile_image = random.choice(weighted_brown_bear_tiles)
-                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                x = clamp_spawn_x(tile_x)
+                if x is None:
+                    continue
                 y = random.randint(0, height - 64)
                 brown_bear = BrownBear(x, y, "Brown Bear")
                 brown_bear.level = random_level_for_position(x, y, 6, 14)
@@ -1851,7 +1843,9 @@ while running:
 
             for _ in range(num_gilas):
                 tile_x, tile_image = random.choice(weighted_gila_tiles)
-                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                x = clamp_spawn_x(tile_x)
+                if x is None:
+                    continue
                 y = random.randint(0, height - 64)
                 gila = Gila(x, y, "Gila")
                 gila.level = random_level_for_position(x, y, 4, 10)
@@ -1862,7 +1856,9 @@ while running:
                 if not weighted_redmite_tiles:
                     break
                 tile_x, tile_image = random.choice(weighted_redmite_tiles)
-                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 32)
+                x = clamp_spawn_x(tile_x, margin=32)
+                if x is None:
+                    continue
                 y = random.randint(0, height - 32)
                 redmite = Redmite(x, y, "Redmite")
                 redmite.level = random_level_for_position(x, y, 2, 6)
@@ -1873,7 +1869,9 @@ while running:
                 if not weighted_salamander_tiles:
                     break
                 tile_x, tile_image = random.choice(weighted_salamander_tiles)
-                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                x = clamp_spawn_x(tile_x)
+                if x is None:
+                    continue
                 y = random.randint(0, height - 64)
                 salamander = Salamander(x, y, "Salamander")
                 salamander.level = random_level_for_position(x, y, 5, 11)
@@ -1882,7 +1880,9 @@ while running:
 
             for _ in range(num_crows):
                 tile_x, tile_image = random.choice(weighted_crow_tiles)
-                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                x = clamp_spawn_x(tile_x)
+                if x is None:
+                    continue
                 y = random.randint(0, height - 64)
                 crow = Crow(x, y, "Crow")
                 crow.level = random_level_for_position(x, y, 1, 4)
@@ -1892,7 +1892,9 @@ while running:
             for _ in range(num_glowbirds):
                 if weighted_glowbird_tiles:
                     tile_x, tile_image = random.choice(weighted_glowbird_tiles)
-                    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    x = clamp_spawn_x(tile_x)
+                    if x is None:
+                        continue
                     y = random.randint(0, height - 64)
                     glowbird = Glowbird(x, y, "Glowbird")
                     glowbird.level = random_level_for_position(x, y, 1, 5)
@@ -1901,7 +1903,9 @@ while running:
 
             for _ in range(num_duskwretches):
                 tile_x, tile_image = random.choice(weighted_duskwretch_tiles)
-                x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                x = clamp_spawn_x(tile_x)
+                if x is None:
+                    continue
                 y = random.randint(0, height - 64)
                 duskwretch = Duskwretch(x, y, "Duskwretch")
                 duskwretch.level = random_level_for_position(x, y, 5, 12)
@@ -1911,7 +1915,9 @@ while running:
             for _ in range(num_fire_dragons):
                 if weighted_fire_dragon_tiles:
                     tile_x, tile_image = random.choice(weighted_fire_dragon_tiles)
-                    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    x = clamp_spawn_x(tile_x)
+                    if x is None:
+                        continue
                     y = random.randint(0, height - 64)
                     lvl = random_level_for_position(x, y, 10, 40)
                     dragon = Dragon(x, y, "Fire Dragon", "fire", lvl)
@@ -1921,7 +1927,9 @@ while running:
             for _ in range(num_ice_dragons):
                 if weighted_ice_dragon_tiles:
                     tile_x, tile_image = random.choice(weighted_ice_dragon_tiles)
-                    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    x = clamp_spawn_x(tile_x)
+                    if x is None:
+                        continue
                     y = random.randint(0, height - 64)
                     lvl = random_level_for_position(x, y, 10, 40)
                     dragon = Dragon(x, y, "Ice Dragon", "ice", lvl)
@@ -1931,7 +1939,9 @@ while running:
             for _ in range(num_electric_dragons):
                 if weighted_electric_dragon_tiles:
                     tile_x, tile_image = random.choice(weighted_electric_dragon_tiles)
-                    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    x = clamp_spawn_x(tile_x)
+                    if x is None:
+                        continue
                     y = random.randint(0, height - 64)
                     lvl = random_level_for_position(x, y, 10, 40)
                     dragon = Dragon(x, y, "Electric Dragon", "electric", lvl)
@@ -1941,7 +1951,9 @@ while running:
             for _ in range(num_poison_dragons):
                 if weighted_poison_dragon_tiles:
                     tile_x, tile_image = random.choice(weighted_poison_dragon_tiles)
-                    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    x = clamp_spawn_x(tile_x)
+                    if x is None:
+                        continue
                     y = random.randint(0, height - 64)
                     lvl = random_level_for_position(x, y, 10, 40)
                     dragon = Dragon(x, y, "Poison Dragon", "poison", lvl)
@@ -1951,7 +1963,9 @@ while running:
             for _ in range(num_dusk_dragons):
                 if weighted_dusk_dragon_tiles:
                     tile_x, tile_image = random.choice(weighted_dusk_dragon_tiles)
-                    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+                    x = clamp_spawn_x(tile_x)
+                    if x is None:
+                        continue
                     y = random.randint(0, height - 64)
                     lvl = random_level_for_position(x, y, 10, 40)
                     dragon = Dragon(x, y, "Dusk Dragon", "dusk", lvl)
