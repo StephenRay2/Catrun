@@ -202,6 +202,88 @@ salamander_walk_left_images = ["assets/sprites/mobs/SalamanderWalkLeft1.png", "a
 salamander_attack_left_images = ["assets/sprites/mobs/SalamanderAttackLeft1.png", "assets/sprites/mobs/SalamanderAttackLeft2.png", "assets/sprites/mobs/SalamanderAttackLeft3.png"]
 salamander_dead_image = pygame.image.load("assets/sprites/mobs/SalamanderDead.png").convert_alpha()
 
+def create_gorlin_images(prefix):
+    return {
+        "idle_left": [f"assets/sprites/mobs/{prefix}LeftIdle{i}.png" for i in range(1, 4)],
+        "walk_left": [f"assets/sprites/mobs/{prefix}LeftWalk{i}.png" for i in range(1, 5)],
+        "attack_left": [f"assets/sprites/mobs/{prefix}LeftAttack{i}.png" for i in range(1, 4)],
+        "start_roll_left": [f"assets/sprites/mobs/{prefix}StartLeftRoll{i}.png" for i in range(1, 4)],
+        "roll_left": [f"assets/sprites/mobs/{prefix}LeftRoll{i}.png" for i in range(1, 6)],
+        "end_roll_left": [f"assets/sprites/mobs/{prefix}EndLeftRoll{i}.png" for i in range(1, 6)],
+    }
+
+gorlin_variants = {
+    "mudrustle": create_gorlin_images("MudrustleGorlin"),
+    "slateback": create_gorlin_images("SlatebackGorlin"),
+    "fluffy": create_gorlin_images("FluffyGorlin"),
+}
+
+def alert_gorlins_to_food_thief(corpse, offender, max_distance=900):
+    """
+    Notify nearby gorlins that someone is taking their food so they can retaliate.
+    corpse: the dead mob that was harvested/eaten
+    offender: the entity responsible (player or mob)
+    """
+    if corpse is None or offender is None:
+        return
+
+    def _offender_is_protected(offender_obj):
+        """Skip aggro if offender is the player inside the spawn-safe bubble."""
+        try:
+            if offender_obj.__class__.__name__ == "Player" and hasattr(offender_obj, "is_in_spawn_protection"):
+                if offender_obj.is_in_spawn_protection():
+                    return True
+        except Exception:
+            pass
+        try:
+            from mob_placement import SPAWN_PROTECTION_CENTER, SPAWN_PROTECTION_RADIUS
+            if offender_obj.__class__.__name__ == "Player":
+                ox = offender_obj.rect.centerx
+                oy = offender_obj.rect.centery
+                cx, cy = SPAWN_PROTECTION_CENTER
+                dx = ox - cx
+                dy = oy - cy
+                if (dx * dx + dy * dy) <= (SPAWN_PROTECTION_RADIUS * SPAWN_PROTECTION_RADIUS):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    if _offender_is_protected(offender):
+        return
+
+    try:
+        from mob_placement import mudrustle_gorlins, slateback_gorlins, fluffy_gorlins
+        scavengers = mudrustle_gorlins + slateback_gorlins + fluffy_gorlins
+    except Exception:
+        scavengers = []
+
+    max_dist_sq = max_distance * max_distance
+    for gorlin in scavengers:
+        if getattr(gorlin, "destroyed", False):
+            continue
+        if not getattr(gorlin, "is_alive", True):
+            continue
+        corpse_rect = getattr(corpse, "rect", None)
+        gorlin_rect = getattr(gorlin, "rect", None)
+        offender_rect = getattr(offender, "rect", None)
+        if corpse_rect is None or gorlin_rect is None or offender_rect is None:
+            continue
+        dx = corpse_rect.centerx - gorlin_rect.centerx
+        dy = corpse_rect.centery - gorlin_rect.centery
+        dist_sq = dx * dx + dy * dy
+        alert_range_sq = getattr(gorlin, "scavenge_alert_range_sq", max_dist_sq)
+        if dist_sq <= alert_range_sq:
+            gorlin.current_target = offender
+            gorlin.chasing = True
+            gorlin.fleeing = False
+            gorlin.target_carcass = None
+            gorlin.roll_on_alert = True
+            gorlin.want_to_roll = True
+            gorlin.roll_strike_used = False
+            if hasattr(gorlin, "aggro_timeout"):
+                gorlin.aggro_timer = gorlin.aggro_timeout
+
 crow_walk_left_images = ["assets/sprites/mobs/CrowWalkLeft1.png", "assets/sprites/mobs/CrowWalkLeft2.png", "assets/sprites/mobs/CrowWalkLeft3.png", "assets/sprites/mobs/CrowWalkLeft4.png", "assets/sprites/mobs/CrowWalkLeft5.png"]
 crow_fly_left_images = ["assets/sprites/mobs/CrowFlyLeft1.png", "assets/sprites/mobs/CrowFlyLeft2.png", "assets/sprites/mobs/CrowFlyLeft3.png", "assets/sprites/mobs/CrowFlyLeft4.png"]
 crow_start_fly_left_images = ["assets/sprites/mobs/CrowStartFlyLeft1.png", "assets/sprites/mobs/CrowStartFlyLeft2.png", "assets/sprites/mobs/CrowStartFlyLeft3.png", "assets/sprites/mobs/CrowStartFlyLeft4.png", "assets/sprites/mobs/CrowStartFlyLeft5.png", "assets/sprites/mobs/CrowStartFlyLeft6.png"]
@@ -1384,6 +1466,11 @@ class Mob(pygame.sprite.Sprite):
                                 cat.gain_experience(share)
                 except Exception:
                     pass
+
+            try:
+                alert_gorlins_to_food_thief(self, player)
+            except Exception:
+                pass
             
             return resources
         return []
@@ -2127,6 +2214,10 @@ class Wolf(Enemy):
         self.chasing = False
         self.attacking = False
         self.direction.xy = (0, 0)
+        try:
+            alert_gorlins_to_food_thief(corpse, self)
+        except Exception:
+            pass
     
     def _apply_light_separation(self, packmates):
         """Apply gentle separation to prevent overlap within the pack."""
@@ -2790,6 +2881,420 @@ class AggressiveMob(Mob):
         if self.health < self.last_health and not self.aggressive:
             self.aggressive = True
             self.enemy = True
+
+
+class Gorlin(Enemy):
+    def __init__(self, x, y, name, variant="mudrustle"):
+        super().__init__(x, y, name)
+        variant_key = (variant or "mudrustle").lower()
+        if variant_key not in gorlin_variants:
+            variant_key = "mudrustle"
+        self.variant = variant_key
+        images = gorlin_variants[variant_key]
+
+        self.walk_left_images = [pygame.image.load(img).convert_alpha() for img in images["walk_left"]]
+        self.stand_left_images = [pygame.image.load(img).convert_alpha() for img in images["idle_left"]]
+        self.attack_left_images = [pygame.image.load(img).convert_alpha() for img in images["attack_left"]]
+        self.roll_start_left_images = [pygame.image.load(img).convert_alpha() for img in images["start_roll_left"]]
+        self.roll_left_images = [pygame.image.load(img).convert_alpha() for img in images["roll_left"]]
+        self.roll_end_left_images = [pygame.image.load(img).convert_alpha() for img in images["end_roll_left"]]
+
+        self.walk_right_images = [pygame.transform.flip(img, True, False) for img in self.walk_left_images]
+        self.stand_right_images = [pygame.transform.flip(img, True, False) for img in self.stand_left_images]
+        self.attack_right_images = [pygame.transform.flip(img, True, False) for img in self.attack_left_images]
+        self.roll_start_right_images = [pygame.transform.flip(img, True, False) for img in self.roll_start_left_images]
+        self.roll_right_images = [pygame.transform.flip(img, True, False) for img in self.roll_left_images]
+        self.roll_end_right_images = [pygame.transform.flip(img, True, False) for img in self.roll_end_left_images]
+
+        self.dead_left_image = self.roll_end_left_images[-1]
+        self.dead_right_image = pygame.transform.flip(self.dead_left_image, True, False)
+
+        self.image = self.stand_left_images[0]
+        self.rect = self.image.get_rect(center=(x, y))
+
+        self.frame_index = 0
+        self.animation_speed = 0.22
+        self.attack_animation_speed = 0.16
+        self.direction = pygame.Vector2(0, 0)
+        self.move_timer = 0
+        self.last_direction = "left"
+        self.state = "idle"
+
+        self.attacking = False
+        self.attack_timer = 0
+        self.attack_duration = 26
+        self.attack_damage = 6
+
+        self.base_speed = 150
+        self.walk_speed = 1.05
+        self.roll_speed = 2.2
+        self.speed = self.walk_speed
+        # Let base class handle idle roaming when not scavenging/engaged.
+        self.disable_autonomous_movement = False
+
+        self.full_health = 240 + (random.randint(10, 16) * self.level)
+        self.health = self.full_health
+        self.resource = "Monster Meat"
+        self.meat_resource = "Monster Meat"
+        self.resource_amount = random.randint(3, 6)
+        self.death_experience = int(750 * (1 + (self.level * 0.05)))
+        self.level = 1
+
+        self.roll_hit_range_sq = 50 * 50
+        self.attack_range_sq = 60 * 60
+        self.roll_stop_distance_sq = 75 * 75
+        self.roll_damage_multiplier = 2.0
+        self.roll_hit_cooldown_frames = 18
+        self.roll_hit_cooldown = 0
+        self.roll_animation_speed = 0.26
+        self.want_to_roll = False
+
+        self.target_carcass = None
+        self.current_target = None
+        self.scavenge_alert_range_sq = (900 * 900)
+        self.scavenge_scan_timer = 0.0
+        self.scavenge_eat_radius = 40
+        self.roll_on_alert = False
+        self.roll_strike_used = False
+        self.scavenge_rush = False
+
+    def get_collision_rect(self, cam_x):
+        rect = self.rect
+        return pygame.Rect(rect.x - cam_x + 12, rect.y + 38, rect.width - 24, rect.height - 48)
+
+    def _can_eat(self, obj):
+        if obj is None:
+            return False
+        if getattr(obj, "destroyed", False):
+            return False
+        if not hasattr(obj, "is_alive") or getattr(obj, "is_alive", True):
+            return False
+        if not hasattr(obj, "meat_resource"):
+            return False
+        return True
+
+    def _eat_carcass(self, corpse):
+        if not self._can_eat(corpse):
+            return
+        heal_amount = max(8, int(self.full_health * 0.2))
+        self.health = min(self.full_health, self.health + heal_amount)
+        corpse.destroyed = True
+        self.target_carcass = None
+        self.chasing = False
+        self.attacking = False
+        self.direction.xy = (0, 0)
+        try:
+            alert_gorlins_to_food_thief(corpse, self)
+        except Exception:
+            pass
+
+    def _find_nearest_carcass(self, nearby_mobs, nearby_objects=None):
+        nearest = None
+        best_dist = float("inf")
+        for mob in nearby_mobs or []:
+            if mob is self:
+                continue
+            if not self._can_eat(mob):
+                continue
+            dx = mob.rect.centerx - self.rect.centerx
+            dy = mob.rect.centery - self.rect.centery
+            dist_sq = dx * dx + dy * dy
+            if dist_sq < best_dist:
+                best_dist = dist_sq
+                nearest = mob
+        for obj in nearby_objects or []:
+            if not hasattr(obj, "rect"):
+                continue
+            if not self._can_eat(obj):
+                continue
+            dx = obj.rect.centerx - self.rect.centerx
+            dy = obj.rect.centery - self.rect.centery
+            dist_sq = dx * dx + dy * dy
+            if dist_sq < best_dist:
+                best_dist = dist_sq
+                nearest = obj
+        if nearest is None:
+            return None, None
+        return nearest, best_dist
+
+    def _apply_damage(self, target, damage):
+        if target is None or not hasattr(target, "health"):
+            return
+        if isinstance(target, Player) and hasattr(target, "is_in_spawn_protection") and target.is_in_spawn_protection():
+            return
+        target.health = max(0, target.health - damage)
+        if hasattr(target, "register_attack"):
+            target.register_attack(self)
+        try:
+            sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+        except Exception:
+            pass
+
+    def attack(self, target_world_x, target_world_y, target):
+        if not self.is_alive:
+            return
+
+        if self.health <= self.full_health * 0.5:
+            self.fleeing = True
+            self.attacking = False
+            self.current_target = None
+        elif self.fleeing and self.health >= self.full_health * 0.6:
+            self.fleeing = False
+
+        effective_target = target
+        if self.current_target is not None:
+            valid = getattr(self.current_target, "destroyed", False) is False and (
+                getattr(self.current_target, "is_alive", True) or getattr(self.current_target, "health", 0) > 0
+            )
+            if valid:
+                effective_target = self.current_target
+                target_world_x = effective_target.rect.centerx
+                target_world_y = effective_target.rect.centery
+            else:
+                self.current_target = None
+
+        dx = target_world_x - self.rect.centerx
+        dy = target_world_y - self.rect.centery
+        distance_sq = dx * dx + dy * dy
+
+        if self.roll_on_alert:
+            self.want_to_roll = True
+            self.speed = self.roll_speed
+        else:
+            self.want_to_roll = (not self.attacking) and (self.fleeing or (self.chasing and distance_sq > self.roll_stop_distance_sq))
+
+        if self.roll_hit_cooldown > 0:
+            self.roll_hit_cooldown = max(0, self.roll_hit_cooldown - 1)
+
+        if self.state in ("roll", "roll_start") and distance_sq < self.roll_hit_range_sq and self.roll_hit_cooldown == 0:
+            if not self.roll_strike_used:
+                self._apply_damage(effective_target, self.attack_damage * self.roll_damage_multiplier)
+                self.roll_hit_cooldown = self.roll_hit_cooldown_frames
+                self.roll_strike_used = True
+                self.roll_on_alert = False
+                self.scavenge_rush = False
+                self.want_to_roll = False
+                if self.state == "roll":
+                    self.state = "roll_end"
+
+        if self.fleeing:
+            return
+
+        if distance_sq < self.attack_range_sq and not self.want_to_roll:
+            if not self.attacking:
+                self.attacking = True
+                self.attack_timer = self.attack_duration
+                self.frame_index = 0.0
+                self.state = "attack"
+                self.direction.xy = (0, 0)
+
+        if self.attacking:
+            frames = self.attack_right_images if self.last_direction == "right" else self.attack_left_images
+            self.frame_index = (self.frame_index + self.attack_animation_speed) % len(frames)
+            self.image = frames[int(self.frame_index)]
+
+            self.attack_timer -= 1
+            if self.attack_timer == self.attack_duration // 2 and distance_sq < self.attack_range_sq:
+                self._apply_damage(effective_target, self.attack_damage)
+
+            if self.attack_timer <= 0:
+                self.attacking = False
+                self.frame_index = 0.0
+                self.state = "idle"
+
+    def _update_roll(self, dt, nearby_objects, nearby_mobs, player_sleeping=False):
+        sleep_multiplier = 40 if player_sleeping else 1
+        animation_speed_multiplier = sleep_multiplier
+
+        if self.direction.length_squared() > 0:
+            can_move_x, can_move_y = self.check_collision(self.direction, nearby_objects or [], nearby_mobs or [])
+            actual_speed = self.get_speed() * dt
+            movement = self.direction * actual_speed
+
+            new_x = self.rect.x + movement.x if can_move_x else self.rect.x
+            new_y = self.rect.y + movement.y if can_move_y else self.rect.y
+            self.rect.topleft = (new_x, new_y)
+
+            if movement.x > 0:
+                self.last_direction = "right"
+            elif movement.x < 0:
+                self.last_direction = "left"
+
+        if self.state == "roll_start":
+            frames = self.roll_start_right_images if self.last_direction == "right" else self.roll_start_left_images
+            self.frame_index += self.roll_animation_speed * animation_speed_multiplier
+            if self.frame_index >= len(frames):
+                self.state = "roll"
+                self.frame_index = 0.0
+            self.image = frames[int(min(self.frame_index, len(frames) - 1))]
+        elif self.state == "roll":
+            frames = self.roll_right_images if self.last_direction == "right" else self.roll_left_images
+            self.frame_index = (self.frame_index + self.roll_animation_speed * animation_speed_multiplier) % len(frames)
+            self.image = frames[int(self.frame_index)]
+        elif self.state == "roll_end":
+            frames = self.roll_end_right_images if self.last_direction == "right" else self.roll_end_left_images
+            self.frame_index = min(self.frame_index + self.roll_animation_speed * animation_speed_multiplier, len(frames) - 1)
+            self.image = frames[int(self.frame_index)]
+            if self.frame_index >= len(frames) - 1 and not self.want_to_roll:
+                self.state = "idle"
+                self.frame_index = 0.0
+
+    def flee(self, player_world_x, player_world_y, dt, player_sleeping=False):
+        if self.health <= self.full_health * 0.5:
+            self.fleeing = True
+        if self.fleeing:
+            threat_x = player_world_x
+            threat_y = player_world_y
+            if self.current_target is not None and hasattr(self.current_target, "rect"):
+                threat_x = self.current_target.rect.centerx
+                threat_y = self.current_target.rect.centery
+            direction = pygame.Vector2(self.rect.centerx - threat_x, self.rect.centery - threat_y)
+            if direction.length_squared() > 0:
+                direction = direction.normalize()
+            self.direction = direction
+            self.speed = self.roll_speed
+            self.want_to_roll = True
+            return
+        super().flee(player_world_x, player_world_y, dt, player_sleeping)
+
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
+        if not self.is_alive:
+            self.direction.xy = (0, 0)
+            self.image = self.dead_right_image if self.last_direction == "right" else self.dead_left_image
+            return
+
+        if self.attacking:
+            return
+
+        # Health-based retreat
+        if self.health <= self.full_health * 0.5:
+            self.fleeing = True
+            self.current_target = None
+        elif self.fleeing and self.health >= self.full_health * 0.6:
+            self.fleeing = False
+
+        # Refresh targets
+        if self.current_target is not None:
+            if getattr(self.current_target, "destroyed", False) or not getattr(self.current_target, "is_alive", True):
+                self.current_target = None
+                self.roll_on_alert = False
+                self.roll_strike_used = False
+            elif self.current_target.__class__.__name__ == "Player":
+                try:
+                    if hasattr(self.current_target, "is_in_spawn_protection") and self.current_target.is_in_spawn_protection():
+                        self.current_target = None
+                        self.roll_on_alert = False
+                        self.chasing = False
+                        self.want_to_roll = False
+                        self.roll_strike_used = False
+                except Exception:
+                    pass
+            else:
+                # Drop target if it leaves our alert radius
+                dx = self.current_target.rect.centerx - self.rect.centerx
+                dy = self.current_target.rect.centery - self.rect.centery
+                if (dx * dx + dy * dy) > self.scavenge_alert_range_sq:
+                    self.current_target = None
+                    self.roll_on_alert = False
+                    self.want_to_roll = False
+                    self.roll_strike_used = False
+        if self.target_carcass is not None:
+            if getattr(self.target_carcass, "destroyed", False) or getattr(self.target_carcass, "is_alive", True):
+                self.target_carcass = None
+
+        # Scan for nearby carcasses to scavenge when not fighting
+        self.scavenge_scan_timer = max(0.0, self.scavenge_scan_timer - dt)
+        if (not self.fleeing) and (not self.attacking) and self.current_target is None and self.scavenge_scan_timer <= 0:
+            carcass, _ = self._find_nearest_carcass(nearby_mobs, nearby_objects)
+            self.target_carcass = carcass
+            self.scavenge_scan_timer = 0.25
+
+        # Choose movement intent
+        if self.fleeing:
+            flee_from = self.current_target or player
+            if flee_from is not None:
+                fx = getattr(flee_from, "rect", self.rect).centerx
+                fy = getattr(flee_from, "rect", self.rect).centery
+                direction = pygame.Vector2(self.rect.centerx - fx, self.rect.centery - fy)
+            else:
+                direction = pygame.Vector2(random.uniform(-1, 1), random.uniform(-1, 1))
+            if direction.length_squared() > 0:
+                direction = direction.normalize()
+            self.direction = direction
+            self.speed = self.roll_speed
+            self.scavenge_rush = False
+        elif self.current_target is not None:
+            tx = self.current_target.rect.centerx
+            ty = self.current_target.rect.centery
+            direction = pygame.Vector2(tx - self.rect.centerx, ty - self.rect.centery)
+            if direction.length_squared() > 0:
+                direction = direction.normalize()
+            self.direction = direction
+            self.chasing = True
+            if self.roll_on_alert:
+                self.speed = self.roll_speed
+                self.want_to_roll = True
+            else:
+                self.speed = self.walk_speed
+        elif self.target_carcass is not None:
+            cx = self.target_carcass.rect.centerx
+            cy = self.target_carcass.rect.centery
+            dx = cx - self.rect.centerx
+            dy = cy - self.rect.centery
+            dist_sq = dx * dx + dy * dy
+            if dist_sq <= (self.scavenge_eat_radius * self.scavenge_eat_radius):
+                # Stop rolling once we reach food
+                self.want_to_roll = False
+                self.scavenge_rush = False
+                self.roll_on_alert = False
+                self.roll_strike_used = False
+                self.state = "idle"
+                self.frame_index = 0.0
+                self._eat_carcass(self.target_carcass)
+            else:
+                direction = pygame.Vector2(dx, dy)
+                if direction.length_squared() > 0:
+                    direction = direction.normalize()
+                self.direction = direction
+                self.speed = self.roll_speed
+                self.chasing = False
+                self.scavenge_rush = True
+                self.want_to_roll = True
+        else:
+            self.chasing = False
+            self.scavenge_rush = False
+            self.roll_on_alert = False
+            self.roll_strike_used = False
+            # Let base class autonomous roaming handle idle wandering
+            self.direction = self.direction
+            self.speed = self.walk_speed
+
+        if self.roll_hit_cooldown > 0:
+            self.roll_hit_cooldown = max(0, self.roll_hit_cooldown - 1)
+
+        should_roll = self.want_to_roll and (self.chasing or self.fleeing or self.scavenge_rush)
+        if should_roll:
+            if self.state not in ("roll_start", "roll"):
+                self.state = "roll_start"
+                self.frame_index = 0.0
+            self.speed = self.roll_speed
+        else:
+            if self.state in ("roll_start", "roll"):
+                self.state = "roll_end"
+                self.frame_index = 0.0
+            elif self.state == "roll_end" and self.frame_index >= len(self.roll_end_left_images) - 1:
+                self.state = "idle"
+
+            if self.chasing and not self.fleeing:
+                self.speed = max(self.walk_speed, 1.2)
+            else:
+                self.speed = self.walk_speed
+
+        if self.state in ("roll_start", "roll", "roll_end"):
+            self._update_roll(dt, nearby_objects, nearby_mobs, player_sleeping)
+        else:
+            super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
+
 
 class PockRock:
     """Simple projectile for pock throws; mirrors player stones."""

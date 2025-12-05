@@ -1102,6 +1102,9 @@ def world_rect_collides(collision_rect):
         gilas,
         salamanders,
         redmites,
+        mudrustle_gorlins,
+        slateback_gorlins,
+        fluffy_gorlins,
         crows,
         duskwretches,
         fire_dragons,
@@ -1130,6 +1133,9 @@ def world_rect_collides(collision_rect):
         + gilas
         + salamanders
         + redmites
+        + mudrustle_gorlins
+        + slateback_gorlins
+        + fluffy_gorlins
         + crows
         + glowbirds
         + duskwretches
@@ -1653,6 +1659,9 @@ while running:
             crows.clear()
             glowbirds.clear()
             duskwretches.clear()
+            mudrustle_gorlins.clear()
+            slateback_gorlins.clear()
+            fluffy_gorlins.clear()
             fire_dragons.clear()
             ice_dragons.clear()
             electric_dragons.clear()
@@ -1901,6 +1910,45 @@ while running:
                 salamander.level = random_level_for_position(x, y, 5, 11)
                 apply_wild_mob_level_scaling(salamander)
                 salamanders.append(salamander)
+
+            for _ in range(num_mudrustle_gorlins):
+                if not weighted_mudrustle_gorlin_tiles:
+                    break
+                tile_x, tile_image = random.choice(weighted_mudrustle_gorlin_tiles)
+                x = clamp_spawn_x(tile_x)
+                if x is None:
+                    continue
+                y = random.randint(0, height - 64)
+                gorlin = Gorlin(x, y, "Mudrustle Gorlin", "mudrustle")
+                gorlin.level = random_level_for_position(x, y, 6, 12)
+                apply_wild_mob_level_scaling(gorlin)
+                mudrustle_gorlins.append(gorlin)
+
+            for _ in range(num_slateback_gorlins):
+                if not weighted_slateback_gorlin_tiles:
+                    break
+                tile_x, tile_image = random.choice(weighted_slateback_gorlin_tiles)
+                x = clamp_spawn_x(tile_x)
+                if x is None:
+                    continue
+                y = random.randint(0, height - 64)
+                gorlin = Gorlin(x, y, "Slateback Gorlin", "slateback")
+                gorlin.level = random_level_for_position(x, y, 6, 12)
+                apply_wild_mob_level_scaling(gorlin)
+                slateback_gorlins.append(gorlin)
+
+            for _ in range(num_fluffy_gorlins):
+                if not weighted_fluffy_gorlin_tiles:
+                    break
+                tile_x, tile_image = random.choice(weighted_fluffy_gorlin_tiles)
+                x = clamp_spawn_x(tile_x)
+                if x is None:
+                    continue
+                y = random.randint(0, height - 64)
+                gorlin = Gorlin(x, y, "Fluffy Gorlin", "fluffy")
+                gorlin.level = random_level_for_position(x, y, 6, 12)
+                apply_wild_mob_level_scaling(gorlin)
+                fluffy_gorlins.append(gorlin)
 
             for _ in range(num_crows):
                 tile_x, tile_image = random.choice(weighted_crow_tiles)
@@ -3436,7 +3484,7 @@ while running:
                 
                 collision_detected = False
                 collision_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants + ponds + lavas + banks
-                collision_mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + wastedogs + wolves + pocks + deers + black_bears + brown_bears + polar_bears + pandas + gilas + salamanders + redmites + crows + glowbirds + duskwretches
+                collision_mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + wastedogs + wolves + pocks + deers + black_bears + brown_bears + polar_bears + pandas + gilas + salamanders + redmites + mudrustle_gorlins + slateback_gorlins + fluffy_gorlins + crows + glowbirds + duskwretches
                 
                 for obj in collision_objects:
                     obj_rect = obj.get_collision_rect(0) if hasattr(obj, 'get_collision_rect') else obj.rect
@@ -3644,6 +3692,24 @@ while running:
             for _ in destroyed_salamanders:
                 mob_placement.schedule_respawn("salamander", enemy_respawn_delay_ms)
         salamanders[:] = [salamander for salamander in salamanders if not salamander.destroyed]
+
+        destroyed_mudrustle_gorlins = [gorlin for gorlin in mudrustle_gorlins if gorlin.destroyed]
+        if destroyed_mudrustle_gorlins:
+            for _ in destroyed_mudrustle_gorlins:
+                mob_placement.schedule_respawn("mudrustle_gorlin", enemy_respawn_delay_ms)
+        mudrustle_gorlins[:] = [gorlin for gorlin in mudrustle_gorlins if not gorlin.destroyed]
+
+        destroyed_slateback_gorlins = [gorlin for gorlin in slateback_gorlins if gorlin.destroyed]
+        if destroyed_slateback_gorlins:
+            for _ in destroyed_slateback_gorlins:
+                mob_placement.schedule_respawn("slateback_gorlin", enemy_respawn_delay_ms)
+        slateback_gorlins[:] = [gorlin for gorlin in slateback_gorlins if not gorlin.destroyed]
+
+        destroyed_fluffy_gorlins = [gorlin for gorlin in fluffy_gorlins if gorlin.destroyed]
+        if destroyed_fluffy_gorlins:
+            for _ in destroyed_fluffy_gorlins:
+                mob_placement.schedule_respawn("fluffy_gorlin", enemy_respawn_delay_ms)
+        fluffy_gorlins[:] = [gorlin for gorlin in fluffy_gorlins if not gorlin.destroyed]
         
         destroyed_crows = [crow for crow in crows if crow.destroyed]
         if destroyed_crows:
@@ -3707,7 +3773,7 @@ while running:
         collectibles = sticks + stones + grasses + savannah_grasses + mushrooms + dropped_items + marsh_reeds
         all_objects_no_liquids = rocks + trees + boulders + gemstone_rocks + metal_ore_rocks + metal_vein_rocks + gold_ore_rocks + gold_vein_rocks + berry_bushes + dead_bushes + ferns + fruit_plants + banks
         all_objects = all_objects_no_liquids + ponds + lavas
-        mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + wastedogs + wolves + duskwretches + pocks + deers + black_bears + brown_bears + polar_bears + pandas + gilas + salamanders + redmites + crows + glowbirds + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
+        mobs = cats + squirrels + cows + chickens + crawlers + ashhounds + wastedogs + wolves + duskwretches + pocks + deers + black_bears + brown_bears + polar_bears + pandas + gilas + salamanders + redmites + mudrustle_gorlins + slateback_gorlins + fluffy_gorlins + crows + glowbirds + fire_dragons + ice_dragons + electric_dragons + poison_dragons + dusk_dragons
         all_mobs = mobs
 
         visibility_cam_x = sleeping_tent_x if (sleeping_in_tent or tent_hide_active) else cam_x
@@ -4624,10 +4690,11 @@ while running:
                     temp_player = TempPlayerCollision(player_world_x, player_world_y, player.rect.width, player.rect.height)
                     mob_nearby_objects.append(temp_player)
                 
+                proximity = 900 if isinstance(mob, Gorlin) else 100
                 mob_nearby_mobs = [m for m in nearby_mobs 
                                 if m is not mob 
-                                and abs(m.rect.x - mob.rect.x) < 100 
-                                and abs(m.rect.y - mob.rect.y) < 100]
+                                and abs(m.rect.x - mob.rect.x) < proximity 
+                                and abs(m.rect.y - mob.rect.y) < proximity]
                 
             
                 if hasattr(mob, "enemy"):
@@ -5278,5 +5345,6 @@ while running:
 
         pygame.display.flip()
         dt = clock.tick(60) / 1000
-    
+
+sound_manager.shutdown()
 pygame.quit()

@@ -147,6 +147,39 @@ def _spawn_salamander():
     apply_wild_mob_level_scaling(mob)
     salamanders.append(mob)
 
+def _spawn_mudrustle_gorlin():
+    if not weighted_mudrustle_gorlin_tiles:
+        return
+    tile_x, tile_image = random.choice(weighted_mudrustle_gorlin_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    mob = Gorlin(x, y, "Mudrustle Gorlin", "mudrustle")
+    mob.level = _random_level_for_position(x, y, 6, 12)
+    apply_wild_mob_level_scaling(mob)
+    mudrustle_gorlins.append(mob)
+
+def _spawn_slateback_gorlin():
+    if not weighted_slateback_gorlin_tiles:
+        return
+    tile_x, tile_image = random.choice(weighted_slateback_gorlin_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    mob = Gorlin(x, y, "Slateback Gorlin", "slateback")
+    mob.level = _random_level_for_position(x, y, 6, 12)
+    apply_wild_mob_level_scaling(mob)
+    slateback_gorlins.append(mob)
+
+def _spawn_fluffy_gorlin():
+    if not weighted_fluffy_gorlin_tiles:
+        return
+    tile_x, tile_image = random.choice(weighted_fluffy_gorlin_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    mob = Gorlin(x, y, "Fluffy Gorlin", "fluffy")
+    mob.level = _random_level_for_position(x, y, 6, 12)
+    apply_wild_mob_level_scaling(mob)
+    fluffy_gorlins.append(mob)
+
 def process_respawns():
     """Spawn any pending animals whose timers have expired."""
     if not pending_respawns:
@@ -176,6 +209,12 @@ def process_respawns():
             _spawn_salamander()
         elif kind == "redmite":
             _spawn_redmite()
+        elif kind == "mudrustle_gorlin":
+            _spawn_mudrustle_gorlin()
+        elif kind == "slateback_gorlin":
+            _spawn_slateback_gorlin()
+        elif kind == "fluffy_gorlin":
+            _spawn_fluffy_gorlin()
         # Unknown kinds are ignored.
     pending_respawns[:] = remaining
 
@@ -202,6 +241,9 @@ num_wastedogs = 20
 num_crawlers = 20
 num_pocks = 20
 num_duskwretches = 20
+num_mudrustle_gorlins = 25
+num_slateback_gorlins = 25
+num_fluffy_gorlins = 18
 
 num_fire_dragons = 50
 num_ice_dragons = 50
@@ -801,6 +843,111 @@ for _ in range(num_redmites):
     mob = Redmite(x, y, "Redmite")
     mob.level = _random_level_for_position(x, y, 2, 6)
     redmites.append(mob)
+
+allowed_mudrustle_gorlin_tiles = [bg_grass, bg_dirt, bg_compact, bg_riverrock, bg_savannah, bg_bigrock]
+
+mudrustle_gorlin_spawn_weights = {
+    bg_grass: 3,
+    bg_dirt: 3,
+    bg_compact: 2,
+    bg_sand: 0,
+    bg_savannah: 1,
+    bg_riverrock: 2,
+    bg_bigrock: 1,
+    bg_duskstone: 0,
+    bg_lavastone: 0,
+    bg_snow: 0,
+    bg_wasteland: 0,
+    bg_blackstone: 0,
+    bg_redrock: 0
+}
+
+weighted_mudrustle_gorlin_tiles = []
+for tile_x, tile_image in tiles:
+    weight = mudrustle_gorlin_spawn_weights.get(tile_image, 0)
+    weighted_mudrustle_gorlin_tiles.extend([(tile_x, tile_image)] * weight)
+
+mudrustle_gorlins = []
+for _ in range(num_mudrustle_gorlins):
+    if not weighted_mudrustle_gorlin_tiles:
+        break
+    tile_x, tile_image = random.choice(weighted_mudrustle_gorlin_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    mob = Gorlin(x, y, "Mudrustle Gorlin", "mudrustle")
+    mob.level = _random_level_for_position(x, y, 6, 12)
+    apply_wild_mob_level_scaling(mob)
+    mudrustle_gorlins.append(mob)
+
+allowed_slateback_gorlin_tiles = [bg_bigrock, bg_duskstone, bg_blackstone, bg_redrock, bg_wasteland]
+
+slateback_gorlin_spawn_weights = {
+    bg_grass: 0,
+    bg_dirt: 0,
+    bg_compact: 0,
+    bg_sand: 0,
+    bg_savannah: 0,
+    bg_riverrock: 0,
+    bg_bigrock: 3,
+    bg_duskstone: 3,
+    bg_lavastone: 0,
+    bg_snow: 0,
+    bg_wasteland: 2,
+    bg_blackstone: 2,
+    bg_redrock: 2
+}
+
+weighted_slateback_gorlin_tiles = []
+for tile_x, tile_image in tiles:
+    weight = slateback_gorlin_spawn_weights.get(tile_image, 0)
+    weighted_slateback_gorlin_tiles.extend([(tile_x, tile_image)] * weight)
+
+slateback_gorlins = []
+for _ in range(num_slateback_gorlins):
+    if not weighted_slateback_gorlin_tiles:
+        break
+    tile_x, tile_image = random.choice(weighted_slateback_gorlin_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    mob = Gorlin(x, y, "Slateback Gorlin", "slateback")
+    mob.level = _random_level_for_position(x, y, 6, 12)
+    apply_wild_mob_level_scaling(mob)
+    slateback_gorlins.append(mob)
+
+allowed_fluffy_gorlin_tiles = [bg_snow, bg_bigrock, bg_grass]
+
+fluffy_gorlin_spawn_weights = {
+    bg_grass: 0,
+    bg_dirt: 0,
+    bg_compact: 0,
+    bg_sand: 0,
+    bg_savannah: 2,
+    bg_riverrock: 0,
+    bg_bigrock: 1,
+    bg_duskstone: 0,
+    bg_lavastone: 0,
+    bg_snow: 5,
+    bg_wasteland: 0,
+    bg_blackstone: 0,
+    bg_redrock: 0
+}
+
+weighted_fluffy_gorlin_tiles = []
+for tile_x, tile_image in tiles:
+    weight = fluffy_gorlin_spawn_weights.get(tile_image, 0)
+    weighted_fluffy_gorlin_tiles.extend([(tile_x, tile_image)] * weight)
+
+fluffy_gorlins = []
+for _ in range(num_fluffy_gorlins):
+    if not weighted_fluffy_gorlin_tiles:
+        break
+    tile_x, tile_image = random.choice(weighted_fluffy_gorlin_tiles)
+    x = random.randint(tile_x, tile_x + BACKGROUND_SIZE - 64)
+    y = random.randint(0, height - 64)
+    mob = Gorlin(x, y, "Fluffy Gorlin", "fluffy")
+    mob.level = _random_level_for_position(x, y, 6, 12)
+    apply_wild_mob_level_scaling(mob)
+    fluffy_gorlins.append(mob)
 
 allowed_crow_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock]
 

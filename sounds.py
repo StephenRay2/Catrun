@@ -15,6 +15,9 @@ class SoundManager:
         self.playing_randomly = False
         self.ambient_running = False
 
+    def _mixer_ready(self):
+        return pygame.mixer.get_init() is not None
+
     def add_song(self, path):
         self.songs.append(path)
 
@@ -26,6 +29,8 @@ class SoundManager:
         self.default_volumes[name] = clamped_volume
 
     def play_sound(self, name, volume_scale=None):
+        if not self._mixer_ready():
+            return
         if name not in self.sounds:
             return
 
@@ -40,6 +45,8 @@ class SoundManager:
                 channel.set_volume(self.default_volumes[name])
 
     def play_music(self, path, loop=True, volume=0.3, fade_in=0):
+        if not self._mixer_ready():
+            return
         if path != self.current_music:
             pygame.mixer.music.stop()
             pygame.mixer.music.load(path)
@@ -48,24 +55,38 @@ class SoundManager:
             self.current_music = path
 
     def stop_music(self, fade_out=0):
+        self.playing_randomly = False
+        self.ambient_running = False
+        self.current_music = None
+        if not self._mixer_ready():
+            return
         if fade_out > 0:
             pygame.mixer.music.fadeout(fade_out)
             time.sleep(fade_out / 1000)
         else:
             pygame.mixer.music.stop()
-        self.current_music = None
-        self.playing_randomly = False
-        self.ambient_running = False
 
     def _random_music_loop(self, min_delay=5, max_delay=20, volume=0.6, start_delay=100, fade_in=0):
         if start_delay > 0:
             time.sleep(start_delay)
         while self.playing_randomly:
+            if not self._mixer_ready():
+                self.playing_randomly = False
+                break
             song = random.choice(self.songs)
-            pygame.mixer.music.load(song)
-            pygame.mixer.music.set_volume(volume)
-            pygame.mixer.music.play(fade_ms=fade_in)
-            while pygame.mixer.music.get_busy() and self.playing_randomly:
+            try:
+                pygame.mixer.music.load(song)
+                pygame.mixer.music.set_volume(volume)
+                pygame.mixer.music.play(fade_ms=fade_in)
+            except pygame.error:
+                self.playing_randomly = False
+                break
+            while self.playing_randomly:
+                if not self._mixer_ready():
+                    self.playing_randomly = False
+                    break
+                if not pygame.mixer.music.get_busy():
+                    break
                 time.sleep(1)
             if not self.playing_randomly:
                 break
@@ -73,7 +94,7 @@ class SoundManager:
             time.sleep(delay)
 
     def play_random_ambient_music(self, min_delay=5, max_delay=20, volume=0.4, start_delay=100, fade_in=1000):
-        if not self.songs or self.playing_randomly:
+        if not self._mixer_ready() or not self.songs or self.playing_randomly:
             return
         self.playing_randomly = True
         threading.Thread(
@@ -84,6 +105,9 @@ class SoundManager:
 
     def _ambient_loop(self, min_delay=3, max_delay=15):
         while self.ambient_running:
+            if not self._mixer_ready():
+                self.ambient_running = False
+                break
             if self.ambient_sounds:
                 sound = random.choice(self.ambient_sounds)
                 sound.play()
@@ -91,14 +115,23 @@ class SoundManager:
             time.sleep(delay)
 
     def play_random_ambient_sounds(self, min_delay=3, max_delay=15):
-        if self.ambient_running:
+        if not self._mixer_ready() or self.ambient_running:
             return
         self.ambient_running = True
         threading.Thread(target=self._ambient_loop, args=(min_delay, max_delay), daemon=True).start()
 
     def play_random_event_sound(self, name, chance=0.5):
+        if not self._mixer_ready():
+            return
         if name in self.sounds and random.random() < chance:
             self.sounds[name].play()
+
+    def shutdown(self):
+        """Stop background audio threads and tear down the mixer safely."""
+        self.stop_music()
+        if self._mixer_ready():
+            pygame.mixer.stop()
+            pygame.mixer.quit()
 
 
 sound_manager = SoundManager()
