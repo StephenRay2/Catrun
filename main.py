@@ -19,6 +19,7 @@ from debug import font_path, font
 from mobs import hud_font, apply_wild_mob_level_scaling
 from player import *
 from cats import Cat
+from structures import StructureManager, StoneFloor, StoneWall, StoneStairs
 
 clock = pygame.time.Clock()
 from inventory import *
@@ -112,6 +113,11 @@ tent_hold_threshold = 0.6
 fast_travel_menu_active = False
 sleeping_in_tent = False
 sleeping_tent_x = 0
+
+structure_manager = StructureManager()
+player_z = 0
+placement_direction = 0
+placement_snap_index = 0
 sleeping_tent_y = 0
 sleeping_tent_height = default_placeable_sprite_size[1]
 tent_hide_active = False
@@ -119,6 +125,9 @@ tent_exit_offset = 20
 tent_hover_highlight_surface = None
 tent_hover_highlight_rect = None
 current_tent_hover_option = None
+active_stair = None
+stair_progress = 0.0
+stair_direction = 0
 
 def place_player_below_tent():
     tent_bottom_y = sleeping_tent_y + (sleeping_tent_height // 2)
@@ -458,45 +467,37 @@ def populate_test_inventory():
 
 
 def set_starting_loadout():
-    """Populate starting inventory with one of each weapon and clear everything else."""
-    loadout_items = [
-        # Clubs
-        "Wooden Club", "Spiked Wooden Club",
-        # Swords
-        "Wooden Sword", "Stone Sword", "Metal Sword", "Gold Sword", "Bone Sword", "Obsidian Sword",
-        "Dusk Dragon Scale Sword", "Electric Dragon Scale Sword", "Fire Dragon Scale Sword", "Ice Dragon Scale Sword", "Poison Dragon Scale Sword",
-        # Spears
-        "Wooden Spear", "Stone Spear", "Metal Spear", "Gold Spear", "Bone Spear", "Obsidian Spear",
-        "Dusk Dragon Scale Spear", "Electric Dragon Scale Spear", "Fire Dragon Scale Spear", "Ice Dragon Scale Spear", "Poison Dragon Scale Spear",
-        # Axes (weapons)
-        "Wooden Axe", "Stone Axe", "Metal Axe", "Gold Axe", "Bone Axe", "Obsidian Axe",
-        "Dusk Dragon Scale Axe", "Electric Dragon Scale Axe", "Fire Dragon Scale Axe", "Ice Dragon Scale Axe", "Poison Dragon Scale Axe",
-        # Pickaxes (included as weapons/tools)
-        "Wooden Pickaxe", "Stone Pickaxe", "Metal Pickaxe", "Gold Pickaxe", "Bone Pickaxe", "Obsidian Pickaxe",
-        "Dusk Dragon Scale Pickaxe", "Electric Dragon Scale Pickaxe", "Fire Dragon Scale Pickaxe", "Ice Dragon Scale Pickaxe", "Poison Dragon Scale Pickaxe",
+    """Populate starting inventory with 10 of each structure item and nothing else."""
+    inventory.inventory_list = [None] * inventory.capacity
+    inventory.hotbar_slots = [None] * inventory.hotbar_size
+    
+    structure_items = [
+        "Stone Floor", "Stone Wall", "Stone Stairs"
     ]
 
-    next_slot = 0
-    for item_name in loadout_items:
+    next_inv_slot = 0
+    hotbar_idx = 0
+    for item_name in structure_items:
         item_data = next((itm for itm in items_list if itm["item_name"] == item_name), None)
         if not item_data:
             print(f"Warning: starting item '{item_name}' not found.")
             continue
-        new_item = inventory.create_item_instance(item_data, 1)
-        while next_slot < inventory.capacity and inventory.inventory_list[next_slot] is not None:
-            next_slot += 1
-        if next_slot < inventory.capacity:
-            inventory.inventory_list[next_slot] = new_item
-            next_slot += 1
-    # Add torches stack
-    torch_data = next((itm for itm in items_list if itm["item_name"] == "Torch"), None)
-    if torch_data:
-        torch_stack = inventory.create_item_instance(torch_data, 50)
-        while next_slot < inventory.capacity and inventory.inventory_list[next_slot] is not None:
-            next_slot += 1
-        if next_slot < inventory.capacity:
-            inventory.inventory_list[next_slot] = torch_stack
-            next_slot += 1
+
+        # Place one stack in hotbar (native size) for immediate placement
+        if hotbar_idx < inventory.hotbar_size:
+            inventory.hotbar_slots[hotbar_idx] = inventory.create_item_instance(item_data, 10)
+            hotbar_idx += 1
+
+        # Also mirror the stack into the backpack for backup
+        while next_inv_slot < inventory.capacity and inventory.inventory_list[next_inv_slot] is not None:
+            next_inv_slot += 1
+        if next_inv_slot < inventory.capacity:
+            inventory.inventory_list[next_inv_slot] = inventory.create_item_instance(item_data, 10)
+            next_inv_slot += 1
+    
+    inventory.recalc_weight()
+    inventory.selection_mode = "hotbar"
+    inventory.selected_hotbar_slot = 0
 
 def calculate_throw_trajectory(start_x, start_y, target_x, target_y, throw_power):
     delta_x = target_x - start_x
@@ -920,35 +921,7 @@ def apply_temperature_effects(player, gauge_index, dt):
         elif gauge_index == 5:
             player.thirst -= dt * 0.05
 
-# Placement system functions
-def start_placement(item_data):
-    """Start placement mode for a placeable item"""
-    global placement_mode, placement_item, placement_position
 
-    if not item_data or not item_data.get("placeable", False):
-        return False
-
-    placement_mode = True
-    placement_item = item_data
-    # Start placement in front of player
-    placement_distance = 50
-    if player.last_direction == "right":
-        placement_position = (player_world_x + placement_distance, player_world_y)
-    elif player.last_direction == "left":
-        placement_position = (player_world_x - placement_distance, player_world_y)
-    elif player.last_direction == "up":
-        placement_position = (player_world_x, player_world_y - placement_distance)
-    else:  # "down"
-        placement_position = (player_world_x, player_world_y + placement_distance)
-
-    return True
-
-def cancel_placement():
-    """Cancel placement mode"""
-    global placement_mode, placement_item, placement_position
-    placement_mode = False
-    placement_item = None
-    placement_position = (0, 0)
 
 def world_rect_collides(collision_rect):
     """Return True if the provided world-space rect hits any blocking object.
@@ -1161,83 +1134,6 @@ def world_rect_collides(collision_rect):
                 return True
 
     return False
-
-def check_placement_collision(x, y, item_data):
-    """Check if placement position collides with world objects or mobs"""
-    # Define collision bounds based on item sizing
-    _, collision_size = get_placeable_sizes(item_data)
-    
-    # Handle both old format (width, height) and new format (x_offset, y_offset, width, height)
-    if len(collision_size) == 4:
-        collision_x_offset, collision_y_offset, collision_width, collision_height = collision_size
-    else:
-        # Fallback for old format - center the collision box
-        collision_width, collision_height = collision_size
-        collision_x_offset = -collision_width // 2
-        collision_y_offset = -collision_height // 2
-
-    collision_rect = pygame.Rect(x + collision_x_offset, y + collision_y_offset, collision_width, collision_height)
-
-    return world_rect_collides(collision_rect)
-
-def place_structure(x, y, item_data):
-    """Place a structure at the given position"""
-    global placed_structures
-
-    sprite_size, collision_size = get_placeable_sizes(item_data)
-    
-    # Handle both old format (width, height) and new format (x_offset, y_offset, width, height)
-    if len(collision_size) == 4:
-        collision_x_offset, collision_y_offset, collision_width, collision_height = collision_size
-    else:
-        # Fallback for old format - center the collision box
-        collision_width, collision_height = collision_size
-        collision_x_offset = -collision_width // 2
-        collision_y_offset = -collision_height // 2
-
-    # Create structure data
-    structure = {
-        'item_name': item_data['item_name'],
-        'icon': item_data['icon'],
-        'x': x,
-        'y': y,
-        'placed_time': pygame.time.get_ticks(),
-        'sprite_size': sprite_size,
-        'collision_size': collision_size,
-        'rect': pygame.Rect(x + collision_x_offset, y + collision_y_offset, collision_width, collision_height)
-    }
-
-    if item_data['item_name'] == 'Chest':
-        structure['storage'] = [None] * 36
-
-    placed_structures.append(structure)
-
-    # Remove item from inventory
-    selected_slot = inventory.hotbar_slots[inventory.selected_hotbar_slot]
-    if selected_slot and selected_slot['quantity'] > 0:
-        selected_slot['quantity'] -= 1
-        if selected_slot['quantity'] <= 0:
-            inventory.hotbar_slots[inventory.selected_hotbar_slot] = None
-
-    return True
-
-def update_placement_position():
-    """Update placement position to stay in front of the player"""
-    global placement_position
-
-    if not placement_mode:
-        return
-
-    # Keep item in front of player based on their facing direction
-    placement_distance = 50
-    if player.last_direction == "right":
-        placement_position = (player_world_x + placement_distance, player_world_y)
-    elif player.last_direction == "left":
-        placement_position = (player_world_x - placement_distance, player_world_y)
-    elif player.last_direction == "up":
-        placement_position = (player_world_x, player_world_y - placement_distance)
-    else:  # "down"
-        placement_position = (player_world_x, player_world_y + placement_distance)
 
 def group_resources_by_type(resource_list):
     resource_counts = {}
@@ -1538,6 +1434,330 @@ def calculate_movement_rotation(frame_index, num_frames, direction, pendulum_off
     return 0
 
 
+STRUCTURE_TYPE_BY_NAME = {
+    "Stone Floor": "StoneFloor",
+    "Stone Wall": "StoneWall",
+    "Stone Stairs": "StoneStairs",
+}
+
+STRUCTURE_CLASS_MAP = {
+    "StoneFloor": StoneFloor,
+    "StoneWall": StoneWall,
+    "StoneStairs": StoneStairs,
+}
+
+
+def _normalize_structure_type_name(structure_type: str) -> str:
+    """Canonicalize structure_type strings so 'Stone Wall' maps to 'StoneWall'."""
+    if not structure_type:
+        return ""
+    normalized = structure_type.replace(" ", "").replace("_", "")
+    # Maintain original capitalization pattern used in class map
+    for key in STRUCTURE_CLASS_MAP.keys():
+        if normalized.lower() == key.lower():
+            return key
+    return normalized
+
+def _resolved_placeable(item_data):
+    """Return a copy of item_data with structure_type filled in when missing."""
+    if not item_data:
+        return None
+    fixed = dict(item_data)
+    current_type = _normalize_structure_type_name(fixed.get("structure_type", ""))
+    if current_type in STRUCTURE_CLASS_MAP:
+        fixed["structure_type"] = current_type
+    else:
+        name = fixed.get("item_name", "")
+        mapped = STRUCTURE_TYPE_BY_NAME.get(name)
+        if mapped:
+            fixed["structure_type"] = mapped
+    return fixed
+
+
+def start_placement(item_data):
+    global placement_mode, placement_item, placement_direction, placement_snap_index
+    resolved = _resolved_placeable(item_data)
+    if resolved and resolved.get("placeable"):
+        inventory.selection_mode = "hotbar"
+        placement_mode = True
+        placement_item = resolved
+        placement_direction = 0
+        placement_snap_index = 0
+
+
+def cancel_placement():
+    global placement_mode, placement_item, placement_direction, placement_snap_index
+    placement_mode = False
+    placement_item = None
+    placement_direction = 0
+    placement_snap_index = 0
+
+
+def get_structure_class(structure_type):
+    normalized = _normalize_structure_type_name(structure_type)
+    return STRUCTURE_CLASS_MAP.get(normalized)
+
+
+def place_structure(x, y, item_data):
+    global placement_item
+    safe_item = _resolved_placeable(item_data)
+    structure_type = safe_item.get("structure_type", "") if safe_item else ""
+    print(f"[DEBUG] Attempting to place structure: {structure_type} at ({x}, {y}, z={player_z}), direction={placement_direction}")
+    structure_class = get_structure_class(structure_type)
+    
+    if not structure_class:
+        print(f"[DEBUG] No structure class found for type: {structure_type}")
+        return False
+    
+    try:
+        structure = structure_class(x, y, player_z, placement_direction)
+        print(f"[DEBUG] Structure created: {structure}, sprite: {structure.sprite}, size: {structure.native_width}x{structure.native_height}")
+        structure_manager.add_structure(structure)
+        inventory.remove_selected_quantity(1)
+        print(f"[DEBUG] Structure placed successfully")
+        try:
+            sound_manager.play_sound("place_structure")
+        except:
+            pass
+        return True
+    except Exception as e:
+        print(f"[DEBUG] Failed to place structure: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def check_placement_collision(x, y, item_data):
+    safe_item = _resolved_placeable(item_data)
+    structure_type = safe_item.get("structure_type", "") if safe_item else ""
+    structure_class = get_structure_class(structure_type)
+    if not structure_class:
+        return False
+
+    temp_struct = structure_class(x, y, player_z, placement_direction)
+
+    def _mask_and_offset(struct):
+        if hasattr(struct, "get_mask_data"):
+            data = struct.get_mask_data()
+            if data:
+                return data
+        rect = struct.get_collision_rect()
+        print(f"[DEBUG] Using fallback rect mask for placement: {struct.structure_type if hasattr(struct,'structure_type') else type(struct)} size={rect.size}")
+        mask = pygame.Mask((rect.width, rect.height), fill=True)
+        return mask, (rect.x, rect.y)
+
+    for existing in structure_manager.structures:
+        if getattr(existing, "destroyed", False):
+            continue
+        if existing.z != temp_struct.z:
+            continue
+        # Allow placing non-floor structures on top of floors on the same z
+        if not isinstance(temp_struct, StoneFloor) and isinstance(existing, StoneFloor):
+            continue
+
+        mask_a, off_a = _mask_and_offset(temp_struct)
+        mask_b, off_b = _mask_and_offset(existing)
+        offset = (int(off_b[0] - off_a[0]), int(off_b[1] - off_a[1]))
+        if mask_a.overlap(mask_b, offset):
+            return True
+    return False
+
+
+def update_placement_position():
+    global placement_item, placement_position
+    if placement_mode and placement_item:
+        mouse_pos = pygame.mouse.get_pos()
+        world_x = mouse_pos[0] + cam_x
+        world_y = mouse_pos[1]
+        
+        shift_held = pygame.key.get_pressed()[pygame.K_LSHIFT] or pygame.key.get_pressed()[pygame.K_RSHIFT]
+        snap_pos = structure_manager.get_preview_position((world_x, world_y), player_z, shift_held, placement_snap_index)
+        placement_position = snap_pos
+
+
+def draw_placement_preview(screen):
+    if placement_mode and placement_item:
+        structure_type = placement_item.get("structure_type", "")
+        structure_class = get_structure_class(structure_type)
+        if not structure_class:
+            return
+        
+        temp_struct = structure_class(placement_position[0], placement_position[1], player_z, placement_direction)
+        
+        collision = check_placement_collision(placement_position[0], placement_position[1], placement_item)
+        
+        if temp_struct.sprite:
+            try:
+                preview_surf = temp_struct.sprite.copy()
+                preview_surf.set_alpha(int(255 * 0.5))
+                
+                if collision:
+                    temp_color_surf = pygame.Surface(preview_surf.get_size())
+                    temp_color_surf.fill((255, 0, 0))
+                    temp_color_surf.set_alpha(100)
+                    preview_surf.blit(temp_color_surf, (0, 0), special_flags=pygame.BLEND_ADD)
+                
+                screen_x = int(placement_position[0] - cam_x)
+                screen_y = int(placement_position[1])
+                screen.blit(preview_surf, (screen_x, screen_y))
+            except:
+                pass
+
+
+def check_player_fall():
+    global player_z
+    if not player.is_alive or player_z < 0 or active_stair:
+        return
+
+    world_x = player_pos.x + cam_x
+    world_y = player_pos.y
+    player_feet_pos = (world_x, world_y + 10)
+
+    for struct in structure_manager.get_structures_at_z(player_z):
+        if isinstance(struct, (StoneFloor, StoneStairs)):
+            if hasattr(struct, "get_mask_data"):
+                data = struct.get_mask_data()
+                if data:
+                    mask, origin = data
+                    px = int(player_feet_pos[0] - origin[0])
+                    py = int(player_feet_pos[1] - origin[1])
+                    if 0 <= px < mask.get_size()[0] and 0 <= py < mask.get_size()[1]:
+                        if mask.get_at((px, py)):
+                            return
+            rect = struct.get_collision_rect()
+            if rect:
+                return
+    
+    target_z = structure_manager.get_falling_target_z(player_feet_pos, player_z)
+    if target_z is not None and target_z < player_z:
+        fall_damage = structure_manager.calculate_fall_damage(player_z, target_z)
+        player_z = target_z
+        player.health -= fall_damage
+        if player.health <= 0:
+            player.health = 0
+            player.is_alive = False
+            player.dead = True
+    elif target_z is None and player_z > 0:
+        fall_damage = structure_manager.calculate_fall_damage(player_z, 0)
+        player_z = 0
+        player.health -= fall_damage
+        if player.health <= 0:
+            player.health = 0
+            player.is_alive = False
+            player.dead = True
+
+
+def update_z_level_support():
+    structure_manager.check_z_level_integrity()
+
+
+def handle_stair_climbing(dt):
+    global player_z, player_world_x, player_world_y, active_stair, stair_progress, stair_direction
+    if not player.is_alive:
+        return
+
+    keys_state = pygame.key.get_pressed()
+    move_vec_raw = pygame.Vector2(
+        (1 if keys_state[pygame.K_d] else 0) - (1 if keys_state[pygame.K_a] else 0),
+        (1 if keys_state[pygame.K_s] else 0) - (1 if keys_state[pygame.K_w] else 0),
+    )
+    move_vec = move_vec_raw.copy()
+    world_pos_vec = pygame.Vector2(player_pos.x + cam_x, player_pos.y)
+    world_point = (world_pos_vec.x, world_pos_vec.y)
+
+    if active_stair and getattr(active_stair, "destroyed", False):
+        active_stair = None
+
+    if active_stair:
+        path_lower, path_upper = active_stair.get_path_points()
+        path_vec = pygame.Vector2(path_upper) - pygame.Vector2(path_lower)
+        path_len = path_vec.length()
+        if path_len <= 0.001:
+            active_stair = None
+            return
+        path_dir = path_vec.normalize()
+        projected = move_vec_raw.dot(path_dir)
+        move_vec = path_dir * projected
+
+        # Allow exiting at the lower entry when moving back out
+        lower_entry_rect, upper_entry_rect = active_stair.get_entry_rects()
+        if lower_entry_rect.collidepoint(world_point) and projected < -0.05:
+            active_stair = None
+            return
+
+        sprinting = keys_state[pygame.K_LSHIFT] or keys_state[pygame.K_RSHIFT]
+        speed = player.base_speed * active_stair.climb_speed_multiplier * dt
+        if sprinting:
+            speed *= 1.5
+
+        base_sign = 1 if stair_direction >= 0 else -1
+        direction_sign = base_sign
+        if move_vec.length_squared() > 0 and path_vec.length_squared() > 0:
+            move_dir = move_vec.normalize()
+            dot = move_dir.dot(path_dir)
+            if abs(dot) > 0.1:
+                direction_sign = 1 if dot >= 0 else -1
+        stair_direction = direction_sign
+        delta = 0.0
+        if move_vec.length_squared() > 0:
+            delta = (speed / path_len) * direction_sign * min(1.0, abs(projected))
+
+        # Allow slight over/under travel so reversing doesn't immediately detach
+        stair_progress = max(-0.2, min(1.2, stair_progress + delta))
+        new_pos = pygame.Vector2(path_lower) + path_vec * stair_progress
+        player_world_x = new_pos.x
+        player_world_y = new_pos.y
+        player_pos.x = player_world_x - cam_x
+        player_pos.y = player_world_y
+
+        if stair_progress >= 1.01:
+            player_z = active_stair.z + 1
+            active_stair = None
+        elif stair_progress <= -0.01:
+            player_z = active_stair.z
+            active_stair = None
+        return
+
+    if move_vec.length_squared() == 0:
+        return
+
+    for struct in structure_manager.structures:
+        if not isinstance(struct, StoneStairs):
+            continue
+
+        lower_rect, upper_rect = struct.get_entry_rects()
+        if struct.z == player_z and lower_rect.collidepoint(world_point):
+            # Only enter if moving toward the stair from below
+            path_lower, path_upper = struct.get_path_points()
+            path_vec = pygame.Vector2(path_upper) - pygame.Vector2(path_lower)
+            if path_vec.length_squared() > 0:
+                path_dir = path_vec.normalize()
+                if move_vec_raw.dot(path_dir) > 0:
+                    active_stair = struct
+                    stair_direction = 1
+                    stair_progress = max(-0.05, min(1.05, struct.project_progress(world_point)))
+                    proj_pos = pygame.Vector2(*struct.get_path_points()[0]) + (pygame.Vector2(struct.get_path_points()[1]) - pygame.Vector2(struct.get_path_points()[0])) * stair_progress
+                    player_world_x, player_world_y = proj_pos.x, proj_pos.y
+                    player_pos.x = player_world_x - cam_x
+                    player_pos.y = player_world_y
+                    return
+
+        if struct.z + 1 == player_z and upper_rect.collidepoint(world_point):
+            # Only enter if moving toward the stair from above
+            path_lower, path_upper = struct.get_path_points()
+            path_vec = pygame.Vector2(path_upper) - pygame.Vector2(path_lower)
+            if path_vec.length_squared() > 0:
+                path_dir = path_vec.normalize()
+                if move_vec_raw.dot(path_dir) < 0:
+                    active_stair = struct
+                    stair_direction = -1
+                    stair_progress = max(-0.05, min(1.05, struct.project_progress(world_point)))
+                    proj_pos = pygame.Vector2(*struct.get_path_points()[0]) + (pygame.Vector2(struct.get_path_points()[1]) - pygame.Vector2(struct.get_path_points()[0])) * stair_progress
+                    player_world_x, player_world_y = proj_pos.x, proj_pos.y
+                    player_pos.x = player_world_x - cam_x
+                    player_pos.y = player_world_y
+                    return
+
 
 while running:
     if state != previous_state:
@@ -1625,6 +1845,11 @@ while running:
                 campfire.update(time_dt)
             # Update placement position if in placement mode
             update_placement_position()
+            # Check for player fall and update z-level support
+            check_player_fall()
+            update_z_level_support()
+            # Handle stair climbing
+            handle_stair_climbing(dt)
         else:
             dt = 0
 
@@ -1638,6 +1863,10 @@ while running:
             time_speed_multiplier = 1.0
             stamina_depleted_message_timer = 0
             need_pickaxe_message_timer = 0
+            active_stair = None
+            stair_progress = 0.0
+            stair_direction = 0
+            player_z = 0
             player.full_timer = 60
             player.thirst_full_timer = 60
             player.redmite_slots = [None, None, None, None]
@@ -2083,7 +2312,7 @@ while running:
             player.max_warmth = 100
             player.max_heat_resistance = int(round(100 * player.weather_resistance_leveler))
             player.max_cold_resistance = int(round(100 * player.weather_resistance_leveler))
-            player.max_weight = int(round(100 * player.weight_leveler * player.temp_weight_increase))
+            player.max_weight = int(round(400 * player.weight_leveler * player.temp_weight_increase))
             player.attack = int(round(player.damage + (player.strength_leveler - 1) * player.strength_level_gain))
             player.speed = int(round(100 * player.speed_leveler))
             player.defense = int(round(100 * player.defense_leveler))
@@ -2110,23 +2339,18 @@ while running:
             inventory_resources = []
             collection_messages = []
             thrown_items = []
+            structure_manager.structures.clear()
+            structure_manager.structures_by_z.clear()
+            structure_manager.placement_preview = None
+            structure_manager.snap_enabled = True
+            placement_mode = False
+            placement_item = None
+            placement_snap_index = 0
+            placement_direction = 0
 
             inventory.state = "inventory"
-            starter_items = [
-                # "Arcane Crafter",
-                # "Smelter",
-                # "Workbench",
-                # "Mortar And Pestle",
-                "Tent",
-                "Fire Dragon Scale Sword",
-                "Fire Dragon Scale Pickaxe",
-                "Chest",
-                "Chest"
-            ]
-            # Add 20 torches (will stack) plus other starter items
-            torch_stack = ["Torch"] * 10
-            beef_stack = ["Raw Beef"] * 20
-            inventory.add(torch_stack + starter_items + beef_stack)
+            
+            set_starting_loadout()
             
             from world import gemstone_rocks, GemstoneRock
             gemstone_rocks.append(GemstoneRock(int(player_pos.x + cam_x + 100), int(player_pos.y + 50)))
@@ -2326,6 +2550,11 @@ while running:
                     inventory.close_drop_menu()
             
             if event.type == pygame.KEYDOWN and event.key == pygame.K_r and player.is_alive:
+                if placement_mode:
+                    placement_direction = (placement_direction + 1) % 4
+                    placement_snap_index = 0
+                    continue
+                
                 selected_slot = None
                 selected_index = None
                 slot_is_hotbar = False
@@ -2384,14 +2613,18 @@ while running:
                         if drop_result:
                             process_drop_result(drop_result)
                     inventory.close_drop_menu()
-                
-                if inventory_in_use and player.is_alive:
-                    if event.key == pygame.K_ESCAPE:
-                        inventory_in_use = False
-                        inventory.ui_open = False
-                        inventory.selection_mode = "hotbar"
-                        inventory.selected_inventory_slot = None
-                        inventory.close_drop_menu()
+            
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and placement_mode and player.is_alive:
+                placement_snap_index += 1
+                continue
+            
+            if inventory_in_use and player.is_alive:
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    inventory_in_use = False
+                    inventory.ui_open = False
+                    inventory.selection_mode = "hotbar"
+                    inventory.selected_inventory_slot = None
+                    inventory.close_drop_menu()
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and inventory.drop_menu_active:
                 drop_result = inventory.handle_drop_menu_click(pygame.mouse.get_pos())
@@ -2485,10 +2718,16 @@ while running:
                     # Cancel placement mode
                     cancel_placement()
                 else:
-                    # Check if selected hotbar item is placeable
-                    selected_item = inventory.get_selected_item()
-                    if selected_item and selected_item.get("placeable", False):
-                        start_placement(selected_item)
+                    # Check if selected item is placeable (prefer hotbar when UI closed)
+                    if not inventory_in_use:
+                        selected_slot = inventory.hotbar_slots[inventory.selected_hotbar_slot]
+                    else:
+                        selected_slot = inventory.get_selected_item()
+                    if selected_slot and selected_slot.get("placeable", False):
+                        # Use the canonical item def if available so structure_type is guaranteed
+                        item_name = selected_slot.get("item_name")
+                        item_def = next((itm for itm in items_list if itm.get("item_name") == item_name), selected_slot)
+                        start_placement(item_def)
                     else:
                         # Fall back to throw mechanic
                         throw_charge_start = pygame.time.get_ticks()
@@ -2855,14 +3094,21 @@ while running:
                             if allow_drag:
                                 inventory.start_drag(slot_index, is_hotbar)
 
-            if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not alchemy_bench_in_use and not chest_in_use and not mortar_pestle_in_use:
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1 and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not arcane_crafter_in_use and not alchemy_bench_in_use and not chest_in_use and not mortar_pestle_in_use:
                 mouse_attack_blocked = False
                 if placement_mode:
                     # Try to place the item
                     x, y = placement_position
-                    if not check_placement_collision(x, y, placement_item):
-                        place_structure(x, y, placement_item)
-                        cancel_placement()  # Exit placement mode after successful placement
+                    has_collision = check_placement_collision(x, y, placement_item)
+                    print(f"[DEBUG] Placement check: position=({x}, {y}), collision={has_collision}")
+                    if not has_collision:
+                        placed_ok = place_structure(x, y, placement_item)
+                        if placed_ok:
+                            cancel_placement()  # Exit placement mode after successful placement
+                        else:
+                            print("[DEBUG] Placement failed; staying in placement mode")
+                    else:
+                        print(f"[DEBUG] Placement blocked due to collision")
                     # If collision detected, don't place but stay in placement mode
                 elif inventory.dragging:
                     mouse_pos = pygame.mouse.get_pos()
@@ -3828,6 +4074,11 @@ while running:
         player_redraw_image = None
         player_redraw_x = 0
         player_redraw_y = 0
+        world_player_rect = player.rect.copy()
+        world_player_rect.x += cam_x
+
+        # Draw floors and stairs before any actors/objects so they stay under the player
+        structure_manager.draw_all(screen, cam_x, player_z, world_player_rect, filter_fn=lambda s: isinstance(s, (StoneFloor, StoneStairs)))
 
         def get_redmite_slot_offset(direction, slot_index):
             offsets = {
@@ -3900,9 +4151,9 @@ while running:
                     screen.blit(text_surface, (text_x, text_y))
                     current_y = text_y - line_spacing
 
-        for obj in visible_liquids:
-            obj.update_animation(dt)
-            obj.draw(screen, cam_x)
+            for obj in visible_liquids:
+                obj.update_animation(dt)
+                obj.draw(screen, cam_x)
 
         def draw_held_item():
             current_hotbar_slot = inventory.hotbar_slots[inventory.selected_hotbar_slot]
@@ -4343,38 +4594,6 @@ while running:
                 # Fallback to circle if sprite not found
                 pygame.draw.circle(screen, (255, 200, 100), (item_screen_x, item_screen_y), 5)
 
-        # Draw placement preview
-        if placement_mode and placement_item:
-            preview_x = placement_position[0] - cam_x
-            preview_y = placement_position[1]
-
-            # Load item sprite for preview
-            item_sprite = None
-            sprite_size, _ = get_placeable_sizes(placement_item)
-            sprite_width, sprite_height = sprite_size
-            try:
-                icon_path = f"assets/sprites/items/{placement_item['icon']}"
-                item_sprite = pygame.image.load(icon_path).convert_alpha()
-                item_sprite = pygame.transform.scale(item_sprite, (sprite_width, sprite_height))
-            except:
-                # Fallback to colored rectangle
-                item_sprite = pygame.Surface((sprite_width, sprite_height))
-                item_sprite.fill((150, 150, 150))
-
-            # Check for collision and tint accordingly
-            has_collision = check_placement_collision(placement_position[0], placement_position[1], placement_item)
-
-            if not has_collision:
-                # Apply green tint for valid placement
-                green_tint = pygame.Surface(item_sprite.get_size())
-                green_tint.fill((0, 255, 0))
-                item_sprite.blit(green_tint, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-                # Make it semi-transparent
-                item_sprite.set_alpha(180)
-
-            # Draw the preview
-            screen.blit(item_sprite, (preview_x - sprite_width // 2, preview_y - sprite_height // 2))
-
         # Draw charge indicator (only show after holding for min_throw_hold_time)
         if throw_charge_start is not None:
             charge_duration = (pygame.time.get_ticks() - throw_charge_start) / 1000.0
@@ -4395,6 +4614,17 @@ while running:
         nearby_structures = [structure for structure in placed_structures
                            if abs(structure['rect'].x - (player_pos.x + cam_x)) < 1500
                            and abs(structure['rect'].y - player_pos.y) < 800]
+
+        nearby_structure_colliders = []
+        for struct in structure_manager.structures:
+            if getattr(struct, "destroyed", False):
+                continue
+            if struct.z not in (player_z, player_z - 1, player_z + 1):
+                continue
+            if isinstance(struct, StoneFloor):
+                continue
+            if abs(struct.x - (player_pos.x + cam_x)) < 1500 and abs(struct.y - player_pos.y) < 800:
+                nearby_structure_colliders.append(struct)
 
         nearby_objects = [obj for obj in all_objects
                     if abs(obj.rect.x - (player_pos.x + cam_x)) < 1500
@@ -4812,11 +5042,15 @@ while running:
                 all_nearby_solid.append(obj)
 
             # Add placed structures to collision detection
-            all_collision_objects = all_nearby_solid + nearby_structures
+            stair_colliders = [s for s in nearby_structure_colliders if not (active_stair and s is active_stair)]
+            all_collision_objects = all_nearby_solid + nearby_structures + stair_colliders
 
             def get_obj_collision_rect(obj, cam_x):
                 if hasattr(obj, 'get_collision_rect'):
-                    return obj.get_collision_rect(cam_x)
+                    try:
+                        return obj.get_collision_rect(cam_x)
+                    except TypeError:
+                        return obj.get_collision_rect()
                 elif isinstance(obj, dict) and 'rect' in obj:
                     # Convert structure rect from world to screen coordinates
                     rect = obj['rect']
@@ -4824,25 +5058,33 @@ while running:
                 else:
                     return obj.rect
 
-            left_collision = any(
-                left_player_check.colliderect(get_obj_collision_rect(obj, cam_x))
-                for obj in all_collision_objects
-            )
+            def obj_collides_rect(obj, rect, cam_x):
+                # Prefer precise mask overlap when available (e.g., stairs)
+                if hasattr(obj, "get_mask_data"):
+                    data = obj.get_mask_data()
+                    if data:
+                        mask, origin = data  # origin in world coords
+                        mask_origin_screen = (origin[0] - cam_x, origin[1])
+                        # Pygame Mask.overlap expects the other mask's origin relative to the first mask.
+                        # First mask here is the player's rect mask located at rect.x/y.
+                        offset = (int(mask_origin_screen[0] - rect.x), int(mask_origin_screen[1] - rect.y))
+                        try:
+                            test_mask = pygame.Mask((rect.width, rect.height), fill=True)
+                            return test_mask.overlap(mask, offset) is not None
+                        except Exception:
+                            pass
+                try:
+                    obj_rect = get_obj_collision_rect(obj, cam_x)
+                    if obj_rect is None:
+                        return False
+                    return rect.colliderect(obj_rect)
+                except Exception:
+                    return False
 
-            right_collision = any(
-                right_player_check.colliderect(get_obj_collision_rect(obj, cam_x))
-                for obj in all_collision_objects
-            )
-
-            up_collision = any(
-                top_player_check.colliderect(get_obj_collision_rect(obj, cam_x))
-                for obj in all_collision_objects
-            )
-
-            down_collision = any(
-                bottom_player_check.colliderect(get_obj_collision_rect(obj, cam_x))
-                for obj in all_collision_objects
-            )
+            left_collision = any(obj_collides_rect(obj, left_player_check, cam_x) for obj in all_collision_objects)
+            right_collision = any(obj_collides_rect(obj, right_player_check, cam_x) for obj in all_collision_objects)
+            up_collision = any(obj_collides_rect(obj, top_player_check, cam_x) for obj in all_collision_objects)
+            down_collision = any(obj_collides_rect(obj, bottom_player_check, cam_x) for obj in all_collision_objects)
 
             # Liquid collision detection - use bottom center point of player
             player_feet_rect = pygame.Rect(player.rect.centerx - 5, player.rect.bottom - 5, 10, 10)
@@ -5172,6 +5414,10 @@ while running:
             screen.blit(temp_surface, (x - 5, y - 5))
             screen.blit(full_text, (x, y))
             inventory.inventory_full_message_timer -= dt
+
+        # Draw non-floor structures (floors and stairs were drawn earlier under the player)
+        structure_manager.draw_all(screen, cam_x, player_z, world_player_rect, filter_fn=lambda s: not isinstance(s, (StoneFloor, StoneStairs)))
+        draw_placement_preview(screen)
 
         if inventory_in_use or campfire_in_use or smelter_in_use or crafting_bench_in_use or arcane_crafter_in_use or mortar_pestle_in_use or alchemy_bench_in_use or chest_in_use:
             inventory.begin_hover_pass()

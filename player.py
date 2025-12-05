@@ -111,7 +111,7 @@ class Player(pygame.sprite.Sprite):
         self.extreme_temp_timer = 0
         self.temp_weight_increase = 1
         self.weight_leveler = 1
-        self.max_weight = 100 * self.weight_leveler * self.temp_weight_increase
+        self.max_weight = 400 * self.weight_leveler * self.temp_weight_increase
         self.weight = 0
         self.glow = False
         self.glow_time = 0

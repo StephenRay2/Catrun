@@ -5918,6 +5918,57 @@ items_list = [
         "crafting_medium": "workbench",
         "tags": ["weapon", "ranged"],
         "output_amount": 1
+    },
+    {
+        "item_name": "Stone Floor",
+        "icon": "StoneFloor.png",
+        "stack_size": 999,
+        "weight": 5.0,
+        "type": "structure",
+        "description": "A flat stone floor tile. Place to build up.",
+        "use_effect": None,
+        "placeable": True,
+        "consumable": False,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": None,
+        "tags": ["structure", "building", "floor"],
+        "output_amount": 1,
+        "structure_type": "StoneFloor"
+    },
+    {
+        "item_name": "Stone Wall",
+        "icon": "StoneWall.png",
+        "stack_size": 999,
+        "weight": 5.0,
+        "type": "structure",
+        "description": "A stone wall. Rotate (R) to change direction.",
+        "use_effect": None,
+        "placeable": True,
+        "consumable": False,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": None,
+        "tags": ["structure", "building", "wall"],
+        "output_amount": 1,
+        "structure_type": "StoneWall"
+    },
+    {
+        "item_name": "Stone Stairs",
+        "icon": "StoneStairs.png",
+        "stack_size": 999,
+        "weight": 10.0,
+        "type": "structure",
+        "description": "Stone stairs. Rotate (R) to change direction. Provides vertical z-level transitions.",
+        "use_effect": None,
+        "placeable": True,
+        "consumable": False,
+        "durability": None,
+        "recipe": None,
+        "crafting_medium": None,
+        "tags": ["structure", "building", "stairs"],
+        "output_amount": 1,
+        "structure_type": "StoneStairs"
     }
 
 ]
@@ -5987,6 +6038,11 @@ for item in items_list:
             pygame.image.load(item['icon']).convert_alpha(),
             (60, 60)
         )
+    elif "structure_type" in item:
+        icon_surface = pygame.image.load(f"{image_path}/{item['icon']}").convert_alpha()
+        # Structures should keep their native icon dimensions for clarity
+        item["image"] = icon_surface
+        item["image_hotbar"] = icon_surface
     else:
         # Load hotbar version (45x45)
         item["image_hotbar"] = pygame.transform.scale(

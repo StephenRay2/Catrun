@@ -219,31 +219,31 @@ def process_respawns():
     pending_respawns[:] = remaining
 
 
-num_deers = 50
-num_squirrels = 100
-num_cats = 250
-num_cows = 50
-num_chickens = 50
-num_crows = 75
+num_deers = 0
+num_squirrels = 0
+num_cats = 20
+num_cows = 0
+num_chickens = 0
+num_crows = 5
 
-num_wolves = 50
+num_wolves = 0
 num_glowbirds = 75
 num_gilas = 50
 num_salamanders = 50
 num_redmites = 120
-num_black_bears = 50
-num_brown_bears = 30
+num_black_bears = 0
+num_brown_bears = 0
 num_polar_bears = 20
-num_pandas = 40
+num_pandas = 0
 
 num_ashhounds = 20
 num_wastedogs = 20
-num_crawlers = 20
-num_pocks = 20
-num_duskwretches = 20
-num_mudrustle_gorlins = 25
-num_slateback_gorlins = 25
-num_fluffy_gorlins = 18
+num_crawlers = 0
+num_pocks = 0
+num_duskwretches = 0
+num_mudrustle_gorlins = 0
+num_slateback_gorlins = 0
+num_fluffy_gorlins = 0
 
 num_fire_dragons = 50
 num_ice_dragons = 50
