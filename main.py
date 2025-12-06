@@ -105,6 +105,7 @@ default_placeable_sprite_size = (64, 64)
 placement_mode = False
 placement_item = None
 placement_position = (0, 0)
+placement_target_z = 0
 placed_structures = []
 tent_menu_active = False
 tent_menu_tent = None
@@ -118,6 +119,7 @@ structure_manager = StructureManager()
 player_z = 0
 placement_direction = 0
 placement_snap_index = 0
+placement_descending = False
 sleeping_tent_y = 0
 sleeping_tent_height = default_placeable_sprite_size[1]
 tent_hide_active = False
@@ -128,6 +130,11 @@ current_tent_hover_option = None
 active_stair = None
 stair_progress = 0.0
 stair_direction = 0
+is_falling = False
+fall_velocity = 0.0
+fall_start_z = 0
+fall_target_z = 0
+fall_start_y = 0.0
 
 def place_player_below_tent():
     tent_bottom_y = sleeping_tent_y + (sleeping_tent_height // 2)
@@ -1475,7 +1482,7 @@ def _resolved_placeable(item_data):
 
 
 def start_placement(item_data):
-    global placement_mode, placement_item, placement_direction, placement_snap_index
+    global placement_mode, placement_item, placement_direction, placement_snap_index, placement_target_z, placement_descending
     resolved = _resolved_placeable(item_data)
     if resolved and resolved.get("placeable"):
         inventory.selection_mode = "hotbar"
@@ -1483,14 +1490,18 @@ def start_placement(item_data):
         placement_item = resolved
         placement_direction = 0
         placement_snap_index = 0
+        placement_target_z = player_z
+        placement_descending = False
 
 
 def cancel_placement():
-    global placement_mode, placement_item, placement_direction, placement_snap_index
+    global placement_mode, placement_item, placement_direction, placement_snap_index, placement_target_z, placement_descending
     placement_mode = False
     placement_item = None
     placement_direction = 0
     placement_snap_index = 0
+    placement_target_z = player_z
+    placement_descending = False
 
 
 def get_structure_class(structure_type):
@@ -1502,7 +1513,7 @@ def place_structure(x, y, item_data):
     global placement_item
     safe_item = _resolved_placeable(item_data)
     structure_type = safe_item.get("structure_type", "") if safe_item else ""
-    print(f"[DEBUG] Attempting to place structure: {structure_type} at ({x}, {y}, z={player_z}), direction={placement_direction}")
+    print(f"[DEBUG] Attempting to place structure: {structure_type} at ({x}, {y}, z={placement_target_z}), direction={placement_direction}")
     structure_class = get_structure_class(structure_type)
     
     if not structure_class:
@@ -1510,7 +1521,9 @@ def place_structure(x, y, item_data):
         return False
     
     try:
-        structure = structure_class(x, y, player_z, placement_direction)
+        structure = structure_class(x, y, placement_target_z, placement_direction)
+        if isinstance(structure, StoneStairs):
+            structure.descending = placement_descending
         print(f"[DEBUG] Structure created: {structure}, sprite: {structure.sprite}, size: {structure.native_width}x{structure.native_height}")
         structure_manager.add_structure(structure)
         inventory.remove_selected_quantity(1)
@@ -1534,7 +1547,7 @@ def check_placement_collision(x, y, item_data):
     if not structure_class:
         return False
 
-    temp_struct = structure_class(x, y, player_z, placement_direction)
+    temp_struct = structure_class(x, y, placement_target_z, placement_direction)
 
     def _mask_and_offset(struct):
         if hasattr(struct, "get_mask_data"):
@@ -1564,7 +1577,7 @@ def check_placement_collision(x, y, item_data):
 
 
 def update_placement_position():
-    global placement_item, placement_position
+    global placement_item, placement_position, placement_target_z
     if placement_mode and placement_item:
         mouse_pos = pygame.mouse.get_pos()
         world_x = mouse_pos[0] + cam_x
@@ -1572,7 +1585,12 @@ def update_placement_position():
         
         shift_held = pygame.key.get_pressed()[pygame.K_LSHIFT] or pygame.key.get_pressed()[pygame.K_RSHIFT]
         snap_pos = structure_manager.get_preview_position((world_x, world_y), player_z, shift_held, placement_snap_index)
-        placement_position = snap_pos
+        if snap_pos and len(snap_pos) == 3:
+            placement_position = (snap_pos[0], snap_pos[1])
+            placement_target_z = snap_pos[2]
+        else:
+            placement_position = snap_pos
+            placement_target_z = player_z
 
 
 def draw_placement_preview(screen):
@@ -1582,7 +1600,10 @@ def draw_placement_preview(screen):
         if not structure_class:
             return
         
-        temp_struct = structure_class(placement_position[0], placement_position[1], player_z, placement_direction)
+        temp_struct = structure_class(placement_position[0], placement_position[1], placement_target_z, placement_direction)
+        
+        if isinstance(temp_struct, StoneStairs):
+            temp_struct.descending = placement_descending
         
         collision = check_placement_collision(placement_position[0], placement_position[1], placement_item)
         
@@ -1600,15 +1621,25 @@ def draw_placement_preview(screen):
                 screen_x = int(placement_position[0] - cam_x)
                 screen_y = int(placement_position[1])
                 screen.blit(preview_surf, (screen_x, screen_y))
+                # Show target z-level next to the preview
+                try:
+                    z_text = hud_font.render(f"Z: {placement_target_z}", True, (255, 255, 255))
+                    screen.blit(z_text, (screen_x, screen_y - z_text.get_height() - 4))
+                    # Show descending mode for stairs
+                    if isinstance(temp_struct, StoneStairs) and placement_descending:
+                        desc_text = hud_font.render("Descending", True, (255, 200, 0))
+                        screen.blit(desc_text, (screen_x, screen_y - z_text.get_height() - desc_text.get_height() - 6))
+                except Exception:
+                    pass
             except:
                 pass
 
 
 def check_player_fall():
-    global player_z
-    if not player.is_alive or player_z < 0 or active_stair:
+    global player_z, is_falling, fall_velocity, fall_start_z, fall_target_z, fall_start_y
+    if not player.is_alive or player_z < 0 or active_stair or is_falling:
         return
-
+    
     world_x = player_pos.x + cam_x
     world_y = player_pos.y
     player_feet_pos = (world_x, world_y + 10)
@@ -1625,26 +1656,56 @@ def check_player_fall():
                         if mask.get_at((px, py)):
                             return
             rect = struct.get_collision_rect()
-            if rect:
+            if rect and rect.collidepoint(player_feet_pos):
                 return
     
     target_z = structure_manager.get_falling_target_z(player_feet_pos, player_z)
     if target_z is not None and target_z < player_z:
-        fall_damage = structure_manager.calculate_fall_damage(player_z, target_z)
-        player_z = target_z
-        player.health -= fall_damage
-        if player.health <= 0:
-            player.health = 0
-            player.is_alive = False
-            player.dead = True
+        is_falling = True
+        fall_start_z = player_z
+        fall_target_z = target_z
+        fall_velocity = 0.0
+        fall_start_y = player_pos.y
     elif target_z is None and player_z > 0:
-        fall_damage = structure_manager.calculate_fall_damage(player_z, 0)
-        player_z = 0
+        is_falling = True
+        fall_start_z = player_z
+        fall_target_z = 0
+        fall_velocity = 0.0
+        fall_start_y = player_pos.y
+
+
+def update_falling(dt):
+    global is_falling, fall_velocity, player_z, fall_start_y
+    if not is_falling:
+        return
+    
+    gravity = 800.0
+    fall_velocity += gravity * dt
+    
+    player_pos.y += fall_velocity * dt
+    if hasattr(player, "rect"):
+        player.rect.center = (player_pos.x, player_pos.y)
+    
+    z_level_height = 96
+    expected_drop = (fall_start_z - fall_target_z) * z_level_height
+    current_drop = player_pos.y - fall_start_y
+    
+    if current_drop >= expected_drop:
+        player_pos.y = fall_start_y + expected_drop
+        if hasattr(player, "rect"):
+            player.rect.center = (player_pos.x, player_pos.y)
+        
+        player_z = fall_target_z
+        
+        fall_damage = structure_manager.calculate_fall_damage(fall_start_z, fall_target_z)
         player.health -= fall_damage
         if player.health <= 0:
             player.health = 0
             player.is_alive = False
             player.dead = True
+        
+        is_falling = False
+        fall_velocity = 0.0
 
 
 def update_z_level_support():
@@ -1664,6 +1725,8 @@ def handle_stair_climbing(dt):
     move_vec = move_vec_raw.copy()
     world_pos_vec = pygame.Vector2(player_pos.x + cam_x, player_pos.y)
     world_point = (world_pos_vec.x, world_pos_vec.y)
+    player_world_rect = player.rect.copy()
+    player_world_rect.x += cam_x
 
     if active_stair and getattr(active_stair, "destroyed", False):
         active_stair = None
@@ -1677,7 +1740,8 @@ def handle_stair_climbing(dt):
             return
         path_dir = path_vec.normalize()
         projected = move_vec_raw.dot(path_dir)
-        move_vec = path_dir * projected
+        input_mag = move_vec_raw.length()
+        move_vec = path_dir * (input_mag if projected >= 0 else -input_mag)
 
         # Allow exiting at the lower entry when moving back out
         lower_entry_rect, upper_entry_rect = active_stair.get_entry_rects()
@@ -1693,14 +1757,11 @@ def handle_stair_climbing(dt):
         base_sign = 1 if stair_direction >= 0 else -1
         direction_sign = base_sign
         if move_vec.length_squared() > 0 and path_vec.length_squared() > 0:
-            move_dir = move_vec.normalize()
-            dot = move_dir.dot(path_dir)
-            if abs(dot) > 0.1:
-                direction_sign = 1 if dot >= 0 else -1
+            direction_sign = 1 if projected >= 0 else -1
         stair_direction = direction_sign
         delta = 0.0
-        if move_vec.length_squared() > 0:
-            delta = (speed / path_len) * direction_sign * min(1.0, abs(projected))
+        if input_mag > 0:
+            delta = (speed / path_len) * direction_sign * input_mag
 
         # Allow slight over/under travel so reversing doesn't immediately detach
         stair_progress = max(-0.2, min(1.2, stair_progress + delta))
@@ -1710,11 +1771,39 @@ def handle_stair_climbing(dt):
         player_pos.x = player_world_x - cam_x
         player_pos.y = player_world_y
 
-        if stair_progress >= 1.01:
-            player_z = active_stair.z + 1
+        if stair_progress >= 1.0:
+            # Snap to top and finalize z-level
+            stair_progress = 1.0
+            player_world_x, player_world_y = path_upper
+            player_pos.x = player_world_x - cam_x
+            player_pos.y = player_world_y
+            is_descending = getattr(active_stair, 'descending', False)
+            stair_dir = active_stair.direction % 4
+            if is_descending and stair_dir == 1:
+                player_z = active_stair.z
+            elif is_descending and stair_dir == 3:
+                player_z = active_stair.z - 1
+            elif is_descending:
+                player_z = active_stair.z
+            else:
+                player_z = active_stair.z + 1
             active_stair = None
-        elif stair_progress <= -0.01:
-            player_z = active_stair.z
+        elif stair_progress <= 0.0:
+            # Snap to bottom and finalize z-level
+            stair_progress = 0.0
+            player_world_x, player_world_y = path_lower
+            player_pos.x = player_world_x - cam_x
+            player_pos.y = player_world_y
+            is_descending = getattr(active_stair, 'descending', False)
+            stair_dir = active_stair.direction % 4
+            if is_descending and stair_dir == 1:
+                player_z = active_stair.z - 1
+            elif is_descending and stair_dir == 3:
+                player_z = active_stair.z
+            elif is_descending:
+                player_z = active_stair.z - 1
+            else:
+                player_z = active_stair.z
             active_stair = None
         return
 
@@ -1725,38 +1814,127 @@ def handle_stair_climbing(dt):
         if not isinstance(struct, StoneStairs):
             continue
 
+        is_descending = getattr(struct, 'descending', False)
         lower_rect, upper_rect = struct.get_entry_rects()
-        if struct.z == player_z and lower_rect.collidepoint(world_point):
-            # Only enter if moving toward the stair from below
-            path_lower, path_upper = struct.get_path_points()
-            path_vec = pygame.Vector2(path_upper) - pygame.Vector2(path_lower)
-            if path_vec.length_squared() > 0:
-                path_dir = path_vec.normalize()
-                if move_vec_raw.dot(path_dir) > 0:
-                    active_stair = struct
-                    stair_direction = 1
-                    stair_progress = max(-0.05, min(1.05, struct.project_progress(world_point)))
-                    proj_pos = pygame.Vector2(*struct.get_path_points()[0]) + (pygame.Vector2(struct.get_path_points()[1]) - pygame.Vector2(struct.get_path_points()[0])) * stair_progress
-                    player_world_x, player_world_y = proj_pos.x, proj_pos.y
-                    player_pos.x = player_world_x - cam_x
-                    player_pos.y = player_world_y
-                    return
+        stair_dir = struct.direction % 4
+        
+        # For ascending stairs: lower entry at struct.z, upper entry at struct.z+1
+        # For descending stairs: depends on direction
+        #   Direction 1 (StoneStairsUp): upper entry (top) at struct.z, descends to struct.z-1
+        #   Direction 3 (StoneStairsDown): lower entry (bottom) at struct.z, descends to struct.z-1
+        if is_descending:
+            # Descending stairs entry logic
+            if stair_dir == 1:
+                # Direction 1: Enter from top (upper), move down to z-1
+                if struct.z == player_z and upper_rect.colliderect(player_world_rect):
+                    path_lower, path_upper = struct.get_path_points()
+                    if move_vec_raw.y > 0.05:
+                        active_stair = struct
+                        stair_direction = -1
+                        stair_progress = max(-0.05, min(1.05, struct.project_progress(world_point)))
+                        proj_pos = pygame.Vector2(*struct.get_path_points()[0]) + (pygame.Vector2(struct.get_path_points()[1]) - pygame.Vector2(struct.get_path_points()[0])) * stair_progress
+                        player_world_x, player_world_y = proj_pos.x, proj_pos.y
+                        player_pos.x = player_world_x - cam_x
+                        player_pos.y = player_world_y
+                        return
 
-        if struct.z + 1 == player_z and upper_rect.collidepoint(world_point):
-            # Only enter if moving toward the stair from above
-            path_lower, path_upper = struct.get_path_points()
-            path_vec = pygame.Vector2(path_upper) - pygame.Vector2(path_lower)
-            if path_vec.length_squared() > 0:
-                path_dir = path_vec.normalize()
-                if move_vec_raw.dot(path_dir) < 0:
-                    active_stair = struct
-                    stair_direction = -1
-                    stair_progress = max(-0.05, min(1.05, struct.project_progress(world_point)))
-                    proj_pos = pygame.Vector2(*struct.get_path_points()[0]) + (pygame.Vector2(struct.get_path_points()[1]) - pygame.Vector2(struct.get_path_points()[0])) * stair_progress
-                    player_world_x, player_world_y = proj_pos.x, proj_pos.y
-                    player_pos.x = player_world_x - cam_x
-                    player_pos.y = player_world_y
-                    return
+                if struct.z - 1 == player_z and player_z >= 0 and lower_rect.colliderect(player_world_rect):
+                    if move_vec_raw.y < -0.05:
+                        active_stair = struct
+                        stair_direction = 1
+                        stair_progress = max(-0.05, min(1.05, struct.project_progress(world_point)))
+                        proj_pos = pygame.Vector2(*struct.get_path_points()[0]) + (pygame.Vector2(struct.get_path_points()[1]) - pygame.Vector2(struct.get_path_points()[0])) * stair_progress
+                        player_world_x, player_world_y = proj_pos.x, proj_pos.y
+                        player_pos.x = player_world_x - cam_x
+                        player_pos.y = player_world_y
+                        return
+            elif stair_dir == 3:
+                # Direction 3: Enter from bottom (lower), move up to z-1
+                if struct.z == player_z and lower_rect.colliderect(player_world_rect):
+                    if move_vec_raw.y < -0.05:
+                        active_stair = struct
+                        stair_direction = 1
+                        stair_progress = max(-0.05, min(1.05, struct.project_progress(world_point)))
+                        proj_pos = pygame.Vector2(*struct.get_path_points()[0]) + (pygame.Vector2(struct.get_path_points()[1]) - pygame.Vector2(struct.get_path_points()[0])) * stair_progress
+                        player_world_x, player_world_y = proj_pos.x, proj_pos.y
+                        player_pos.x = player_world_x - cam_x
+                        player_pos.y = player_world_y
+                        return
+
+                if struct.z - 1 == player_z and player_z >= 0 and upper_rect.colliderect(player_world_rect):
+                    if move_vec_raw.y > 0.05:
+                        active_stair = struct
+                        stair_direction = -1
+                        stair_progress = max(-0.05, min(1.05, struct.project_progress(world_point)))
+                        proj_pos = pygame.Vector2(*struct.get_path_points()[0]) + (pygame.Vector2(struct.get_path_points()[1]) - pygame.Vector2(struct.get_path_points()[0])) * stair_progress
+                        player_world_x, player_world_y = proj_pos.x, proj_pos.y
+                        player_pos.x = player_world_x - cam_x
+                        player_pos.y = player_world_y
+                        return
+            else:
+                # Horizontal stairs (direction 0, 2) - keep original logic
+                if struct.z == player_z and upper_rect.colliderect(player_world_rect):
+                    path_lower, path_upper = struct.get_path_points()
+                    path_vec = pygame.Vector2(path_upper) - pygame.Vector2(path_lower)
+                    if path_vec.length_squared() > 0:
+                        path_dir = path_vec.normalize()
+                        if move_vec_raw.dot(path_dir) < -0.05:
+                            active_stair = struct
+                            stair_direction = -1
+                            stair_progress = max(-0.05, min(1.05, struct.project_progress(world_point)))
+                            proj_pos = pygame.Vector2(*struct.get_path_points()[0]) + (pygame.Vector2(struct.get_path_points()[1]) - pygame.Vector2(struct.get_path_points()[0])) * stair_progress
+                            player_world_x, player_world_y = proj_pos.x, proj_pos.y
+                            player_pos.x = player_world_x - cam_x
+                            player_pos.y = player_world_y
+                            return
+
+                if struct.z - 1 == player_z and player_z >= 0 and lower_rect.colliderect(player_world_rect):
+                    path_lower, path_upper = struct.get_path_points()
+                    path_vec = pygame.Vector2(path_upper) - pygame.Vector2(path_lower)
+                    if path_vec.length_squared() > 0:
+                        path_dir = path_vec.normalize()
+                        if move_vec_raw.dot(path_dir) > 0.05:
+                            active_stair = struct
+                            stair_direction = 1
+                            stair_progress = max(-0.05, min(1.05, struct.project_progress(world_point)))
+                            proj_pos = pygame.Vector2(*struct.get_path_points()[0]) + (pygame.Vector2(struct.get_path_points()[1]) - pygame.Vector2(struct.get_path_points()[0])) * stair_progress
+                            player_world_x, player_world_y = proj_pos.x, proj_pos.y
+                            player_pos.x = player_world_x - cam_x
+                            player_pos.y = player_world_y
+                            return
+        else:
+            # Ascending stairs entry logic (original behavior)
+            if struct.z == player_z and lower_rect.colliderect(player_world_rect):
+                # Only enter from the lower side when moving toward the stair
+                path_lower, path_upper = struct.get_path_points()
+                path_vec = pygame.Vector2(path_upper) - pygame.Vector2(path_lower)
+                if path_vec.length_squared() > 0:
+                    path_dir = path_vec.normalize()
+                    if move_vec_raw.dot(path_dir) > 0.05:
+                        active_stair = struct
+                        stair_direction = 1
+                        stair_progress = max(-0.05, min(1.05, struct.project_progress(world_point)))
+                        proj_pos = pygame.Vector2(*struct.get_path_points()[0]) + (pygame.Vector2(struct.get_path_points()[1]) - pygame.Vector2(struct.get_path_points()[0])) * stair_progress
+                        player_world_x, player_world_y = proj_pos.x, proj_pos.y
+                        player_pos.x = player_world_x - cam_x
+                        player_pos.y = player_world_y
+                        return
+
+            if struct.z + 1 == player_z and upper_rect.colliderect(player_world_rect):
+                # Only enter from the upper side when moving down toward the stair
+                path_lower, path_upper = struct.get_path_points()
+                path_vec = pygame.Vector2(path_upper) - pygame.Vector2(path_lower)
+                if path_vec.length_squared() > 0:
+                    path_dir = path_vec.normalize()
+                    if move_vec_raw.dot(path_dir) < -0.05:
+                        active_stair = struct
+                        stair_direction = -1
+                        stair_progress = max(-0.05, min(1.05, struct.project_progress(world_point)))
+                        proj_pos = pygame.Vector2(*struct.get_path_points()[0]) + (pygame.Vector2(struct.get_path_points()[1]) - pygame.Vector2(struct.get_path_points()[0])) * stair_progress
+                        player_world_x, player_world_y = proj_pos.x, proj_pos.y
+                        player_pos.x = player_world_x - cam_x
+                        player_pos.y = player_world_y
+                        return
 
 
 while running:
@@ -1847,6 +2025,7 @@ while running:
             update_placement_position()
             # Check for player fall and update z-level support
             check_player_fall()
+            update_falling(dt)
             update_z_level_support()
             # Handle stair climbing
             handle_stair_climbing(dt)
@@ -1867,6 +2046,11 @@ while running:
             stair_progress = 0.0
             stair_direction = 0
             player_z = 0
+            is_falling = False
+            fall_velocity = 0.0
+            fall_start_z = 0
+            fall_target_z = 0
+            fall_start_y = 0.0
             player.full_timer = 60
             player.thirst_full_timer = 60
             player.redmite_slots = [None, None, None, None]
@@ -2553,6 +2737,11 @@ while running:
                 if placement_mode:
                     placement_direction = (placement_direction + 1) % 4
                     placement_snap_index = 0
+                    continue
+            
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_t and player.is_alive:
+                if placement_mode and placement_item and placement_item.get("structure_type") == "StoneStairs":
+                    placement_descending = not placement_descending
                     continue
                 
                 selected_slot = None
@@ -4079,6 +4268,8 @@ while running:
 
         # Draw floors and stairs before any actors/objects so they stay under the player
         structure_manager.draw_all(screen, cam_x, player_z, world_player_rect, filter_fn=lambda s: isinstance(s, (StoneFloor, StoneStairs)))
+        # Draw walls at or below player z-level before depth-sorted objects
+        structure_manager.draw_all(screen, cam_x, player_z, world_player_rect, filter_fn=lambda s: not isinstance(s, (StoneFloor, StoneStairs)) and s.z <= player_z)
 
         def get_redmite_slot_offset(direction, slot_index):
             offsets = {
@@ -4619,7 +4810,7 @@ while running:
         for struct in structure_manager.structures:
             if getattr(struct, "destroyed", False):
                 continue
-            if struct.z not in (player_z, player_z - 1, player_z + 1):
+            if struct.z != player_z:
                 continue
             if isinstance(struct, StoneFloor):
                 continue
@@ -5105,7 +5296,7 @@ while running:
             if not in_liquid:
                 player.exit_liquid()
 
-            if not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and not chest_in_use and naming_cat is None:
+            if not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and not chest_in_use and naming_cat is None and not is_falling:
 
                 if (((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]) and (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT])) or (pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not mouse_over_hotbar)) and not player.exhausted:
                     if player.lose_stamina(screen, dt):
@@ -5415,8 +5606,8 @@ while running:
             screen.blit(full_text, (x, y))
             inventory.inventory_full_message_timer -= dt
 
-        # Draw non-floor structures (floors and stairs were drawn earlier under the player)
-        structure_manager.draw_all(screen, cam_x, player_z, world_player_rect, filter_fn=lambda s: not isinstance(s, (StoneFloor, StoneStairs)))
+        # Draw structures above player z-level on top of player
+        structure_manager.draw_all(screen, cam_x, player_z, world_player_rect, filter_fn=lambda s: s.z > player_z)
         draw_placement_preview(screen)
 
         if inventory_in_use or campfire_in_use or smelter_in_use or crafting_bench_in_use or arcane_crafter_in_use or mortar_pestle_in_use or alchemy_bench_in_use or chest_in_use:
@@ -5462,6 +5653,13 @@ while running:
         time_surface.fill((0, 0, 0, 100))
         screen.blit(time_surface, (time_rect.x + 8, time_rect.y + 22))
         screen.blit(time_text, (time_rect.x + 13, time_rect.y + 27))
+        # Display current z-level beneath the time in the top-right corner
+        z_text = hud_font.render(f"Z: {player_z}", True, (255, 255, 255))
+        z_rect = pygame.Rect(time_rect.x, time_rect.y + time_rect.height + 10, z_text.get_width(), z_text.get_height())
+        z_surface = pygame.Surface((z_rect.width + 10, z_rect.height + 10), pygame.SRCALPHA)
+        z_surface.fill((0, 0, 0, 100))
+        screen.blit(z_surface, (z_rect.x + 8, z_rect.y + 22))
+        screen.blit(z_text, (z_rect.x + 13, z_rect.y + 27))
 
         if player.extreme_temp_timer >= 180:
             fatigue_color = (255, 150, 100)

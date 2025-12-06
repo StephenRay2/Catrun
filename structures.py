@@ -348,8 +348,8 @@ class StoneStairs(Structure):
         1: {
             "lower_point": (32, 56),
             "upper_point": (32, 8),
-            "lower_entry": pygame.Rect(18, 32, 26, 42),
-            "upper_entry": pygame.Rect(18, -12, 26, 42),
+            "lower_entry": pygame.Rect(0, 32, 64, 42),
+            "upper_entry": pygame.Rect(0, -12, 64, 42),
             "slow": 1.0,
         },
         2: {
@@ -364,8 +364,8 @@ class StoneStairs(Structure):
             # Opposite orientation of "up": climb while moving downward
             "lower_point": (32, 8),
             "upper_point": (32, 56),
-            "lower_entry": pygame.Rect(18, -12, 26, 42),
-            "upper_entry": pygame.Rect(18, 32, 26, 42),
+            "lower_entry": pygame.Rect(0, -12, 64, 42),
+            "upper_entry": pygame.Rect(0, 32, 64, 42),
             "slow": 0.85,
         },
     }
@@ -373,6 +373,7 @@ class StoneStairs(Structure):
     def __init__(self, x: float, y: float, z: int, direction: int = 0):
         super().__init__(x, y, z, "Stone Stairs", direction)
         self.direction = direction
+        self.descending = False
         self.climb_speed_multiplier = 1.0
         self.path_lower: Tuple[float, float] = (x, y)
         self.path_upper: Tuple[float, float] = (x, y)
@@ -461,28 +462,58 @@ class StoneStairs(Structure):
             direction_vec = vec.normalize()
             self.path_lower = tuple((pygame.Vector2(self.path_lower) - direction_vec * 12))
             self.path_upper = tuple((pygame.Vector2(self.path_upper) + direction_vec * 32))
-        # Dynamic entry rectangles centered near path endpoints, offset along path direction
-        path_dir = (pygame.Vector2(self.path_upper) - pygame.Vector2(self.path_lower))
-        entry_w, entry_h = 3, 56
-        if path_dir.length_squared() > 0:
-            path_dir = path_dir.normalize()
-            lower_center = pygame.Vector2(self.path_lower) - path_dir * 20 + pygame.Vector2(7, -5)
-            upper_center = pygame.Vector2(self.path_upper) + path_dir * 20 + pygame.Vector2(-20, 10)
+        # Align entry rectangles based on stair direction
+        if self.mask_bbox:
+            left_edge = self.x + self.mask_bbox.x
+            right_edge = self.x + self.mask_bbox.x + self.mask_bbox.width
+            top_edge = self.y + self.mask_bbox.y
+            bottom_edge = self.y + self.mask_bbox.y + self.mask_bbox.height
         else:
-            lower_center = pygame.Vector2(self.path_lower) + pygame.Vector2(7, -5)
-            upper_center = pygame.Vector2(self.path_upper) + pygame.Vector2(-20, 10)
-        self.lower_entry_rect = pygame.Rect(
-            lower_center.x - entry_w / 2,
-            lower_center.y - entry_h / 2,
-            entry_w,
-            entry_h,
-        )
-        self.upper_entry_rect = pygame.Rect(
-            upper_center.x - entry_w / 2,
-            upper_center.y - entry_h / 2,
-            entry_w,
-            entry_h,
-        )
+            left_edge = self.x
+            right_edge = self.x + self.native_width
+            top_edge = self.y
+            bottom_edge = self.y + self.native_height
+        
+        direction = self.direction % 4
+        if direction in (1, 3):
+            # Vertical stairs: entry at top and bottom
+            entry_w, entry_h = self.native_width, 3
+            self.lower_entry_rect = pygame.Rect(
+                left_edge,
+                bottom_edge,
+                entry_w,
+                entry_h,
+            )
+            self.upper_entry_rect = pygame.Rect(
+                left_edge,
+                top_edge - entry_h,
+                entry_w,
+                entry_h,
+            )
+            # Path endpoints stay at center x, but move beyond top/bottom edges
+            half_player_height = 32
+            center_x = (left_edge + right_edge) / 2
+            self.path_lower = (center_x, bottom_edge + half_player_height)
+            self.path_upper = (center_x, top_edge - half_player_height)
+        else:
+            # Horizontal stairs: entry at left and right
+            entry_w, entry_h = 3, 56
+            self.lower_entry_rect = pygame.Rect(
+                left_edge - entry_w,
+                self.path_lower[1] - entry_h / 2,
+                entry_w,
+                entry_h,
+            )
+            self.upper_entry_rect = pygame.Rect(
+                right_edge,
+                self.path_upper[1] - entry_h / 2,
+                entry_w,
+                entry_h,
+            )
+            # Move actual path start/end half a player width beyond the mask
+            half_player_width = 32
+            self.path_lower = (left_edge - half_player_width, self.path_lower[1])
+            self.path_upper = (right_edge + half_player_width, self.path_upper[1])
         self.climb_speed_multiplier = profile.get("slow", 1.0)
 
         self.all_snap_points = []
@@ -511,9 +542,10 @@ class StoneStairs(Structure):
             bbox = self.mask_bbox if self.mask_bbox and self.mask_bbox.width > 0 else pygame.Rect(0, 0, self.native_width, self.native_height)
             bottom_left = (self.x + bbox.x, self.y + bbox.y + bbox.height)
             self.all_snap_points.append(bottom_left)
-        # Always include stair endpoints to aid alignment
-        self.all_snap_points.append(self.path_lower)
-        self.all_snap_points.append(self.path_upper)
+
+    def toggle_descending(self):
+        """Toggle between ascending (z to z+1) and descending (z to z-1) mode."""
+        self.descending = not self.descending
 
     def rotate(self):
         self.direction = (self.direction + 1) % 4
@@ -528,21 +560,15 @@ class StoneStairs(Structure):
         try:
             lower = self.path_lower
             upper = self.path_upper
-            bar_width = 6
-            bar_height = 24
-            pygame.draw.rect(
-                screen,
-                (0, 255, 0),
-                pygame.Rect(int(lower[0] - cam_x - bar_width // 2), int(lower[1] - cam_y - bar_height // 2), bar_width, bar_height),
-            )
-            pygame.draw.rect(
-                screen,
-                (255, 0, 0),
-                pygame.Rect(int(upper[0] - cam_x - bar_width // 2), int(upper[1] - cam_y - bar_height // 2), bar_width, bar_height),
-            )
-            # Entry rectangles debug overlay
-            pygame.draw.rect(screen, (0, 0, 255), pygame.Rect(self.lower_entry_rect.x - cam_x, self.lower_entry_rect.y - cam_y, self.lower_entry_rect.width, self.lower_entry_rect.height), 2)
-            pygame.draw.rect(screen, (255, 165, 0), pygame.Rect(self.upper_entry_rect.x - cam_x, self.upper_entry_rect.y - cam_y, self.upper_entry_rect.width, self.upper_entry_rect.height), 2)
+            # Use entry rectangles for both markers so they match size/position
+            lower_rect_screen = pygame.Rect(self.lower_entry_rect.x - cam_x, self.lower_entry_rect.y - cam_y, self.lower_entry_rect.width, self.lower_entry_rect.height)
+            upper_rect_screen = pygame.Rect(self.upper_entry_rect.x - cam_x, self.upper_entry_rect.y - cam_y, self.upper_entry_rect.width, self.upper_entry_rect.height)
+
+            pygame.draw.rect(screen, (0, 255, 0), lower_rect_screen, 0)  # filled green
+            pygame.draw.rect(screen, (0, 0, 255), lower_rect_screen, 2)   # blue outline
+
+            pygame.draw.rect(screen, (255, 0, 0), upper_rect_screen, 0)   # filled red
+            pygame.draw.rect(screen, (255, 165, 0), upper_rect_screen, 2) # orange outline
             # Mask overlay to visualize actual collision footprint
             if self.mask:
                 mask_surf = self.mask.to_surface(setcolor=(0, 255, 255, 80), unsetcolor=(0, 0, 0, 0))
@@ -613,32 +639,37 @@ class StructureManager:
         snap_points = []
         current_z_structures = self.get_structures_at_z(player_z)
         z_above_structures = self.get_structures_at_z(player_z + 1)
-        all_nearby = current_z_structures + z_above_structures
+        z_below_structures = self.get_structures_at_z(player_z - 1) if player_z > 0 else []
+        all_nearby = current_z_structures + z_above_structures + z_below_structures
         
         for struct in all_nearby:
             if getattr(struct, "destroyed", False):
                 continue
             for point in struct.get_snap_points():
+                px, py = point[0], point[1]
                 if origin:
-                    dist = math.hypot(point[0] - origin[0], point[1] - origin[1])
+                    dist = math.hypot(px - origin[0], py - origin[1])
                     if dist > nearby_range:
                         continue
-                snap_points.append((point[0], point[1], struct.z))
+                # For stairs, add top-level snap first so it wins ties when distances are equal
+                if isinstance(struct, StoneStairs):
+                    snap_points.append((px, py, struct.z + 1))
+                snap_points.append((px, py, struct.z))
                 
         return snap_points
     
     def get_preview_position(self, mouse_pos: Tuple[float, float], player_z: int, shift_held: bool, snap_index: int = 0, snap_radius: float = 120) -> Optional[Tuple[float, float]]:
         if shift_held or not self.snap_enabled:
-            return mouse_pos
+            return mouse_pos[0], mouse_pos[1], player_z
         
         snap_points = self.find_snap_points(player_z, origin=mouse_pos, nearby_range=snap_radius)
         if not snap_points:
-            return mouse_pos
+            return mouse_pos[0], mouse_pos[1], player_z
 
-        snap_points.sort(key=lambda pt: math.hypot(mouse_pos[0] - pt[0], mouse_pos[1] - pt[1]))
+        snap_points.sort(key=lambda pt: (math.hypot(mouse_pos[0] - pt[0], mouse_pos[1] - pt[1]), -pt[2]))
         snap_index = snap_index % len(snap_points)
         chosen = snap_points[snap_index]
-        return (chosen[0], chosen[1])
+        return (chosen[0], chosen[1], chosen[2] if len(chosen) > 2 else player_z)
     
     def check_z_level_integrity(self):
         z_levels_to_remove = []
