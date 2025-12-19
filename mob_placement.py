@@ -219,37 +219,37 @@ def process_respawns():
     pending_respawns[:] = remaining
 
 
-num_deers = 0
-num_squirrels = 0
-num_cats = 20
-num_cows = 0
-num_chickens = 0
-num_crows = 5
+num_deers = 50
+num_squirrels = 50
+num_cats = 100
+num_cows = 50
+num_chickens = 50
+num_crows = 55
 
-num_wolves = 0
-num_glowbirds = 75
-num_gilas = 50
-num_salamanders = 50
+num_wolves = 20
+num_glowbirds = 45
+num_gilas = 30
+num_salamanders = 30
 num_redmites = 120
-num_black_bears = 0
-num_brown_bears = 0
+num_black_bears = 20
+num_brown_bears = 20
 num_polar_bears = 20
-num_pandas = 0
+num_pandas = 20
 
 num_ashhounds = 20
 num_wastedogs = 20
-num_crawlers = 0
-num_pocks = 0
-num_duskwretches = 0
-num_mudrustle_gorlins = 0
-num_slateback_gorlins = 0
-num_fluffy_gorlins = 0
+num_crawlers = 20
+num_pocks = 20
+num_duskwretches = 20
+num_mudrustle_gorlins = 20
+num_slateback_gorlins = 20
+num_fluffy_gorlins = 20
 
-num_fire_dragons = 50
-num_ice_dragons = 50
-num_electric_dragons = 50
-num_poison_dragons = 50
-num_dusk_dragons = 50
+num_fire_dragons = 5
+num_ice_dragons = 5
+num_electric_dragons = 5
+num_poison_dragons = 5
+num_dusk_dragons = 5
 
 
 allowed_squirrel_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah, bg_riverrock, bg_bigrock, bg_snow, bg_wasteland]

@@ -1250,18 +1250,27 @@ class Mob(pygame.sprite.Sprite):
     def draw(self, screen, cam_x):
         if self.swimming:
             if hasattr(self, 'current_liquid') and self.current_liquid:
-                liquid_center_x = self.current_liquid.rect.centerx
-                liquid_center_y = self.current_liquid.rect.centery
-                liquid_width = self.current_liquid.rect.width
-                liquid_height = self.current_liquid.rect.height
-                
-                dist_x = abs(self.rect.centerx - liquid_center_x) / (liquid_width / 2)
-                dist_y = abs(self.rect.centery - liquid_center_y) / (liquid_height / 2)
-                
-                sinking_ratio = max(0, 1 - max(dist_x, dist_y))
+                liquid_rect = self.current_liquid.rect
+                liquid_mask = self.current_liquid.mask
+                mob_feet_x = self.rect.centerx
+                mob_feet_y = self.rect.centery
+
+                liquid_local_x = mob_feet_x - liquid_rect.left
+                liquid_local_y = mob_feet_y - liquid_rect.top
+
+                liquid_surface_y = liquid_rect.height
+                if 0 <= liquid_local_x < liquid_mask.get_size()[0]:
+                    for y in range(liquid_mask.get_size()[1]):
+                        if liquid_mask.get_at((liquid_local_x, y)):
+                            liquid_surface_y = y
+                            break
+
+                sinking_depth = max(0, liquid_surface_y - liquid_local_y)
+                max_sinking_depth = liquid_rect.height * 0.75
+                sinking_ratio = min(1.0, sinking_depth / max_sinking_depth)
                 
                 # Clip image from bottom based on sinking depth
-                clip_pixels = int(sinking_ratio * self.rect.height * 0.4)
+                clip_pixels = int(sinking_ratio * self.image.get_height())
                 
                 if clip_pixels > 0 and self.image:
                     clipped_image = self.image.subsurface(pygame.Rect(0, 0, self.image.get_width(), self.image.get_height() - clip_pixels))
@@ -2957,6 +2966,10 @@ class Gorlin(Enemy):
         self.roll_on_alert = False
         self.roll_strike_used = False
         self.scavenge_rush = False
+        
+        self.eating = False
+        self.eating_timer = 0
+        self.eating_duration = 60
 
     def get_collision_rect(self, cam_x):
         rect = self.rect
@@ -2980,6 +2993,8 @@ class Gorlin(Enemy):
         self.health = min(self.full_health, self.health + heal_amount)
         corpse.destroyed = True
         self.target_carcass = None
+        self.eating = False
+        self.eating_timer = 0
         self.chasing = False
         self.attacking = False
         self.direction.xy = (0, 0)
@@ -3163,6 +3178,23 @@ class Gorlin(Enemy):
             self.image = self.dead_right_image if self.last_direction == "right" else self.dead_left_image
             return
 
+        if self.eating:
+            if self.target_carcass is not None and self._can_eat(self.target_carcass):
+                frames = self.attack_right_images if self.last_direction == "right" else self.attack_left_images
+                self.frame_index = (self.frame_index + self.attack_animation_speed) % len(frames)
+                self.image = frames[int(self.frame_index)]
+                
+                self.eating_timer -= 1
+                if self.eating_timer <= 0:
+                    self._eat_carcass(self.target_carcass)
+                    self.state = "idle"
+            else:
+                self.eating = False
+                self.eating_timer = 0
+                self.target_carcass = None
+                self.state = "idle"
+            return
+
         if self.attacking:
             return
 
@@ -3243,14 +3275,18 @@ class Gorlin(Enemy):
             dy = cy - self.rect.centery
             dist_sq = dx * dx + dy * dy
             if dist_sq <= (self.scavenge_eat_radius * self.scavenge_eat_radius):
-                # Stop rolling once we reach food
+                if not self.eating:
+                    self.eating = True
+                    self.eating_timer = self.eating_duration
+                    self.frame_index = 0.0
                 self.want_to_roll = False
                 self.scavenge_rush = False
                 self.roll_on_alert = False
                 self.roll_strike_used = False
-                self.state = "idle"
-                self.frame_index = 0.0
-                self._eat_carcass(self.target_carcass)
+                self.state = "eating"
+                self.direction.xy = (0, 0)
+                self.speed = 0
+                return
             else:
                 direction = pygame.Vector2(dx, dy)
                 if direction.length_squared() > 0:
@@ -3272,7 +3308,7 @@ class Gorlin(Enemy):
         if self.roll_hit_cooldown > 0:
             self.roll_hit_cooldown = max(0, self.roll_hit_cooldown - 1)
 
-        should_roll = self.want_to_roll and (self.chasing or self.fleeing or self.scavenge_rush)
+        should_roll = self.want_to_roll and (self.chasing or self.fleeing or self.scavenge_rush) and not self.eating
         if should_roll:
             if self.state not in ("roll_start", "roll"):
                 self.state = "roll_start"
@@ -3283,7 +3319,10 @@ class Gorlin(Enemy):
                 self.state = "roll_end"
                 self.frame_index = 0.0
             elif self.state == "roll_end" and self.frame_index >= len(self.roll_end_left_images) - 1:
-                self.state = "idle"
+                if self.eating:
+                    self.state = "eating"
+                else:
+                    self.state = "idle"
 
             if self.chasing and not self.fleeing:
                 self.speed = max(self.walk_speed, 1.2)
@@ -3384,16 +3423,16 @@ def update_pock_rocks(dt, player_world_x, player_world_y, player, mobs):
 class Redmite(Enemy):
     def __init__(self, x, y, name):
         super().__init__(x, y, name)
-        self.stand_left_images = [pygame.transform.scale(img, (24, 24)) for img in redmite_idle_left_images]
-        self.walk_left_images = [pygame.transform.scale(img, (24, 24)) for img in redmite_walk_left_images]
-        self.latch_left_images = [pygame.transform.scale(img, (24, 24)) for img in redmite_latch_left_images]
+        self.stand_left_images = [pygame.transform.scale(img, (16, 16)) for img in redmite_idle_left_images]
+        self.walk_left_images = [pygame.transform.scale(img, (16, 16)) for img in redmite_walk_left_images]
+        self.latch_left_images = [pygame.transform.scale(img, (16, 16)) for img in redmite_latch_left_images]
         self.walk_right_images = [pygame.transform.flip(img, True, False) for img in self.walk_left_images]
         self.stand_right_images = [pygame.transform.flip(img, True, False) for img in self.stand_left_images]
         self.latch_right_images = [pygame.transform.flip(img, True, False) for img in self.latch_left_images]
 
-        self.latched_left_image = pygame.transform.scale(redmite_latched_left_image, (24, 24))
+        self.latched_left_image = pygame.transform.scale(redmite_latched_left_image, (16, 16))
         self.latched_right_image = pygame.transform.flip(self.latched_left_image, True, False)
-        self.latched_up_image = pygame.transform.scale(redmite_latched_up_image, (24, 24))
+        self.latched_up_image = pygame.transform.scale(redmite_latched_up_image, (16, 16))
 
         self.image = self.stand_left_images[0]
         self.rect = self.image.get_rect(center=(x, y))

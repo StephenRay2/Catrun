@@ -19,7 +19,7 @@ from debug import font_path, font
 from mobs import hud_font, apply_wild_mob_level_scaling
 from player import *
 from cats import Cat
-from structures import StructureManager, StoneFloor, StoneWall, StoneStairs
+from structures import StructureManager, StoneFloor, StoneWall, StoneStairs, Structure
 
 clock = pygame.time.Clock()
 from inventory import *
@@ -473,38 +473,32 @@ def populate_test_inventory():
     return items_added
 
 
-def set_starting_loadout():
-    """Populate starting inventory with 10 of each structure item and nothing else."""
-    inventory.inventory_list = [None] * inventory.capacity
-    inventory.hotbar_slots = [None] * inventory.hotbar_size
+# def set_starting_loadout():
+#     """Populate starting inventory with 10 of each structure item and nothing else."""
+#     inventory.inventory_list = [None] * inventory.capacity
+#     inventory.hotbar_slots = [None] * inventory.hotbar_size
     
-    structure_items = [
-        "Stone Floor", "Stone Wall", "Stone Stairs"
-    ]
+#     structure_items = [
+#         "Stone Floor", "Stone Wall", "Stone Stairs"
+#     ]
 
-    next_inv_slot = 0
-    hotbar_idx = 0
-    for item_name in structure_items:
-        item_data = next((itm for itm in items_list if itm["item_name"] == item_name), None)
-        if not item_data:
-            print(f"Warning: starting item '{item_name}' not found.")
-            continue
+#     next_inv_slot = 0
+#     hotbar_idx = 0
+#     for item_name in structure_items:
+#         item_data = next((itm for itm in items_list if itm["item_name"] == item_name), None)
+#         if not item_data:
+#             print(f"Warning: starting item '{item_name}' not found.")
+#             continue
 
-        # Place one stack in hotbar (native size) for immediate placement
-        if hotbar_idx < inventory.hotbar_size:
-            inventory.hotbar_slots[hotbar_idx] = inventory.create_item_instance(item_data, 10)
-            hotbar_idx += 1
+#         # Place one stack in hotbar (native size) for immediate placement
+#         if hotbar_idx < inventory.hotbar_size:
+#             inventory.hotbar_slots[hotbar_idx] = inventory.create_item_instance(item_data, 10)
+#             hotbar_idx += 1
 
-        # Also mirror the stack into the backpack for backup
-        while next_inv_slot < inventory.capacity and inventory.inventory_list[next_inv_slot] is not None:
-            next_inv_slot += 1
-        if next_inv_slot < inventory.capacity:
-            inventory.inventory_list[next_inv_slot] = inventory.create_item_instance(item_data, 10)
-            next_inv_slot += 1
     
-    inventory.recalc_weight()
-    inventory.selection_mode = "hotbar"
-    inventory.selected_hotbar_slot = 0
+#     inventory.recalc_weight()
+#     inventory.selection_mode = "hotbar"
+#     inventory.selected_hotbar_slot = 0
 
 def calculate_throw_trajectory(start_x, start_y, target_x, target_y, throw_power):
     delta_x = target_x - start_x
@@ -1441,16 +1435,108 @@ def calculate_movement_rotation(frame_index, num_frames, direction, pendulum_off
     return 0
 
 
+def _load_structure_sprite_for_item(item_name: str):
+    """Helper to load and scale a structure sprite using item icon + placeable_size_settings."""
+    icon_name = None
+    for item in items_list:
+        if item.get("item_name") == item_name:
+            icon_name = item.get("icon")
+            break
+    if not icon_name:
+        return None, default_placeable_sprite_size
+    sprite_size, _ = get_placeable_sizes({"item_name": item_name})
+    try:
+        if icon_name.startswith("assets/"):
+            path = icon_name
+        else:
+            path = f"assets/sprites/items/{icon_name}"
+        sprite = pygame.image.load(path).convert_alpha()
+        sprite = pygame.transform.scale(sprite, sprite_size)
+        return sprite, sprite_size
+    except Exception as exc:
+        print(f"[WARN] Failed to load structure sprite for {item_name}: {exc}")
+        return None, default_placeable_sprite_size
+
+
+class WorkbenchStructure(Structure):
+    def __init__(self, x: float, y: float, z: int, direction: int = 0):
+        super().__init__(x, y, z, "Workbench", direction)
+        sprite, size = _load_structure_sprite_for_item("Workbench")
+        self.base_sprite = sprite
+        self.sprite = sprite
+        self.native_width, self.native_height = size
+
+
+class ArcaneCrafterStructure(Structure):
+    def __init__(self, x: float, y: float, z: int, direction: int = 0):
+        super().__init__(x, y, z, "Arcane Crafter", direction)
+        sprite, size = _load_structure_sprite_for_item("Arcane Crafter")
+        self.base_sprite = sprite
+        self.sprite = sprite
+        self.native_width, self.native_height = size
+
+
+class CampfireStructure(Structure):
+    def __init__(self, x: float, y: float, z: int, direction: int = 0):
+        super().__init__(x, y, z, "Campfire", direction)
+        sprite, size = _load_structure_sprite_for_item("Campfire")
+        self.base_sprite = sprite
+        self.sprite = sprite
+        self.native_width, self.native_height = size
+
+
+class SmelterStructure(Structure):
+    def __init__(self, x: float, y: float, z: int, direction: int = 0):
+        super().__init__(x, y, z, "Smelter", direction)
+        sprite, size = _load_structure_sprite_for_item("Smelter")
+        self.base_sprite = sprite
+        self.sprite = sprite
+        self.native_width, self.native_height = size
+
+
+class AlchemyBenchStructure(Structure):
+    def __init__(self, x: float, y: float, z: int, direction: int = 0):
+        super().__init__(x, y, z, "Alchemy Bench", direction)
+        sprite, size = _load_structure_sprite_for_item("Alchemy Bench")
+        self.base_sprite = sprite
+        self.sprite = sprite
+        self.native_width, self.native_height = size
+
+
+class MortarPestleStructure(Structure):
+    """World structure representation for the Mortar & Pestle."""
+
+    def __init__(self, x: float, y: float, z: int, direction: int = 0):
+        # Use a readable structure_type label for debugging/UI
+        super().__init__(x, y, z, "Mortar And Pestle", direction)
+        sprite, size = _load_structure_sprite_for_item("Mortar And Pestle")
+        self.base_sprite = sprite
+        self.sprite = sprite
+        self.native_width, self.native_height = size
+
+
 STRUCTURE_TYPE_BY_NAME = {
     "Stone Floor": "StoneFloor",
     "Stone Wall": "StoneWall",
     "Stone Stairs": "StoneStairs",
+    "Workbench": "Workbench",
+    "Arcane Crafter": "ArcaneCrafter",
+    "Campfire": "Campfire",
+    "Smelter": "Smelter",
+    "Mortar And Pestle": "MortarPestle",
+    "Alchemy Bench": "AlchemyBench",
 }
 
 STRUCTURE_CLASS_MAP = {
     "StoneFloor": StoneFloor,
     "StoneWall": StoneWall,
     "StoneStairs": StoneStairs,
+    "Workbench": WorkbenchStructure,
+    "ArcaneCrafter": ArcaneCrafterStructure,
+    "Campfire": CampfireStructure,
+    "Smelter": SmelterStructure,
+    "MortarPestle": MortarPestleStructure,
+    "AlchemyBench": AlchemyBenchStructure,
 }
 
 
@@ -2496,7 +2582,7 @@ while running:
             player.max_warmth = 100
             player.max_heat_resistance = int(round(100 * player.weather_resistance_leveler))
             player.max_cold_resistance = int(round(100 * player.weather_resistance_leveler))
-            player.max_weight = int(round(400 * player.weight_leveler * player.temp_weight_increase))
+            player.max_weight = int(round(100 * player.weight_leveler * player.temp_weight_increase))
             player.attack = int(round(player.damage + (player.strength_leveler - 1) * player.strength_level_gain))
             player.speed = int(round(100 * player.speed_leveler))
             player.defense = int(round(100 * player.defense_leveler))
@@ -2533,8 +2619,34 @@ while running:
             placement_direction = 0
 
             inventory.state = "inventory"
-            
-            set_starting_loadout()
+            # starting_items = ("Mortar And Pestle", "Smelter")
+
+            # for target_name in starting_items:
+            #     item_data = next((itm for itm in items_list if itm["item_name"] == target_name), None)
+
+            #     if item_data:
+            #         new_item = inventory.create_item_instance(item_data, 1)
+            #         placed = False
+
+            #         # Try hotbar
+            #         for idx, slot in enumerate(inventory.hotbar_slots):
+            #             if slot is None:
+            #                 inventory.hotbar_slots[idx] = new_item
+            #                 placed = True
+            #                 break
+
+            #         # Try main inventory
+            #         if not placed:
+            #             for idx, slot in enumerate(inventory.inventory_list):
+            #                 if slot is None:
+            #                     inventory.inventory_list[idx] = new_item
+            #                     placed = True
+            #                     break
+
+            #         if placed:
+            #             inventory.recalc_weight()
+            #     else:
+            #         print(f"Warning: starting item '{target_name}' not found in items_list")
             
             from world import gemstone_rocks, GemstoneRock
             gemstone_rocks.append(GemstoneRock(int(player_pos.x + cam_x + 100), int(player_pos.y + 50)))
@@ -3497,6 +3609,31 @@ while running:
                                 crafting_bench.open((structure['x'], structure['y']))
                                 crafting_bench_in_use = True
                                 break
+
+                    if not crafting_bench_in_use:
+                        for struct in nearby_structure_colliders:
+                            if isinstance(struct, WorkbenchStructure):
+                                struct_collision = struct.get_collision_rect(0)
+                                horizontal_dist = abs(struct_collision.centerx - player_world_x)
+                                vertical_dist = abs(struct_collision.centery - player_world_y)
+                                workbench_reach = 20
+                                horizontal_range = (struct_collision.width / 2) + workbench_reach
+                                vertical_range = (struct_collision.height / 2) + workbench_reach
+
+                                facing_object = False
+                                if player.last_direction == "right" and struct_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                    facing_object = True
+                                elif player.last_direction == "left" and struct_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                    facing_object = True
+                                elif player.last_direction == "up" and struct_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                    facing_object = True
+                                elif player.last_direction == "down" and struct_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                    facing_object = True
+
+                                if facing_object:
+                                    crafting_bench.open((struct.x, struct.y))
+                                    crafting_bench_in_use = True
+                                    break
                     
                     if not crafting_bench_in_use and not arcane_crafter_in_use:
                         for structure in nearby_structures:
@@ -3522,6 +3659,31 @@ while running:
                                     arcane_crafter.open((structure['x'], structure['y']))
                                     arcane_crafter_in_use = True
                                     break
+
+                        if not arcane_crafter_in_use:
+                            for struct in nearby_structure_colliders:
+                                if isinstance(struct, ArcaneCrafterStructure):
+                                    struct_collision = struct.get_collision_rect(0)
+                                    horizontal_dist = abs(struct_collision.centerx - player_world_x)
+                                    vertical_dist = abs(struct_collision.centery - player_world_y)
+                                    reach = 20
+                                    horizontal_range = (struct_collision.width / 2) + reach
+                                    vertical_range = (struct_collision.height / 2) + reach
+
+                                    facing_object = False
+                                    if player.last_direction == "right" and struct_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                        facing_object = True
+                                    elif player.last_direction == "left" and struct_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                        facing_object = True
+                                    elif player.last_direction == "up" and struct_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                        facing_object = True
+                                    elif player.last_direction == "down" and struct_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                        facing_object = True
+
+                                    if facing_object:
+                                        arcane_crafter.open((struct.x, struct.y))
+                                        arcane_crafter_in_use = True
+                                        break
                     
                     if not crafting_bench_in_use and not arcane_crafter_in_use:
                         for structure in nearby_structures:
@@ -3547,6 +3709,31 @@ while running:
                                     smelter.open((structure['x'], structure['y']))
                                     smelter_in_use = True
                                     break
+
+                        if not smelter_in_use:
+                            for struct in nearby_structure_colliders:
+                                if isinstance(struct, SmelterStructure):
+                                    struct_collision = struct.get_collision_rect(0)
+                                    horizontal_dist = abs(struct_collision.centerx - player_world_x)
+                                    vertical_dist = abs(struct_collision.centery - player_world_y)
+                                    smelter_reach = 20
+                                    horizontal_range = (struct_collision.width / 2) + smelter_reach
+                                    vertical_range = (struct_collision.height / 2) + smelter_reach
+
+                                    facing_object = False
+                                    if player.last_direction == "right" and struct_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                        facing_object = True
+                                    elif player.last_direction == "left" and struct_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                        facing_object = True
+                                    elif player.last_direction == "up" and struct_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                        facing_object = True
+                                    elif player.last_direction == "down" and struct_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                        facing_object = True
+
+                                    if facing_object:
+                                        smelter.open((struct.x, struct.y))
+                                        smelter_in_use = True
+                                        break
                     
                     if not crafting_bench_in_use and not smelter_in_use:
                         for structure in nearby_structures:
@@ -3573,7 +3760,33 @@ while running:
                                     campfire_in_use = True
                                     break
 
+                        if not campfire_in_use:
+                            for struct in nearby_structure_colliders:
+                                if isinstance(struct, CampfireStructure):
+                                    struct_collision = struct.get_collision_rect(0)
+                                    horizontal_dist = abs(struct_collision.centerx - player_world_x)
+                                    vertical_dist = abs(struct_collision.centery - player_world_y)
+                                    campfire_reach = 20
+                                    horizontal_range = (struct_collision.width / 2) + campfire_reach
+                                    vertical_range = (struct_collision.height / 2) + campfire_reach
+
+                                    facing_object = False
+                                    if player.last_direction == "right" and struct_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                        facing_object = True
+                                    elif player.last_direction == "left" and struct_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                        facing_object = True
+                                    elif player.last_direction == "up" and struct_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                        facing_object = True
+                                    elif player.last_direction == "down" and struct_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                        facing_object = True
+
+                                    if facing_object:
+                                        campfire.open((struct.x, struct.y))
+                                        campfire_in_use = True
+                                        break
+
                     if not crafting_bench_in_use and not smelter_in_use and not campfire_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and not chest_in_use:
+                        # Legacy placed-structure dictionaries
                         for structure in nearby_structures:
                             if structure['item_name'] == 'Mortar And Pestle':
                                 struct_collision = structure['rect']
@@ -3597,6 +3810,32 @@ while running:
                                     mortar_pestle.open((structure['x'], structure['y']))
                                     mortar_pestle_in_use = True
                                     break
+
+                        # New z-aware structures managed by StructureManager
+                        if not mortar_pestle_in_use:
+                            for struct in nearby_structure_colliders:
+                                if isinstance(struct, MortarPestleStructure):
+                                    struct_collision = struct.get_collision_rect(0)
+                                    horizontal_dist = abs(struct_collision.centerx - player_world_x)
+                                    vertical_dist = abs(struct_collision.centery - player_world_y)
+                                    mortar_pestle_reach = 20
+                                    horizontal_range = (struct_collision.width / 2) + mortar_pestle_reach
+                                    vertical_range = (struct_collision.height / 2) + mortar_pestle_reach
+
+                                    facing_object = False
+                                    if player.last_direction == "right" and struct_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                        facing_object = True
+                                    elif player.last_direction == "left" and struct_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                        facing_object = True
+                                    elif player.last_direction == "up" and struct_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                        facing_object = True
+                                    elif player.last_direction == "down" and struct_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                        facing_object = True
+
+                                    if facing_object:
+                                        mortar_pestle.open((struct.x, struct.y))
+                                        mortar_pestle_in_use = True
+                                        break
 
                     if not crafting_bench_in_use and not smelter_in_use and not campfire_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and not chest_in_use:
                         for structure in nearby_structures:
@@ -3622,6 +3861,31 @@ while running:
                                     alchemy_bench.open((structure['x'], structure['y']))
                                     alchemy_bench_in_use = True
                                     break
+
+                        if not alchemy_bench_in_use:
+                            for struct in nearby_structure_colliders:
+                                if isinstance(struct, AlchemyBenchStructure):
+                                    struct_collision = struct.get_collision_rect(0)
+                                    horizontal_dist = abs(struct_collision.centerx - player_world_x)
+                                    vertical_dist = abs(struct_collision.centery - player_world_y)
+                                    alchemy_reach = 20
+                                    horizontal_range = (struct_collision.width / 2) + alchemy_reach
+                                    vertical_range = (struct_collision.height / 2) + alchemy_reach
+
+                                    facing_object = False
+                                    if player.last_direction == "right" and struct_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                        facing_object = True
+                                    elif player.last_direction == "left" and struct_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                        facing_object = True
+                                    elif player.last_direction == "up" and struct_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                        facing_object = True
+                                    elif player.last_direction == "down" and struct_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                        facing_object = True
+
+                                    if facing_object:
+                                        alchemy_bench.open((struct.x, struct.y))
+                                        alchemy_bench_in_use = True
+                                        break
 
                     if not crafting_bench_in_use and not smelter_in_use and not campfire_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and not chest_in_use:
                         for structure in nearby_structures:
@@ -4248,6 +4512,10 @@ while running:
         visible_objects.extend(visible_projectiles)
         visible_objects.sort(key=lambda obj: (obj.rect.y + obj.rect.height) if hasattr(obj, 'rect') else obj['y'] + 32)
 
+        for obj in visible_liquids:
+            obj.update_animation(dt)
+            obj.draw(screen, cam_x)
+
         for mob in list(visible_mobs):
             if mob.destroyed:
                 visible_mobs.remove(mob)
@@ -4341,10 +4609,6 @@ while running:
                     screen.blit(bg_surface, bg_rect.topleft)
                     screen.blit(text_surface, (text_x, text_y))
                     current_y = text_y - line_spacing
-
-            for obj in visible_liquids:
-                obj.update_animation(dt)
-                obj.draw(screen, cam_x)
 
         def draw_held_item():
             current_hotbar_slot = inventory.hotbar_slots[inventory.selected_hotbar_slot]
@@ -4649,26 +4913,42 @@ while running:
                 # Draw player (with shadow)
                 draw_shadow_for_obj(player)
                 if player.swimming and player.current_liquid:
-                    liquid_center_x = player.current_liquid.rect.centerx
-                    liquid_center_y = player.current_liquid.rect.centery
-                    liquid_width = player.current_liquid.rect.width
-                    liquid_height = player.current_liquid.rect.height
+                    liquid_rect = player.current_liquid.rect
+                    liquid_mask = player.current_liquid.mask
+                    player_world_x = int(player_pos.x + cam_x)
+                    player_feet_y = int(player_pos.y + player_current_image.get_height() / 2)
 
-                    distance_x = abs((player_pos.x + cam_x) - liquid_center_x)
-                    distance_y = abs(player_pos.y - liquid_center_y)
-                    max_distance_x = liquid_width / 2
-                    max_distance_y = liquid_height / 2
+                    liquid_local_x = player_world_x - liquid_rect.left
+                    liquid_local_y = player_feet_y - liquid_rect.top
 
-                    normalized_x = min(1, distance_x / max_distance_x) if max_distance_x > 0 else 0
-                    normalized_y = min(1, distance_y / max_distance_y) if max_distance_y > 0 else 0
+                    min_edge_distance = float('inf')
+                    if 0 <= liquid_local_x < liquid_mask.get_size()[0] and 0 <= liquid_local_y < liquid_mask.get_size()[1]:
+                        if liquid_mask.get_at((int(liquid_local_x), int(liquid_local_y))):
+                            for angle in range(0, 360, 15):
+                                rad = math.radians(angle)
+                                dx = math.cos(rad)
+                                dy = math.sin(rad)
+                                for distance in range(1, max(liquid_mask.get_size())):
+                                    check_x = int(liquid_local_x + dx * distance)
+                                    check_y = int(liquid_local_y + dy * distance)
+                                    if check_x < 0 or check_x >= liquid_mask.get_size()[0] or check_y < 0 or check_y >= liquid_mask.get_size()[1]:
+                                        min_edge_distance = min(min_edge_distance, distance)
+                                        break
+                                    if not liquid_mask.get_at((check_x, check_y)):
+                                        min_edge_distance = min(min_edge_distance, distance)
+                                        break
+                    
+                    if min_edge_distance == float('inf'):
+                        min_edge_distance = 0
+                    
+                    max_distance_for_center = min(liquid_rect.width, liquid_rect.height) * 0.4
+                    sinking_ratio = min(0.75, min_edge_distance / max_distance_for_center)
 
-                    sinking_ratio = max(0, 1 - max(normalized_x, normalized_y))
-
-                    clip_height = int(player_current_image.get_height() * (1 - sinking_ratio * 0.5))
+                    clip_height = int(player_current_image.get_height() * (1 - sinking_ratio))
                     clip_rect = pygame.Rect(0, 0, player_current_image.get_width(), clip_height)
                     clipped_image = player_current_image.subsurface(clip_rect)
 
-                    y_offset = sinking_ratio * 4
+                    y_offset = sinking_ratio * 8
                     half_w = player_current_image.get_width() / 2
                     half_h = clip_height / 2
                     screen.blit(clipped_image, (int(player_pos.x - half_w), int(player_pos.y - half_h + y_offset)))
@@ -4741,26 +5021,42 @@ while running:
 
             draw_shadow_for_obj(player)
             if player.swimming and player.current_liquid:
-                liquid_center_x = player.current_liquid.rect.centerx
-                liquid_center_y = player.current_liquid.rect.centery
-                liquid_width = player.current_liquid.rect.width
-                liquid_height = player.current_liquid.rect.height
+                liquid_rect = player.current_liquid.rect
+                liquid_mask = player.current_liquid.mask
+                player_world_x = int(player_pos.x + cam_x)
+                player_feet_y = int(player_pos.y + player_current_image.get_height() / 2)
 
-                distance_x = abs((player_pos.x + cam_x) - liquid_center_x)
-                distance_y = abs(player_pos.y - liquid_center_y)
-                max_distance_x = liquid_width / 2
-                max_distance_y = liquid_height / 2
+                liquid_local_x = player_world_x - liquid_rect.left
+                liquid_local_y = player_feet_y - liquid_rect.top
 
-                normalized_x = min(1, distance_x / max_distance_x) if max_distance_x > 0 else 0
-                normalized_y = min(1, distance_y / max_distance_y) if max_distance_y > 0 else 0
+                min_edge_distance = float('inf')
+                if 0 <= liquid_local_x < liquid_mask.get_size()[0] and 0 <= liquid_local_y < liquid_mask.get_size()[1]:
+                    if liquid_mask.get_at((int(liquid_local_x), int(liquid_local_y))):
+                        for angle in range(0, 360, 15):
+                            rad = math.radians(angle)
+                            dx = math.cos(rad)
+                            dy = math.sin(rad)
+                            for distance in range(1, max(liquid_mask.get_size())):
+                                check_x = int(liquid_local_x + dx * distance)
+                                check_y = int(liquid_local_y + dy * distance)
+                                if check_x < 0 or check_x >= liquid_mask.get_size()[0] or check_y < 0 or check_y >= liquid_mask.get_size()[1]:
+                                    min_edge_distance = min(min_edge_distance, distance)
+                                    break
+                                if not liquid_mask.get_at((check_x, check_y)):
+                                    min_edge_distance = min(min_edge_distance, distance)
+                                    break
+                
+                if min_edge_distance == float('inf'):
+                    min_edge_distance = 0
+                
+                max_distance_for_center = min(liquid_rect.width, liquid_rect.height) * 0.4
+                sinking_ratio = min(0.75, min_edge_distance / max_distance_for_center)
 
-                sinking_ratio = max(0, 1 - max(normalized_x, normalized_y))
-
-                clip_height = int(player_current_image.get_height() * (1 - sinking_ratio * 0.5))
+                clip_height = int(player_current_image.get_height() * (1 - sinking_ratio))
                 clip_rect = pygame.Rect(0, 0, player_current_image.get_width(), clip_height)
                 clipped_image = player_current_image.subsurface(clip_rect)
 
-                y_offset = sinking_ratio * 4
+                y_offset = sinking_ratio * 8
                 half_w = player_current_image.get_width() / 2
                 half_h = clip_height / 2
                 screen.blit(clipped_image, (int(player_pos.x - half_w), int(player_pos.y - half_h + y_offset)))
@@ -4915,6 +5211,14 @@ while running:
                     lights.append((struct["x"] - cam_x, struct["y"], 260, None))
                 elif struct.get("item_name") == "Smelter" and smelter and getattr(smelter, "fire_lit", False):
                     lights.append((struct["x"] - cam_x, struct["y"], 260, None))
+            # Z-aware campfire/smelter structures
+            for struct in structure_manager.structures:
+                if getattr(struct, "destroyed", False):
+                    continue
+                if isinstance(struct, CampfireStructure) and campfire and getattr(campfire, "fire_lit", False):
+                    lights.append((struct.x - cam_x, struct.y, 260, None))
+                elif isinstance(struct, SmelterStructure) and smelter and getattr(smelter, "fire_lit", False):
+                    lights.append((struct.x - cam_x, struct.y, 260, None))
             # Held torch (player light)
             player_torch = None
             sel_slot = inventory.selected_hotbar_slot
@@ -5277,8 +5581,8 @@ while running:
             up_collision = any(obj_collides_rect(obj, top_player_check, cam_x) for obj in all_collision_objects)
             down_collision = any(obj_collides_rect(obj, bottom_player_check, cam_x) for obj in all_collision_objects)
 
-            # Liquid collision detection - use bottom center point of player
-            player_feet_rect = pygame.Rect(player.rect.centerx - 5, player.rect.bottom - 5, 10, 10)
+            # Liquid collision detection - use center point of player
+            player_feet_rect = pygame.Rect(player.rect.centerx - 5, player.rect.centery - 5, 10, 10)
             in_liquid = False
             for pond in nearby_objects:
                 if hasattr(pond, 'liquid_type') and pond.liquid_type == "water":
@@ -5683,6 +5987,13 @@ while running:
                 light_sources.append((struct["x"], struct["y"], 260, 10))
             elif struct.get("item_name") == "Smelter" and smelter and getattr(smelter, "fire_lit", False):
                 light_sources.append((struct["x"], struct["y"], 260, 12))
+        for struct in structure_manager.structures:
+            if getattr(struct, "destroyed", False):
+                continue
+            if isinstance(struct, CampfireStructure) and campfire and getattr(campfire, "fire_lit", False):
+                light_sources.append((struct.x, struct.y, 260, 10))
+            elif isinstance(struct, SmelterStructure) and smelter and getattr(smelter, "fire_lit", False):
+                light_sources.append((struct.x, struct.y, 260, 12))
         # Held torch warmth
         sel_slot = inventory.selected_hotbar_slot
         if 0 <= sel_slot < len(inventory.hotbar_slots):

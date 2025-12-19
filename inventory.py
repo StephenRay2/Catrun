@@ -1376,7 +1376,7 @@ items_list = [
         "placeable": False,
         "consumable": False,
         "durability": None,
-        "recipe": [{"item_tag": "Fiber", "amount": 4}],
+        "recipe": [{"item_tag": "fiber", "amount": 4}],
         "crafting_medium": "hand",
         "tags": ["crafted", "material"],
         "output_amount": 1
@@ -1597,7 +1597,7 @@ items_list = [
         "placeable": False,
         "consumable": True,
         "durability": None,
-        "recipe": [{"item": "Stone", "amount": 1}, {"item_tag": "oil", "amount": 1}, {"item_tag": "Fiber", "amount": 1}],
+        "recipe": [{"item": "Stone", "amount": 1}, {"item_tag": "oil", "amount": 1}, {"item_tag": "fiber", "amount": 1}],
         "output_amount": 10,
         "crafting_medium": "mortar_and_pestle",
         "tags": ["crafted", "material"]
@@ -1629,7 +1629,7 @@ items_list = [
         "placeable": False,
         "consumable": True,
         "durability": None,
-        "recipe": [{"item_tag": "Fiber", "amount": 10}, {"item": "Twilight Drupes", "amount": 3}, {"item": "Small Water", "amount": 1}],
+        "recipe": [{"item_tag": "fiber", "amount": 10}, {"item": "Twilight Drupes", "amount": 3}, {"item": "Small Water", "amount": 1}],
         "crafting_medium": "mortar_and_pestle",
         "tags": ["potion", "consumable"],
         "output_amount": 1
@@ -4509,7 +4509,7 @@ items_list = [
         "placeable": False,
         "consumable": True,
         "durability": None,
-        "recipe": [{"item_tag": "Fiber", "amount": 15}, {"item": "Twilight Drupes", "amount": 4}, {"item": "Medium Glass Water", "amount": 1}],
+        "recipe": [{"item_tag": "fiber", "amount": 15}, {"item": "Twilight Drupes", "amount": 4}, {"item": "Medium Glass Water", "amount": 1}],
         "crafting_medium": "alchemy_bench",
         "tags": ["potion", "consumable"],
         "output_amount": 1
@@ -5041,7 +5041,7 @@ items_list = [
         "placeable": False,
         "consumable": False,
         "durability": None,
-        "recipe": [{"item": "Hide", "amount": 4}, {"item_tag": "Fiber", "amount": 2}],
+        "recipe": [{"item": "Hide", "amount": 4}, {"item_tag": "fiber", "amount": 2}],
         "crafting_medium": "hand",
         "tags": ["container"],
         "output_amount": 1
@@ -7585,43 +7585,64 @@ class Inventory():
                         self.inventory_full_message_timer = 2.0
                 continue
 
-            item_name = entry
-            stacked = False
+            if isinstance(resource, dict) and entry in resource:
+                item_name = entry
+                quantity_to_add = resource[entry]
+            else:
+                item_name = entry
+                quantity_to_add = 1
             
             for item_data in items_list:
                 if item_data["item_name"] == item_name:
                     max_stack = item_data["stack_size"]
+                    remaining = quantity_to_add
                     
-                    for i in range(self.hotbar_size):
-                        slot = self.hotbar_slots[i]
-                        if slot and slot["item_name"] == item_name:
-                            if slot["quantity"] < max_stack:
-                                slot["quantity"] += 1
-                                stacked = True
-                                break
-                    
-                    if not stacked:
-                        for i in range(self.capacity):
-                            slot = self.inventory_list[i]
+                    while remaining > 0:
+                        stacked = False
+                        
+                        for i in range(self.hotbar_size):
+                            slot = self.hotbar_slots[i]
                             if slot and slot["item_name"] == item_name:
                                 if slot["quantity"] < max_stack:
-                                    slot["quantity"] += 1
+                                    add_amount = min(remaining, max_stack - slot["quantity"])
+                                    slot["quantity"] += add_amount
+                                    remaining -= add_amount
+                                    stacked = True
+                                    if remaining <= 0:
+                                        break
+                        
+                        if remaining > 0 and not stacked:
+                            for i in range(self.capacity):
+                                slot = self.inventory_list[i]
+                                if slot and slot["item_name"] == item_name:
+                                    if slot["quantity"] < max_stack:
+                                        add_amount = min(remaining, max_stack - slot["quantity"])
+                                        slot["quantity"] += add_amount
+                                        remaining -= add_amount
+                                        stacked = True
+                                        if remaining <= 0:
+                                            break
+                        
+                        if remaining > 0 and not stacked:
+                            for i in range(self.hotbar_size):
+                                if self.hotbar_slots[i] is None:
+                                    add_amount = min(remaining, max_stack)
+                                    self.hotbar_slots[i] = self.create_item_instance(item_data, add_amount)
+                                    remaining -= add_amount
                                     stacked = True
                                     break
-                    
-                    if not stacked:
-                        for i in range(self.hotbar_size):
-                            if self.hotbar_slots[i] is None:
-                                self.hotbar_slots[i] = self.create_item_instance(item_data, 1)
-                                stacked = True
-                                break
-                    
-                    if not stacked:
-                        for i in range(self.capacity):
-                            if self.inventory_list[i] is None:
-                                self.inventory_list[i] = self.create_item_instance(item_data, 1)
-                                stacked = True
-                                break
+                        
+                        if remaining > 0 and not stacked:
+                            for i in range(self.capacity):
+                                if self.inventory_list[i] is None:
+                                    add_amount = min(remaining, max_stack)
+                                    self.inventory_list[i] = self.create_item_instance(item_data, add_amount)
+                                    remaining -= add_amount
+                                    stacked = True
+                                    break
+                        
+                        if not stacked:
+                            break
                     
                     break
             
