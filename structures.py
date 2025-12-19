@@ -373,7 +373,7 @@ class StoneStairs(Structure):
     def __init__(self, x: float, y: float, z: int, direction: int = 0):
         super().__init__(x, y, z, "Stone Stairs", direction)
         self.direction = direction
-        self.descending = False
+        self.descending = direction in (1, 3)
         self.climb_speed_multiplier = 1.0
         self.path_lower: Tuple[float, float] = (x, y)
         self.path_upper: Tuple[float, float] = (x, y)
@@ -549,6 +549,7 @@ class StoneStairs(Structure):
 
     def rotate(self):
         self.direction = (self.direction + 1) % 4
+        self.descending = self.direction in (1, 3)
         self._update_sprite()
         self._refresh_mask()
         self._configure_geometry()
