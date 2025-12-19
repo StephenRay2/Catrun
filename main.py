@@ -1857,22 +1857,18 @@ def handle_stair_climbing(dt):
         player_pos.x = player_world_x - cam_x
         player_pos.y = player_world_y
 
+        base_z = active_stair.z
+        # Treat stairs as spanning base_z (bottom) to base_z+1 (top) in all cases.
+        z_low = base_z
+        z_high = base_z + 1
+
         if stair_progress >= 1.0:
             # Snap to top and finalize z-level
             stair_progress = 1.0
             player_world_x, player_world_y = path_upper
             player_pos.x = player_world_x - cam_x
             player_pos.y = player_world_y
-            is_descending = getattr(active_stair, 'descending', False)
-            stair_dir = active_stair.direction % 4
-            if is_descending and stair_dir == 1:
-                player_z = active_stair.z
-            elif is_descending and stair_dir == 3:
-                player_z = active_stair.z - 1
-            elif is_descending:
-                player_z = active_stair.z
-            else:
-                player_z = active_stair.z + 1
+            player_z = z_high
             active_stair = None
         elif stair_progress <= 0.0:
             # Snap to bottom and finalize z-level
@@ -1880,16 +1876,7 @@ def handle_stair_climbing(dt):
             player_world_x, player_world_y = path_lower
             player_pos.x = player_world_x - cam_x
             player_pos.y = player_world_y
-            is_descending = getattr(active_stair, 'descending', False)
-            stair_dir = active_stair.direction % 4
-            if is_descending and stair_dir == 1:
-                player_z = active_stair.z - 1
-            elif is_descending and stair_dir == 3:
-                player_z = active_stair.z
-            elif is_descending:
-                player_z = active_stair.z - 1
-            else:
-                player_z = active_stair.z
+            player_z = z_low
             active_stair = None
         return
 
@@ -2006,21 +1993,26 @@ def handle_stair_climbing(dt):
                         player_pos.y = player_world_y
                         return
 
-            if struct.z + 1 == player_z and upper_rect.colliderect(player_world_rect):
-                # Only enter from the upper side when moving down toward the stair
-                path_lower, path_upper = struct.get_path_points()
-                path_vec = pygame.Vector2(path_upper) - pygame.Vector2(path_lower)
-                if path_vec.length_squared() > 0:
-                    path_dir = path_vec.normalize()
-                    if move_vec_raw.dot(path_dir) < -0.05:
-                        active_stair = struct
-                        stair_direction = -1
-                        stair_progress = max(-0.05, min(1.05, struct.project_progress(world_point)))
-                        proj_pos = pygame.Vector2(*struct.get_path_points()[0]) + (pygame.Vector2(struct.get_path_points()[1]) - pygame.Vector2(struct.get_path_points()[0])) * stair_progress
-                        player_world_x, player_world_y = proj_pos.x, proj_pos.y
-                        player_pos.x = player_world_x - cam_x
-                        player_pos.y = player_world_y
-                        return
+        if struct.z + 1 == player_z and upper_rect.colliderect(player_world_rect):
+            # Allow entering from the upper side when moving down OR always for descending stairs (e.g., StoneStairsUp)
+            path_lower, path_upper = struct.get_path_points()
+            path_vec = pygame.Vector2(path_upper) - pygame.Vector2(path_lower)
+            allow_entry = False
+            if path_vec.length_squared() > 0:
+                path_dir = path_vec.normalize()
+                if move_vec_raw.dot(path_dir) < -0.05:
+                    allow_entry = True
+            if getattr(struct, "descending", False):
+                allow_entry = True
+            if allow_entry:
+                active_stair = struct
+                stair_direction = -1
+                stair_progress = max(-0.05, min(1.05, struct.project_progress(world_point)))
+                proj_pos = pygame.Vector2(*struct.get_path_points()[0]) + (pygame.Vector2(struct.get_path_points()[1]) - pygame.Vector2(struct.get_path_points()[0])) * stair_progress
+                player_world_x, player_world_y = proj_pos.x, proj_pos.y
+                player_pos.x = player_world_x - cam_x
+                player_pos.y = player_world_y
+                return
 
 
 while running:
