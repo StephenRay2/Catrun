@@ -18,7 +18,7 @@ from world import DroppedItem, dropped_items, Bank, banks
 from debug import font_path, font
 from mobs import hud_font, apply_wild_mob_level_scaling
 from player import *
-from cats import Cat
+from cats import Cat, cat_types
 from structures import StructureManager, StoneFloor, StoneWall, StoneStairs, Structure
 
 clock = pygame.time.Clock()
@@ -50,6 +50,218 @@ player_world_y = player_pos.y
 prev_player_world_pos = pygame.Vector2(player_world_x, player_world_y)
 
 collection_messages = []
+
+# Menu scene visuals
+menu_decor = []
+menu_cats = []
+menu_scene_ready = False
+menu_decor_assets = None
+menu_cat_type_images = None
+menu_rng = random.Random()
+
+MENU_DECOR_PATHS = {
+    "boulders": [
+        "assets/sprites/biomes/grassland/Boulder1.png",
+        "assets/sprites/biomes/grassland/Boulder2.png",
+        "assets/sprites/biomes/grassland/Boulder3.png",
+        "assets/sprites/biomes/grassland/Boulder4.png",
+        "assets/sprites/biomes/grassland/Boulder5.png",
+        "assets/sprites/biomes/grassland/Boulder6.png",
+        "assets/sprites/biomes/grassland/Boulder7.png",
+    ],
+    "rocks": [
+        "assets/sprites/biomes/grassland/Rock1.png",
+        "assets/sprites/biomes/grassland/Rock2.png",
+        "assets/sprites/biomes/grassland/Rock3.png",
+        "assets/sprites/biomes/grassland/Rock4.png",
+        "assets/sprites/biomes/grassland/Rock5.png",
+        "assets/sprites/biomes/grassland/Rock6.png",
+    ],
+    "stones": [
+        "assets/sprites/biomes/grassland/Stone1.png",
+        "assets/sprites/biomes/grassland/Stone2.png",
+        "assets/sprites/biomes/grassland/Stone3.png",
+        "assets/sprites/biomes/grassland/Stone4.png",
+        "assets/sprites/biomes/grassland/Stone5.png",
+        "assets/sprites/biomes/grassland/Stone6.png",
+        "assets/sprites/biomes/grassland/Stone7.png",
+        "assets/sprites/biomes/grassland/Stone8.png",
+        "assets/sprites/biomes/grassland/Stone9.png",
+        "assets/sprites/biomes/grassland/Stone10.png",
+    ],
+    "trees": [
+        "assets/sprites/biomes/grassland/OakTree.png",
+        "assets/sprites/biomes/grassland/FirTree.png",
+        "assets/sprites/biomes/grassland/DuskwoodTree.png",
+        "assets/sprites/biomes/grassland/AppleTree.png",
+    ],
+    "bushes": [
+        "assets/sprites/biomes/grassland/BloodBerryBush.png",
+        "assets/sprites/biomes/grassland/DawnBerryBush.png",
+        "assets/sprites/biomes/grassland/DuskBerryBush.png",
+        "assets/sprites/biomes/grassland/SunBerryBush.png",
+        "assets/sprites/biomes/grassland/TealBerryBush.png",
+        "assets/sprites/biomes/grassland/TwilightDrupesBush.png",
+        "assets/sprites/biomes/grassland/VioBerryBush.png",
+    ],
+    "grass": [
+        "assets/sprites/biomes/grassland/Grass1.png",
+        "assets/sprites/biomes/grassland/Grass2.png",
+        "assets/sprites/biomes/grassland/Grass3.png",
+        "assets/sprites/biomes/grassland/Grass4.png",
+    ],
+}
+
+MENU_DECOR_COUNTS = {
+    "boulders": (5, 9),
+    "rocks": (10, 18),
+    "stones": (10, 18),
+    "trees": (4, 7),
+    "bushes": (8, 14),
+    "grass": (18, 28),
+}
+
+MENU_CAT_COUNT = 30
+MENU_CAT_MIN_SPEED = 40
+MENU_CAT_MAX_SPEED = 120
+MENU_CAT_MIN_Y_RATIO = 0.05
+MENU_CAT_MAX_Y_RATIO = 0.92
+
+MENU_SHADOW_STYLES = {
+    "cat": {"width_mult": 0.5, "height_mult": 0.2, "alpha": 40, "y_offset": 0},
+    "boulders": {"width_mult": 0.85, "height_mult": 0.22, "alpha": 40, "y_offset": -10},
+    "rocks": {"width_mult": 0.65, "height_mult": 0.2, "alpha": 40, "y_offset": -2},
+    "stones": {"width_mult": 0.55, "height_mult": 0.2, "alpha": 40, "y_offset": -2},
+    "trees": {"width_mult": 0.75, "height_mult": 0.18, "alpha": 40, "y_offset_ratio": -0.04},
+    "bushes": {"width_mult": 0.6, "height_mult": 0.2, "alpha": 40, "y_offset": -4},
+    "grass": {"width_mult": 0.4, "height_mult": 0.18, "alpha": 40, "y_offset": -2},
+}
+
+def draw_menu_shadow(rect, style_key):
+    style = MENU_SHADOW_STYLES.get(style_key, MENU_SHADOW_STYLES["cat"])
+    width_mult = style.get("width_mult", 0.8)
+    height_mult = style.get("height_mult", 0.25)
+    alpha = style.get("alpha", 50)
+    y_offset = style.get("y_offset", 0)
+    if "y_offset_ratio" in style:
+        y_offset += int(rect.height * style["y_offset_ratio"])
+    shadow_width = max(8, int(rect.width * width_mult))
+    shadow_height = max(4, int(rect.height * height_mult))
+    shadow_surface = pygame.Surface((shadow_width, shadow_height), pygame.SRCALPHA)
+    pygame.draw.ellipse(shadow_surface, (0, 0, 0, alpha), shadow_surface.get_rect())
+    shadow_x = rect.centerx - shadow_width // 2
+    shadow_y = rect.bottom - shadow_height // 2 + y_offset
+    screen.blit(shadow_surface, (shadow_x, shadow_y))
+
+def _load_menu_assets():
+    global menu_decor_assets, menu_cat_type_images
+    if menu_decor_assets is None:
+        menu_decor_assets = {}
+        for group, paths in MENU_DECOR_PATHS.items():
+            menu_decor_assets[group] = [
+                pygame.image.load(path).convert_alpha() for path in paths
+            ]
+    if menu_cat_type_images is None:
+        menu_cat_type_images = []
+        for cat_type in cat_types:
+            images = [
+                pygame.image.load(cat_type[f"walk_right_image{i}"]).convert_alpha()
+                for i in range(1, 6)
+            ]
+            menu_cat_type_images.append(images)
+
+def build_menu_scene():
+    global menu_decor, menu_cats, menu_scene_ready
+    _load_menu_assets()
+    menu_rng.seed(pygame.time.get_ticks())
+
+    menu_decor = []
+    for group, images in menu_decor_assets.items():
+        count_min, count_max = MENU_DECOR_COUNTS.get(group, (4, 8))
+        count = menu_rng.randint(count_min, count_max)
+        for _ in range(count):
+            image = menu_rng.choice(images)
+            x_max = max(0, width - image.get_width())
+            if group == "trees":
+                y_min = int(height * 0.12)
+                y_max = int(height * 0.55)
+            elif group == "bushes":
+                y_min = int(height * 0.35)
+                y_max = int(height * 0.8)
+            else:
+                y_min = int(height * 0.55)
+                y_max = int(height * 0.85)
+            y_max = max(y_min, min(y_max, height - image.get_height()))
+            x = menu_rng.randint(0, x_max)
+            y = menu_rng.randint(y_min, y_max)
+            menu_decor.append({"image": image, "x": x, "y": y, "group": group})
+
+    menu_cats = []
+    for _ in range(MENU_CAT_COUNT):
+        images = menu_rng.choice(menu_cat_type_images)
+        frame_index = menu_rng.randrange(len(images))
+        image = images[frame_index]
+        y_min = int(height * MENU_CAT_MIN_Y_RATIO)
+        y_max = int(height * MENU_CAT_MAX_Y_RATIO) - image.get_height()
+        y_max = max(y_min, y_max)
+        menu_cats.append({
+            "images": images,
+            "x": menu_rng.uniform(-width, width * 1.5),
+            "y": menu_rng.randint(y_min, y_max),
+            "speed": menu_rng.uniform(MENU_CAT_MIN_SPEED, MENU_CAT_MAX_SPEED),
+            "frame_index": frame_index,
+            "anim_timer": 0.0,
+            "anim_speed": menu_rng.uniform(0.08, 0.16),
+        })
+    menu_scene_ready = True
+
+def draw_menu_scene(dt):
+    if not menu_scene_ready:
+        build_menu_scene()
+
+    screen.blit(bg_grass, (0, 0))
+
+    draw_entries = []
+    for decor in menu_decor:
+        image = decor["image"]
+        rect = image.get_rect(topleft=(int(decor["x"]), int(decor["y"])))
+        draw_entries.append({
+            "image": image,
+            "rect": rect,
+            "style_key": decor.get("group", "boulders"),
+        })
+
+    for cat in menu_cats:
+        images = cat["images"]
+        cat["x"] += cat["speed"] * dt
+
+        cat["anim_timer"] += dt
+        if cat["anim_timer"] >= cat["anim_speed"]:
+            cat["anim_timer"] -= cat["anim_speed"]
+            cat["frame_index"] = (cat["frame_index"] + 1) % len(images)
+
+        image = images[cat["frame_index"]]
+        if cat["x"] > width + image.get_width():
+            y_min = int(height * MENU_CAT_MIN_Y_RATIO)
+            y_max = int(height * MENU_CAT_MAX_Y_RATIO) - image.get_height()
+            y_max = max(y_min, y_max)
+            cat["x"] = -image.get_width() - menu_rng.uniform(20, width * 0.5)
+            cat["y"] = menu_rng.randint(y_min, y_max)
+            cat["speed"] = menu_rng.uniform(MENU_CAT_MIN_SPEED, MENU_CAT_MAX_SPEED)
+            cat["frame_index"] = menu_rng.randrange(len(images))
+            image = images[cat["frame_index"]]
+
+        rect = image.get_rect(topleft=(int(cat["x"]), int(cat["y"])))
+        draw_entries.append({
+            "image": image,
+            "rect": rect,
+            "style_key": "cat",
+        })
+
+    draw_entries.sort(key=lambda entry: entry["rect"].bottom)
+    for entry in draw_entries:
+        draw_menu_shadow(entry["rect"], entry["style_key"])
+        screen.blit(entry["image"], entry["rect"].topleft)
 
 # Cat naming system
 naming_cat = None
@@ -2021,31 +2233,14 @@ while running:
             sound_manager.stop_music()
             sound_manager.play_music("assets/music/Settler's End.wav")
             menu_zoom_timer = 0.0
+            menu_scene_ready = False
         elif state == "game":
             sound_manager.stop_music()
             sound_manager.play_random_ambient_music(min_delay=200, max_delay=800, volume=0.2, fade_in=4000)
         previous_state = state
     
     if state == "menu":
-        # Smooth zoom in/out valley background (loops) - uses pre-scaled image
-        menu_zoom_timer += dt
-        zoom_cycle = 240.0  # 120s zoom in, 120s zoom out
-        phase = (menu_zoom_timer % zoom_cycle) / zoom_cycle
-        
-        max_zoom = 2.0
-        if phase < 0.5:
-            zoom_t = phase * 2.0
-        else:
-            zoom_t = 2.0 - (phase * 2.0)
-        
-        current_scale = 1.0 + (max_zoom - 1.0) * zoom_t
-        
-        view_scale = 1.0 / current_scale
-        view_w = int(bg_valley_prescaled.get_width() * view_scale)
-        view_h = int(bg_valley_prescaled.get_height() * view_scale)
-        
-        scaled_view = pygame.transform.smoothscale(bg_valley_prescaled, (view_w, view_h))
-        screen.blit(pygame.transform.scale(scaled_view, (width, height)), (0, 0))
+        draw_menu_scene(dt)
 
         catrun_title = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/catrun_title.png").convert_alpha(), (800, 200))
         screen.blit(catrun_title, (width/2 - catrun_title.get_width()/2, 100))
