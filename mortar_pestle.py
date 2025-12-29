@@ -45,6 +45,10 @@ class MortarPestle:
         self.font_medium = pygame.font.Font(font_path, 18)
         self.font_large = pygame.font.Font(font_path, 22)
         self.close_rect = None
+        self.last_item_click_time = 0
+        self.last_item_click_slot = None
+        self.last_item_click_type = None
+        self.double_click_threshold_ms = 300
     
     def _load_mortar_pestle_recipes(self):
         recipes = []
@@ -705,6 +709,44 @@ class MortarPestle:
                 (track_x + 1, thumb_y, track_width - 2, thumb_height),
                 border_radius=3,
             )
+
+    def _wrap_text(self, text, font, max_width):
+        words = text.split()
+        lines = []
+        current = ""
+        for word in words:
+            test_line = word if current == "" else current + " " + word
+            if font.size(test_line)[0] <= max_width:
+                current = test_line
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        if not lines:
+            lines = [""]
+        return lines
+
+    def check_item_double_click(self, slot_index, is_hotbar):
+        now = pygame.time.get_ticks()
+        slot_type = "hotbar" if is_hotbar else "inventory"
+        if (
+            self.last_item_click_slot == slot_index
+            and self.last_item_click_type == slot_type
+            and (now - self.last_item_click_time) < self.double_click_threshold_ms
+        ):
+            self.last_item_click_slot = None
+            self.last_item_click_type = None
+            self.last_item_click_time = 0
+            return True
+        self.last_item_click_slot = slot_index
+        self.last_item_click_type = slot_type
+        self.last_item_click_time = now
+        return False
+
+    def handle_item_double_click(self, slot_index, is_hotbar):
+        return self.inventory.handle_item_double_click(slot_index, is_hotbar)
     
     def _draw_recipe_description(self, screen, bg_x, bg_y):
         if self.selected_recipe is None or self.selected_recipe >= len(self.recipes):
@@ -718,31 +760,96 @@ class MortarPestle:
         screen.blit(name_text, (desc_x, desc_y))
         
         desc_y += 40
-        max_width = 200
-        words = recipe.get("description", "").split()
-        line = ""
-        for word in words:
-            test_line = line + word + " "
-            test_width = self.font_small.size(test_line)[0]
-            if test_width > max_width:
-                if line:
-                    desc_text = self.font_small.render(line, True, (235, 235, 240))
-                    screen.blit(desc_text, (desc_x, desc_y))
-                    desc_y += 18
-                line = word + " "
-            else:
-                line = test_line
-        if line:
-            desc_text = self.font_small.render(line, True, (235, 235, 240))
-            screen.blit(desc_text, (desc_x, desc_y))
-            desc_y += 18
-        
-        desc_y += 15
+        base_width = 200
+        desired_width = int(base_width * 1.5)
+        column_gap = 12
+        min_second_col = 120
+        panel_right = screen.get_width()
+        if self.mortar_pestle_screen_image:
+            panel_right = bg_x + self.mortar_pestle_screen_image.get_width()
+        available_width = max(0, panel_right - desc_x - 10)
+        col1_width = min(
+            desired_width,
+            max(base_width, available_width - column_gap - min_second_col),
+        )
+        if col1_width > available_width:
+            col1_width = available_width
+        col2_width = available_width - col1_width - column_gap
+        column_widths = [col1_width]
+        if col2_width >= 80:
+            column_widths.append(col2_width)
+        grid_top = bg_y + 290
+        max_bottom = grid_top - 15
+        line_step = self.font_small.get_linesize() + 2
+
+        def _flow_text_columns(text, font, col_widths, max_lines):
+            words = text.split()
+            if not words:
+                return [[]]
+            columns = []
+            word_idx = 0
+            for width in col_widths:
+                lines = []
+                current = ""
+                while word_idx < len(words) and len(lines) < max_lines:
+                    word = words[word_idx]
+                    test_line = word if current == "" else current + " " + word
+                    if font.size(test_line)[0] <= width:
+                        current = test_line
+                        word_idx += 1
+                    else:
+                        if current:
+                            lines.append(current)
+                            current = ""
+                        else:
+                            lines.append(word)
+                            word_idx += 1
+                if current and len(lines) < max_lines:
+                    lines.append(current)
+                columns.append(lines)
+                if word_idx >= len(words):
+                    break
+            return columns
+
+        max_lines_per_col = max(1, (max_bottom - desc_y) // line_step)
+        desc_start_y = desc_y
+        columns = _flow_text_columns(
+            recipe.get("description", ""),
+            self.font_small,
+            column_widths,
+            max_lines_per_col,
+        )
+        for col_idx, col_lines in enumerate(columns):
+            col_x = desc_x + sum(column_widths[:col_idx]) + (column_gap * col_idx)
+            for line_idx, line in enumerate(col_lines):
+                line_y = desc_start_y + (line_idx * line_step)
+                if line_y + line_step > max_bottom:
+                    break
+                desc_text = self.font_small.render(line, True, (235, 235, 240))
+                screen.blit(desc_text, (col_x, line_y))
+
+        if columns:
+            max_desc_lines = max(len(col) for col in columns)
+            desc_y = desc_start_y + (max_desc_lines * line_step)
+
+        desc_y += 8
+        if desc_y + self.font_medium.get_linesize() > max_bottom:
+            return
+        recipe_left_shift = int(base_width * 0.50)
+        recipe_x = desc_x - recipe_left_shift
+        preview_x = bg_x + 18 + (8 * (64 + 4)) + 100
+        preview_right = preview_x + 80
+        preview_bottom = bg_y + 34 + 80
         recipe_label = self.font_medium.render("Recipe:", True, (255, 230, 180))
-        screen.blit(recipe_label, (desc_x, desc_y))
-        
-        desc_y += 30
+        recipe_label_y = desc_y
+        recipe_start_y = recipe_label_y + self.font_medium.get_linesize() + 8
+        if recipe_start_y <= preview_bottom + 8 and recipe_x < preview_right + 10:
+            recipe_x = preview_right + 10
+        screen.blit(recipe_label, (recipe_x, recipe_label_y))
+
+        recipe_available_width = max(0, panel_right - recipe_x - 10)
         if recipe.get("recipe"):
+            recipe_lines = []
             for requirement in recipe["recipe"]:
                 if "item" in requirement:
                     item_name = requirement["item"]
@@ -754,11 +861,93 @@ class MortarPestle:
                     have = self.inventory.get_items_by_tag_count(requirement["item_tag"])
                 else:
                     continue
-                
+
                 color = (50, 255, 50) if have >= amount else (255, 50, 50)
-                req_text = self.font_small.render(f"{item_name}: {have}/{amount}", True, color)
-                screen.blit(req_text, (desc_x, desc_y))
-                desc_y += 22
+                label = f"{item_name}: {have}/{amount}"
+                recipe_lines.append((label, color))
+
+            def _flow_colored_lines(lines, font, col_widths, max_lines):
+                columns = [[] for _ in col_widths]
+                col_idx = 0
+                line_idx = 0
+                overflowed = False
+
+                def push_line(text, color):
+                    nonlocal col_idx, line_idx, overflowed
+                    while col_idx < len(col_widths) and line_idx >= max_lines:
+                        col_idx += 1
+                        line_idx = 0
+                    if col_idx >= len(col_widths):
+                        overflowed = True
+                        return False
+                    columns[col_idx].append((text, color))
+                    line_idx += 1
+                    return True
+
+                for text, color in lines:
+                    words = text.split()
+                    if not words:
+                        if not push_line("", color):
+                            return columns, overflowed
+                        continue
+                    current = ""
+                    word_idx = 0
+                    while word_idx < len(words):
+                        if col_idx >= len(col_widths):
+                            overflowed = True
+                            return columns, overflowed
+                        width = col_widths[col_idx]
+                        word = words[word_idx]
+                        test_line = word if current == "" else current + " " + word
+                        if font.size(test_line)[0] <= width:
+                            current = test_line
+                            word_idx += 1
+                        else:
+                            if current:
+                                if not push_line(current, color):
+                                    return columns, overflowed
+                                current = ""
+                            else:
+                                if not push_line(word, color):
+                                    return columns, overflowed
+                                word_idx += 1
+                    if current:
+                        if not push_line(current, color):
+                            return columns, overflowed
+                return columns, overflowed
+
+            def _choose_recipe_columns(lines, font, max_lines, avail_width, gap):
+                if avail_width <= 0:
+                    return [1], [[]]
+                for cols in range(1, 4):
+                    col_width = int((avail_width - gap * (cols - 1)) / cols)
+                    if col_width <= 0:
+                        continue
+                    col_widths = [col_width] * cols
+                    columns, overflowed = _flow_colored_lines(lines, font, col_widths, max_lines)
+                    if not overflowed:
+                        return col_widths, columns
+                col_width = max(1, int((avail_width - gap * 2) / 3))
+                col_widths = [col_width] * 3
+                columns, _ = _flow_colored_lines(lines, font, col_widths, max_lines)
+                return col_widths, columns
+
+            max_lines_per_col = max(1, (max_bottom - recipe_start_y) // line_step)
+            recipe_column_widths, columns = _choose_recipe_columns(
+                recipe_lines,
+                self.font_small,
+                max_lines_per_col,
+                recipe_available_width,
+                column_gap,
+            )
+            for col_idx, col_lines in enumerate(columns):
+                col_x = recipe_x + sum(recipe_column_widths[:col_idx]) + (column_gap * col_idx)
+                for line_idx, (line, color) in enumerate(col_lines):
+                    line_y = recipe_start_y + (line_idx * line_step)
+                    if line_y + line_step > max_bottom:
+                        break
+                    req_text = self.font_small.render(line, True, color)
+                    screen.blit(req_text, (col_x, line_y))
     
     def _draw_dragged_item(self, screen):
         if self.dragged_item is None:

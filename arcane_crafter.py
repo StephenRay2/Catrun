@@ -179,6 +179,101 @@ class ArcaneCrafter(CraftingBench):
         # Enchanting screen: for now, just UI, no special behavior
         return
 
+    def _get_max_stack(self, item_name):
+        for item in items_list:
+            if item["item_name"] == item_name:
+                return item.get("stack_size", 100)
+        return 100
+
+    def _move_from_enchant_slot(self, slot_attr):
+        temp_list = [getattr(self, slot_attr)]
+        if temp_list[0] is None:
+            return False
+        moved = self.inventory._move_stack_to_lists(
+            temp_list,
+            0,
+            [self.inventory.inventory_list, self.inventory.hotbar_slots],
+        )
+        setattr(self, slot_attr, temp_list[0])
+        return moved
+
+    def _move_into_enchant_slot(self, source_list, source_index, slot_attr):
+        slot = source_list[source_index]
+        if slot is None:
+            return False
+        item_name = slot.get("item_name")
+        max_stack = self._get_max_stack(item_name)
+        remaining = slot.get("quantity", 1)
+        target_slot = getattr(self, slot_attr)
+
+        moved = False
+        if target_slot is None:
+            new_stack = slot.copy()
+            new_stack["quantity"] = min(max_stack, remaining)
+            setattr(self, slot_attr, new_stack)
+            remaining -= new_stack["quantity"]
+            moved = True
+        elif target_slot.get("item_name") == item_name:
+            space = max_stack - target_slot.get("quantity", 0)
+            if space > 0:
+                amount = min(space, remaining)
+                target_slot["quantity"] += amount
+                remaining -= amount
+                moved = True
+        else:
+            return False
+
+        if not moved:
+            return False
+
+        if remaining <= 0:
+            source_list[source_index] = None
+        else:
+            slot["quantity"] = remaining
+        self.inventory.recalc_weight()
+        return True
+
+    def check_item_double_click(self, slot_info):
+        slot_index, slot_type = slot_info
+        now = pygame.time.get_ticks()
+        if (
+            self.last_item_click_slot == slot_index
+            and self.last_item_click_type == slot_type
+            and (now - self.last_item_click_time) < self.double_click_threshold_ms
+        ):
+            self.last_item_click_slot = None
+            self.last_item_click_type = None
+            self.last_item_click_time = 0
+            return True
+        self.last_item_click_slot = slot_index
+        self.last_item_click_type = slot_type
+        self.last_item_click_time = now
+        return False
+
+    def handle_item_double_click(self, slot_info):
+        slot_index, slot_type = slot_info
+
+        if self.mode == "crafting":
+            is_hotbar = slot_type == "hotbar"
+            return self.inventory.handle_item_double_click(slot_index, is_hotbar)
+
+        if slot_type == "inventory":
+            if self._move_into_enchant_slot(self.inventory.inventory_list, slot_index, "enchant_input_slot"):
+                return True
+            return self._move_into_enchant_slot(self.inventory.inventory_list, slot_index, "enchant_catalyst_slot")
+        if slot_type == "hotbar":
+            if self._move_into_enchant_slot(self.inventory.hotbar_slots, slot_index, "enchant_input_slot"):
+                return True
+            return self._move_into_enchant_slot(self.inventory.hotbar_slots, slot_index, "enchant_catalyst_slot")
+        if slot_type == "input":
+            return self._move_from_enchant_slot("enchant_input_slot")
+        if slot_type == "catalyst":
+            return self._move_from_enchant_slot("enchant_catalyst_slot")
+        if slot_type == "output":
+            return self._move_from_enchant_slot("enchant_output_slot")
+
+        return False
+
     def draw(self, screen):
         if not self.active:
             return
@@ -220,39 +315,7 @@ class ArcaneCrafter(CraftingBench):
         self._draw_recipe_description(screen, x_pos, y_pos)
 
     def _draw_recipe_description(self, screen, bg_x, bg_y):
-        if self.selected_recipe is None or self.selected_recipe >= len(self.recipes):
-            return
-
-        recipe = self.recipes[self.selected_recipe]
-        desc_x = bg_x + 18 + (8 * (64 + 4)) + 200
-        desc_y = bg_y + 44
-
-        name_text = self.font_large.render(recipe["item_name"], True, (245, 240, 255))
-        screen.blit(name_text, (desc_x, desc_y))
-
-        desc_y += 40
-        max_width = 200
-        words = recipe.get("description", "").split()
-        line = ""
-        for word in words:
-            test_line = line + word + " "
-            test_width = self.font_small.size(test_line)[0]
-            if test_width > max_width:
-                if line:
-                    desc_text = self.font_small.render(line, True, (235, 235, 240))
-                    screen.blit(desc_text, (desc_x, desc_y))
-                    desc_y += 18
-                line = word + " "
-            else:
-                line = test_line
-        if line:
-            desc_text = self.font_small.render(line, True, (235, 235, 240))
-            screen.blit(desc_text, (desc_x, desc_y))
-            desc_y += 18
-
-        desc_y += 15
-        recipe_label = self.font_medium.render("Recipe:", True, (255, 230, 180))
-        screen.blit(recipe_label, (desc_x, desc_y))
+        super()._draw_recipe_description(screen, bg_x, bg_y)
 
     def get_slot_at_mouse(self, mouse_pos, screen):
         mouse_x, mouse_y = mouse_pos

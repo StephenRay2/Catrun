@@ -91,6 +91,10 @@ class Smelter:
         self.slot_size = 64
         self.gap_size = 4
         self.close_rect = None
+        self.last_item_click_time = 0
+        self.last_item_click_slot = None
+        self.last_item_click_type = None
+        self.double_click_threshold_ms = 300
     
     def open(self, smelter_pos):
         self.active = True
@@ -134,6 +138,129 @@ class Smelter:
                     if ingredient.get("item") == item_name:
                         return recipe
         return None
+
+    def _get_max_stack(self, item_name):
+        for item in items_list:
+            if item["item_name"] == item_name:
+                return item.get("stack_size", 100)
+        return 100
+
+    def _update_input_state(self, idx, reset_progress=False):
+        if idx is None or idx < 0 or idx >= len(self.input_slots):
+            return
+        if self.input_slots[idx] is None:
+            self.is_smelting[idx] = False
+            self.smelting_progress[idx] = 0.0
+        elif self.fire_lit:
+            self.is_smelting[idx] = True
+            if reset_progress:
+                self.smelting_progress[idx] = 0.0
+
+    def _insert_item_stack(self, slot, target_slots):
+        remaining = slot.get("quantity", 1)
+        item_name = slot.get("item_name")
+        max_stack = self._get_max_stack(item_name)
+        new_indices = []
+
+        # Fill existing stacks first.
+        for target_slot in target_slots:
+            if remaining <= 0:
+                break
+            if target_slot and target_slot.get("item_name") == item_name:
+                space = max_stack - target_slot.get("quantity", 0)
+                if space > 0:
+                    amount = min(space, remaining)
+                    target_slot["quantity"] += amount
+                    remaining -= amount
+
+        # Then fill empty slots.
+        if remaining > 0:
+            for idx, target_slot in enumerate(target_slots):
+                if remaining <= 0:
+                    break
+                if target_slot is None:
+                    new_stack = slot.copy()
+                    new_stack["quantity"] = min(max_stack, remaining)
+                    target_slots[idx] = new_stack
+                    remaining -= new_stack["quantity"]
+                    new_indices.append(idx)
+
+        return remaining, new_indices
+
+    def check_item_double_click(self, slot_info):
+        slot_index, slot_type = slot_info
+        now = pygame.time.get_ticks()
+        if (
+            self.last_item_click_slot == slot_index
+            and self.last_item_click_type == slot_type
+            and (now - self.last_item_click_time) < self.double_click_threshold_ms
+        ):
+            self.last_item_click_slot = None
+            self.last_item_click_type = None
+            self.last_item_click_time = 0
+            return True
+        self.last_item_click_slot = slot_index
+        self.last_item_click_type = slot_type
+        self.last_item_click_time = now
+        return False
+
+    def handle_item_double_click(self, slot_info):
+        slot_index, slot_type = slot_info
+        if slot_type in ("inventory", "hotbar"):
+            source_list = self.inventory.hotbar_slots if slot_type == "hotbar" else self.inventory.inventory_list
+            slot = source_list[slot_index]
+            if slot is None:
+                return False
+
+            item_name = slot.get("item_name")
+            target_slots = None
+            update_inputs = False
+
+            if self.can_smelt_item(item_name):
+                target_slots = self.input_slots
+                update_inputs = True
+            elif self.has_fuel_tag(item_name):
+                target_slots = self.fuel_slots
+            else:
+                return False
+
+            remaining, new_indices = self._insert_item_stack(slot, target_slots)
+            if remaining == slot.get("quantity", 1):
+                return False
+
+            if remaining <= 0:
+                source_list[slot_index] = None
+            else:
+                slot["quantity"] = remaining
+
+            self.inventory.recalc_weight()
+            if update_inputs:
+                for idx in new_indices:
+                    self._update_input_state(idx, reset_progress=True)
+            return True
+
+        if slot_type == "input":
+            moved = self.inventory._move_stack_to_lists(
+                self.input_slots,
+                slot_index,
+                [self.inventory.inventory_list, self.inventory.hotbar_slots],
+            )
+            if moved:
+                self._update_input_state(slot_index, reset_progress=False)
+            return moved
+        if slot_type == "output":
+            return self.inventory._move_stack_to_lists(
+                self.output_slots,
+                slot_index,
+                [self.inventory.inventory_list, self.inventory.hotbar_slots],
+            )
+        if slot_type == "fuel":
+            return self.inventory._move_stack_to_lists(
+                self.fuel_slots,
+                slot_index,
+                [self.inventory.inventory_list, self.inventory.hotbar_slots],
+            )
+        return False
     
     def _has_output_space(self, output_item_name):
         max_stack = 100

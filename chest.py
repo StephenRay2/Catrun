@@ -32,6 +32,10 @@ class ChestUI:
         self.font_small = pygame.font.Font(font_path, 14)
         self.font_medium = pygame.font.Font(font_path, 18)
         self.close_rect = None
+        self.last_item_click_time = 0
+        self.last_item_click_slot = None
+        self.last_item_click_type = None
+        self.double_click_threshold_ms = 300
 
         self.slot_size = 64
         self.gap_size = 4
@@ -43,16 +47,29 @@ class ChestUI:
         self.active = True
         self.chest_structure = chest_structure
         # Ensure this chest has a storage payload
-        if chest_structure.get("storage") is None:
-            chest_structure["storage"] = [None] * 36
-        elif len(chest_structure["storage"]) != 36:
-            # Preserve existing contents as much as possible, clamp to new size
-            trimmed = chest_structure["storage"][:36]
-            while len(trimmed) < 36:
-                trimmed.append(None)
-            chest_structure["storage"] = trimmed
-        # Keep a direct reference so we mutate in-place
-        self.chest_slots = chest_structure["storage"]
+        if isinstance(chest_structure, dict):
+            if chest_structure.get("storage") is None:
+                chest_structure["storage"] = [None] * 36
+            elif len(chest_structure["storage"]) != 36:
+                # Preserve existing contents as much as possible, clamp to new size
+                trimmed = chest_structure["storage"][:36]
+                while len(trimmed) < 36:
+                    trimmed.append(None)
+                chest_structure["storage"] = trimmed
+            # Keep a direct reference so we mutate in-place
+            self.chest_slots = chest_structure["storage"]
+        else:
+            storage = getattr(chest_structure, "storage", None)
+            if storage is None:
+                storage = [None] * 36
+                chest_structure.storage = storage
+            elif len(storage) != 36:
+                trimmed = storage[:36]
+                while len(trimmed) < 36:
+                    trimmed.append(None)
+                storage = trimmed
+                chest_structure.storage = storage
+            self.chest_slots = storage
         self.dragging = False
         self.dragged_item = None
         self.dragged_from_slot = None
@@ -254,6 +271,43 @@ class ChestUI:
             self.inventory.selection_mode = "inventory"
             self.inventory.selected_inventory_slot = slot_index
         return self.inventory.open_drop_menu(slot_index, slot_type == "hotbar", mouse_pos)
+
+    def check_item_double_click(self, slot_index, slot_type):
+        now = pygame.time.get_ticks()
+        if (
+            self.last_item_click_slot == slot_index
+            and self.last_item_click_type == slot_type
+            and (now - self.last_item_click_time) < self.double_click_threshold_ms
+        ):
+            self.last_item_click_slot = None
+            self.last_item_click_type = None
+            self.last_item_click_time = 0
+            return True
+        self.last_item_click_slot = slot_index
+        self.last_item_click_type = slot_type
+        self.last_item_click_time = now
+        return False
+
+    def handle_item_double_click(self, slot_index, slot_type):
+        if slot_type == "chest":
+            return self.inventory._move_stack_to_lists(
+                self.chest_slots,
+                slot_index,
+                [self.inventory.inventory_list, self.inventory.hotbar_slots],
+            )
+        if slot_type == "inventory":
+            return self.inventory._move_stack_to_lists(
+                self.inventory.inventory_list,
+                slot_index,
+                [self.chest_slots],
+            )
+        if slot_type == "hotbar":
+            return self.inventory._move_stack_to_lists(
+                self.inventory.hotbar_slots,
+                slot_index,
+                [self.chest_slots],
+            )
+        return False
 
     def draw(self, screen):
         if not self.active:

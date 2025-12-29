@@ -635,6 +635,8 @@ placement_item = None
 placement_position = (0, 0)
 placement_target_z = 0
 placed_structures = []
+placement_range = 200
+placement_range_sq = placement_range * placement_range
 tent_menu_active = False
 tent_menu_tent = None
 tent_menu_close_rect = None
@@ -978,27 +980,27 @@ def update_placeable_collision(item_name, collision_settings):
 def populate_test_inventory():
     """Add one of each placeable item to the main inventory for testing purposes."""
     items_added = 0
-    
-    for item_name in placeable_size_settings.keys():
-        item_data = next((itm for itm in items_list if itm["item_name"] == item_name), None)
-        if not item_data:
-            print(f"Warning: Item '{item_name}' not found in items_list")
-            continue
 
+    placeable_items = [itm for itm in items_list if itm.get("placeable")]
+    placeable_items.sort(key=lambda itm: itm.get("item_name", ""))
+
+    for item_data in placeable_items:
         new_item = inventory.create_item_instance(item_data, 1)
-        
+
         target_slot = None
         for idx, slot in enumerate(inventory.inventory_list):
             if slot is None:
                 target_slot = idx
                 break
-        
+
         if target_slot is not None:
             inventory.inventory_list[target_slot] = new_item
             items_added += 1
         else:
             break
-    
+
+    if items_added:
+        inventory.recalc_weight()
     print(f"Successfully added {items_added} placeable items to inventory for testing")
     return items_added
 
@@ -1664,6 +1666,18 @@ def world_rect_collides(collision_rect):
             if struct_rect.colliderect(test_rect):
                 return True
 
+    current_z = player_z if "player_z" in globals() else 0
+    for struct in structure_manager.structures:
+        if getattr(struct, "destroyed", False):
+            continue
+        if isinstance(struct, StoneFloor):
+            continue
+        if getattr(struct, "z", current_z) != current_z:
+            continue
+        struct_rect = struct.get_collision_rect(cam_offset)
+        if struct_rect and struct_rect.colliderect(test_rect):
+            return True
+
     return False
 
 def group_resources_by_type(resource_list):
@@ -1967,6 +1981,19 @@ class MortarPestleStructure(Structure):
         self.native_width, self.native_height = size
 
 
+class GenericPlaceableStructure(Structure):
+    """Fallback structure for placeable items without a dedicated class."""
+
+    def __init__(self, x: float, y: float, z: int, direction: int = 0, item_name: str = ""):
+        label = item_name or "Placeable"
+        super().__init__(x, y, z, label, direction)
+        sprite, size = _load_structure_sprite_for_item(label)
+        self.base_sprite = sprite
+        self.sprite = sprite
+        self.native_width, self.native_height = size
+        self.item_name = label
+
+
 STRUCTURE_TYPE_BY_NAME = {
     "Stone Floor": "StoneFloor",
     "Stone Wall": "StoneWall",
@@ -2047,19 +2074,62 @@ def get_structure_class(structure_type):
     return STRUCTURE_CLASS_MAP.get(normalized)
 
 
+def _get_placeable_center(placeable):
+    if isinstance(placeable, dict):
+        return placeable.get("x", 0), placeable.get("y", 0)
+    x = getattr(placeable, "x", 0)
+    y = getattr(placeable, "y", 0)
+    w = getattr(placeable, "native_width", 0)
+    h = getattr(placeable, "native_height", 0)
+    return x + (w / 2), y + (h / 2)
+
+
+def _get_placeable_sprite_size(placeable):
+    if isinstance(placeable, dict):
+        return placeable.get("sprite_size", default_placeable_sprite_size)
+    w = getattr(placeable, "native_width", default_placeable_sprite_size[0])
+    h = getattr(placeable, "native_height", default_placeable_sprite_size[1])
+    return (w, h)
+
+
+def _create_structure_instance(x, y, z, direction, item_data):
+    safe_item = _resolved_placeable(item_data)
+    if not safe_item:
+        return None
+    structure_type = safe_item.get("structure_type") or safe_item.get("item_name", "")
+    structure_class = get_structure_class(structure_type)
+    if structure_class:
+        return structure_class(x, y, z, direction)
+    item_name = safe_item.get("item_name", "")
+    if not item_name:
+        return None
+    return GenericPlaceableStructure(x, y, z, direction, item_name=item_name)
+
+def is_placement_in_range(x, y, item_data):
+    if not item_data:
+        return True
+    sprite_size, _ = get_placeable_sizes(item_data)
+    center_x = x + (sprite_size[0] / 2)
+    center_y = y + (sprite_size[1] / 2)
+    dx = center_x - player_world_x
+    dy = center_y - player_world_y
+    return (dx * dx + dy * dy) <= placement_range_sq
+
+
 def place_structure(x, y, item_data):
     global placement_item
     safe_item = _resolved_placeable(item_data)
-    structure_type = safe_item.get("structure_type", "") if safe_item else ""
+    structure_type = ""
+    if safe_item:
+        structure_type = safe_item.get("structure_type") or safe_item.get("item_name", "")
     print(f"[DEBUG] Attempting to place structure: {structure_type} at ({x}, {y}, z={placement_target_z}), direction={placement_direction}")
-    structure_class = get_structure_class(structure_type)
-    
-    if not structure_class:
+    structure = _create_structure_instance(x, y, placement_target_z, placement_direction, safe_item)
+
+    if not structure:
         print(f"[DEBUG] No structure class found for type: {structure_type}")
         return False
     
     try:
-        structure = structure_class(x, y, placement_target_z, placement_direction)
         if isinstance(structure, StoneStairs):
             structure.descending = placement_descending
         print(f"[DEBUG] Structure created: {structure}, sprite: {structure.sprite}, size: {structure.native_width}x{structure.native_height}")
@@ -2079,13 +2149,9 @@ def place_structure(x, y, item_data):
 
 
 def check_placement_collision(x, y, item_data):
-    safe_item = _resolved_placeable(item_data)
-    structure_type = safe_item.get("structure_type", "") if safe_item else ""
-    structure_class = get_structure_class(structure_type)
-    if not structure_class:
+    temp_struct = _create_structure_instance(x, y, placement_target_z, placement_direction, item_data)
+    if not temp_struct:
         return False
-
-    temp_struct = structure_class(x, y, placement_target_z, placement_direction)
 
     def _mask_and_offset(struct):
         if hasattr(struct, "get_mask_data"):
@@ -2133,24 +2199,28 @@ def update_placement_position():
 
 def draw_placement_preview(screen):
     if placement_mode and placement_item:
-        structure_type = placement_item.get("structure_type", "")
-        structure_class = get_structure_class(structure_type)
-        if not structure_class:
+        temp_struct = _create_structure_instance(
+            placement_position[0],
+            placement_position[1],
+            placement_target_z,
+            placement_direction,
+            placement_item,
+        )
+        if not temp_struct:
             return
-        
-        temp_struct = structure_class(placement_position[0], placement_position[1], placement_target_z, placement_direction)
         
         if isinstance(temp_struct, StoneStairs):
             temp_struct.descending = placement_descending
         
         collision = check_placement_collision(placement_position[0], placement_position[1], placement_item)
+        in_range = is_placement_in_range(placement_position[0], placement_position[1], placement_item)
         
         if temp_struct.sprite:
             try:
                 preview_surf = temp_struct.sprite.copy()
                 preview_surf.set_alpha(int(255 * 0.5))
                 
-                if collision:
+                if collision or not in_range:
                     temp_color_surf = pygame.Surface(preview_surf.get_size())
                     temp_color_surf.fill((255, 0, 0))
                     temp_color_surf.set_alpha(100)
@@ -3056,6 +3126,7 @@ while running:
             placement_direction = 0
 
             inventory.state = "inventory"
+            populate_test_inventory()
             # starting_items = ("Mortar And Pestle", "Smelter")
 
             # for target_name in starting_items:
@@ -3723,7 +3794,9 @@ while running:
                     if hasattr(campfire, 'button_rect') and campfire.button_rect.collidepoint(mouse_pos):
                         campfire.toggle_fire()
                     elif slot_index is not None:
-                        if campfire.dragging:
+                        if not campfire.dragging and campfire.check_item_double_click(slot_info):
+                            campfire.handle_item_double_click(slot_info)
+                        elif campfire.dragging:
                             campfire.end_drag(slot_info)
                         else:
                             campfire.start_drag(slot_info)
@@ -3747,7 +3820,9 @@ while running:
                     if hasattr(smelter, 'button_rect') and smelter.button_rect.collidepoint(mouse_pos):
                         smelter.toggle_fire()
                     elif slot_index is not None:
-                        if smelter.dragging:
+                        if not smelter.dragging and smelter.check_item_double_click(slot_info):
+                            smelter.handle_item_double_click(slot_info)
+                        elif smelter.dragging:
                             smelter.end_drag(slot_info)
                         else:
                             smelter.start_drag(slot_info)
@@ -3767,7 +3842,9 @@ while running:
                     mouse_pos = pygame.mouse.get_pos()
                     slot_index, is_hotbar = crafting_bench.get_slot_at_mouse(mouse_pos, screen)
                     if slot_index is not None:
-                        if crafting_bench.dragging:
+                        if not crafting_bench.dragging and crafting_bench.check_item_double_click(slot_index, is_hotbar):
+                            crafting_bench.handle_item_double_click(slot_index, is_hotbar)
+                        elif crafting_bench.dragging:
                             crafting_bench.end_drag(slot_index, is_hotbar)
                         else:
                             crafting_bench.start_drag(slot_index, is_hotbar)
@@ -3787,7 +3864,9 @@ while running:
                     slot_info = arcane_crafter.get_slot_at_mouse(mouse_pos, screen)
                     slot_index, slot_type = slot_info
                     if slot_index is not None:
-                        if arcane_crafter.dragging:
+                        if not arcane_crafter.dragging and arcane_crafter.check_item_double_click(slot_info):
+                            arcane_crafter.handle_item_double_click(slot_info)
+                        elif arcane_crafter.dragging:
                             arcane_crafter.end_drag(slot_info)
                         else:
                             arcane_crafter.start_drag(slot_info)
@@ -3807,7 +3886,9 @@ while running:
                     mouse_pos = pygame.mouse.get_pos()
                     slot_index, slot_type = chest_ui.get_slot_at_mouse(mouse_pos, screen)
                     if slot_index is not None:
-                        if chest_ui.dragging:
+                        if not chest_ui.dragging and chest_ui.check_item_double_click(slot_index, slot_type):
+                            chest_ui.handle_item_double_click(slot_index, slot_type)
+                        elif chest_ui.dragging:
                             chest_ui.end_drag(slot_index, slot_type)
                         else:
                             chest_ui.start_drag(slot_index, slot_type)
@@ -3826,7 +3907,9 @@ while running:
                     mouse_pos = pygame.mouse.get_pos()
                     slot_index, is_hotbar = alchemy_bench.get_slot_at_mouse(mouse_pos, screen)
                     if slot_index is not None:
-                        if alchemy_bench.dragging:
+                        if not alchemy_bench.dragging and alchemy_bench.check_item_double_click(slot_index, is_hotbar):
+                            alchemy_bench.handle_item_double_click(slot_index, is_hotbar)
+                        elif alchemy_bench.dragging:
                             alchemy_bench.end_drag(slot_index, is_hotbar)
                         else:
                             alchemy_bench.start_drag(slot_index, is_hotbar)
@@ -3845,7 +3928,9 @@ while running:
                     mouse_pos = pygame.mouse.get_pos()
                     slot_index, is_hotbar = mortar_pestle.get_slot_at_mouse(mouse_pos, screen)
                     if slot_index is not None:
-                        if mortar_pestle.dragging:
+                        if not mortar_pestle.dragging and mortar_pestle.check_item_double_click(slot_index, is_hotbar):
+                            mortar_pestle.handle_item_double_click(slot_index, is_hotbar)
+                        elif mortar_pestle.dragging:
                             mortar_pestle.end_drag(slot_index, is_hotbar)
                         else:
                             mortar_pestle.start_drag(slot_index, is_hotbar)
@@ -3866,6 +3951,9 @@ while running:
                     mouse_attack_blocked = True
                     mouse_attack_block_expires = pygame.time.get_ticks() + 200
                     inventory.handle_selection_click(mouse_pos, screen)
+                    if inventory_in_use and inventory.state == "inventory" and inventory.check_item_double_click(slot_index, is_hotbar):
+                        inventory.handle_item_double_click(slot_index, is_hotbar)
+                        continue
                     inventory.start_drag(slot_index, is_hotbar)
 
                 elif inventory_in_use and player.is_alive:
@@ -3879,6 +3967,9 @@ while running:
                             mouse_attack_block_expires = pygame.time.get_ticks() + 200
                         inventory.handle_selection_click(mouse_pos, screen)
                         if slot_index is not None:
+                            if inventory.state == "inventory" and inventory.check_item_double_click(slot_index, is_hotbar):
+                                inventory.handle_item_double_click(slot_index, is_hotbar)
+                                continue
                             allow_drag = is_hotbar or inventory.state == "inventory"
                             if allow_drag:
                                 inventory.start_drag(slot_index, is_hotbar)
@@ -3888,9 +3979,12 @@ while running:
                 if placement_mode:
                     # Try to place the item
                     x, y = placement_position
+                    in_range = is_placement_in_range(x, y, placement_item)
                     has_collision = check_placement_collision(x, y, placement_item)
-                    print(f"[DEBUG] Placement check: position=({x}, {y}), collision={has_collision}")
-                    if not has_collision:
+                    print(f"[DEBUG] Placement check: position=({x}, {y}), collision={has_collision}, in_range={in_range}")
+                    if not in_range:
+                        print("[DEBUG] Placement blocked: out of range")
+                    elif not has_collision:
                         placed_ok = place_structure(x, y, placement_item)
                         if placed_ok:
                             cancel_placement()  # Exit placement mode after successful placement
@@ -3979,18 +4073,16 @@ while running:
                         sleeping_in_tent = True
                         tent_hide_active = False
                         time_speed_multiplier = 30.0
-                        sleeping_tent_x = tent_menu_tent['x']
-                        sleeping_tent_y = tent_menu_tent['y']
-                        sprite_size = tent_menu_tent.get('sprite_size', default_placeable_sprite_size)
+                        sleeping_tent_x, sleeping_tent_y = _get_placeable_center(tent_menu_tent)
+                        sprite_size = _get_placeable_sprite_size(tent_menu_tent)
                         sleeping_tent_height = sprite_size[1] if sprite_size else default_placeable_sprite_size[1]
                         tent_menu_active = False
                         tent_menu_tent = None
                         tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
                 elif option == "hide":
                     tent_hide_active = True
-                    sleeping_tent_x = tent_menu_tent['x']
-                    sleeping_tent_y = tent_menu_tent['y']
-                    sprite_size = tent_menu_tent.get('sprite_size', default_placeable_sprite_size)
+                    sleeping_tent_x, sleeping_tent_y = _get_placeable_center(tent_menu_tent)
+                    sprite_size = _get_placeable_sprite_size(tent_menu_tent)
                     sleeping_tent_height = sprite_size[1] if sprite_size else default_placeable_sprite_size[1]
                     time_speed_multiplier = 1.0
                     tent_menu_active = False
@@ -3998,16 +4090,22 @@ while running:
                     tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
                 elif option == "pickup":
                     if tent_hover_timers.get("pickup", 0.0) >= tent_hold_threshold:
-                        if tent_menu_tent in placed_structures:
-                            placed_structures.remove(tent_menu_tent)
+                        if isinstance(tent_menu_tent, dict):
+                            if tent_menu_tent in placed_structures:
+                                placed_structures.remove(tent_menu_tent)
+                        elif tent_menu_tent in structure_manager.structures:
+                            structure_manager.remove_structure(tent_menu_tent)
                         inventory.add(["Tent"])
                         tent_menu_active = False
                         tent_menu_tent = None
                         tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
                 elif option == "demolish":
                     if tent_hover_timers.get("demolish", 0.0) >= tent_hold_threshold:
-                        if tent_menu_tent in placed_structures:
-                            placed_structures.remove(tent_menu_tent)
+                        if isinstance(tent_menu_tent, dict):
+                            if tent_menu_tent in placed_structures:
+                                placed_structures.remove(tent_menu_tent)
+                        elif tent_menu_tent in structure_manager.structures:
+                            structure_manager.remove_structure(tent_menu_tent)
                         tent_menu_active = False
                         tent_menu_tent = None
                         tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
@@ -4399,6 +4497,30 @@ while running:
                                     chest_ui.open(structure)
                                     chest_in_use = True
                                     break
+                        if not chest_in_use:
+                            for struct in nearby_structure_colliders:
+                                if getattr(struct, "structure_type", "") == "Chest":
+                                    struct_collision = struct.get_collision_rect(0)
+                                    horizontal_dist = abs(struct_collision.centerx - player_world_x)
+                                    vertical_dist = abs(struct_collision.centery - player_world_y)
+                                    chest_reach = 20
+                                    horizontal_range = (struct_collision.width / 2) + chest_reach
+                                    vertical_range = (struct_collision.height / 2) + chest_reach
+
+                                    facing_object = False
+                                    if player.last_direction == "right" and struct_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                        facing_object = True
+                                    elif player.last_direction == "left" and struct_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                        facing_object = True
+                                    elif player.last_direction == "up" and struct_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                        facing_object = True
+                                    elif player.last_direction == "down" and struct_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                        facing_object = True
+
+                                    if facing_object:
+                                        chest_ui.open(struct)
+                                        chest_in_use = True
+                                        break
                     
                     if not crafting_bench_in_use and not smelter_in_use and not campfire_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and not chest_in_use:
                         for structure in nearby_structures:
@@ -4425,6 +4547,31 @@ while running:
                                     tent_menu_tent = structure
                                     tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
                                     break
+                        if not tent_menu_active:
+                            for struct in nearby_structure_colliders:
+                                if getattr(struct, "structure_type", "") == "Tent":
+                                    struct_collision = struct.get_collision_rect(0)
+                                    horizontal_dist = abs(struct_collision.centerx - player_world_x)
+                                    vertical_dist = abs(struct_collision.centery - player_world_y)
+                                    tent_reach = 50
+                                    horizontal_range = (struct_collision.width / 2) + tent_reach
+                                    vertical_range = (struct_collision.height / 2) + tent_reach
+
+                                    facing_object = False
+                                    if player.last_direction == "right" and struct_collision.centerx > player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                        facing_object = True
+                                    elif player.last_direction == "left" and struct_collision.centerx < player_world_x and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                                        facing_object = True
+                                    elif player.last_direction == "up" and struct_collision.centery < player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                        facing_object = True
+                                    elif player.last_direction == "down" and struct_collision.centery > player_world_y and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                                        facing_object = True
+
+                                    if facing_object:
+                                        tent_menu_active = True
+                                        tent_menu_tent = struct
+                                        tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
+                                        break
                     
                 if not crafting_bench_in_use and not tent_menu_active and not fast_travel_menu_active and not sleeping_in_tent and not tent_hide_active:
                     for obj in visible_objects:
@@ -5705,7 +5852,10 @@ while running:
             for struct in structure_manager.structures:
                 if getattr(struct, "destroyed", False):
                     continue
-                if isinstance(struct, CampfireStructure) and campfire and getattr(campfire, "fire_lit", False):
+                if getattr(struct, "structure_type", "") == "Torch":
+                    cx, cy = _get_placeable_center(struct)
+                    lights.append((cx - cam_x, cy, 220, None))
+                elif isinstance(struct, CampfireStructure) and campfire and getattr(campfire, "fire_lit", False):
                     lights.append((struct.x - cam_x, struct.y, 260, None))
                 elif isinstance(struct, SmelterStructure) and smelter and getattr(smelter, "fire_lit", False):
                     lights.append((struct.x - cam_x, struct.y, 260, None))
@@ -6399,6 +6549,16 @@ while running:
             screen.blit(temp_surface, (x - 5, y - 5))
             screen.blit(full_text, (x, y))
             inventory.inventory_full_message_timer -= dt
+        if placement_mode and placement_item and placement_position is not None:
+            in_range = is_placement_in_range(placement_position[0], placement_position[1], placement_item)
+            if not in_range:
+                range_text = font.render("Out of placement range.", True, (255, 120, 120))
+                x = screen.get_width()//2 - range_text.get_width()//2
+                y = 140
+                temp_surface = pygame.Surface((range_text.get_width() + 10, range_text.get_height() + 10), pygame.SRCALPHA)
+                temp_surface.fill((0, 0, 0, 150))
+                screen.blit(temp_surface, (x - 5, y - 5))
+                screen.blit(range_text, (x, y))
 
         # Draw structures above player z-level on top of player
         structure_manager.draw_all(screen, cam_x, player_z, world_player_rect, filter_fn=lambda s: s.z > player_z)
@@ -6487,7 +6647,10 @@ while running:
         for struct in structure_manager.structures:
             if getattr(struct, "destroyed", False):
                 continue
-            if isinstance(struct, CampfireStructure) and campfire and getattr(campfire, "fire_lit", False):
+            if getattr(struct, "structure_type", "") == "Torch":
+                cx, cy = _get_placeable_center(struct)
+                light_sources.append((cx, cy, 220, 6))
+            elif isinstance(struct, CampfireStructure) and campfire and getattr(campfire, "fire_lit", False):
                 light_sources.append((struct.x, struct.y, 260, 10))
             elif isinstance(struct, SmelterStructure) and smelter and getattr(smelter, "fire_lit", False):
                 light_sources.append((struct.x, struct.y, 260, 12))

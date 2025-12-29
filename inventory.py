@@ -5974,6 +5974,7 @@ items_list = [
 
 ]
 _item_weight_lookup = {item["item_name"]: item.get("weight", 0) for item in items_list if "item_name" in item}
+_item_stack_lookup = {item["item_name"]: item.get("stack_size", 100) for item in items_list if "item_name" in item}
 
 def _get_tier(name_lower):
     if "dragon scale" in name_lower:
@@ -6224,6 +6225,10 @@ class Inventory():
         self.crafting_completion_slot = None
         self.crafting_completion_time = 0
         self.crafting_flash_duration = 0.3
+        self.last_item_click_time = 0
+        self.last_item_click_slot = None
+        self.last_item_click_type = None
+        self.double_click_threshold_ms = 300
         
         self.selected_cat_id = None
         self.cat_card_rects = []
@@ -7153,15 +7158,21 @@ class Inventory():
         if recipe:
             lines.append((self.tooltip_small_font, "Recipe:", (255, 220, 160)))
             for req in recipe:
+                amount = req.get("amount", 1)
                 if "item" in req:
-                    label = f"{req['item']} x{req.get('amount', 1)}"
+                    item_name = req["item"]
+                    have = self.get_item_count(item_name)
+                    label = f"{item_name} x{amount}"
                 elif "item_tag" in req:
                     pretty = req["item_tag"].replace("_", " ").title()
-                    label = f"{pretty} x{req.get('amount', 1)}"
+                    have = self.get_items_by_tag_count(req["item_tag"])
+                    label = f"{pretty} x{amount}"
                 else:
+                    have = 0
                     label = "Unknown ingredient"
+                color = (50, 255, 50) if have >= amount else (255, 120, 120)
                 for line in self._wrap_text(label, self.tooltip_small_font, max_text_width):
-                    lines.append((self.tooltip_small_font, f"- {line}", (230, 230, 200)))
+                    lines.append((self.tooltip_small_font, f"- {line}", color))
 
         line_height = 4
         rendered = []
@@ -7654,31 +7665,89 @@ class Inventory():
             screen.blit(name_text, (recipe_x, recipe_y))
             
             recipe_y += 40
-            max_width = 400
-            words = item["description"].split()
-            line = ""
-            for word in words:
-                test_line = line + word + " "
-                test_width = font_small.size(test_line)[0]
-                if test_width > max_width:
-                    if line:
-                        desc_text = font_small.render(line, True, (0, 0, 0))
-                        screen.blit(desc_text, (recipe_x, recipe_y))
-                        recipe_y += 20
-                    line = word + " "
-                else:
-                    line = test_line
-            if line:
-                desc_text = font_small.render(line, True, (0, 0, 0))
-                screen.blit(desc_text, (recipe_x, recipe_y))
-                recipe_y += 20
+            base_width = 400
+            desired_width = int(base_width * 1.5)
+            column_gap = 12
+            min_second_col = 120
+            panel_x = screen.get_width() / 2 - self.inventory_image.get_width() / 2
+            panel_right = panel_x + self.inventory_image.get_width()
+            available_width = max(0, panel_right - recipe_x - 10)
+            col1_width = min(
+                desired_width,
+                max(base_width, available_width - column_gap - min_second_col),
+            )
+            if col1_width > available_width:
+                col1_width = available_width
+            col2_width = available_width - col1_width - column_gap
+            column_widths = [col1_width]
+            if col2_width >= 80:
+                column_widths.append(col2_width)
+            panel_top = screen.get_height() / 2 - self.inventory_image.get_height() / 2
+            max_text_bottom = int(panel_top + self.inventory_image.get_height() - 20)
+            line_step = font_small.get_linesize() + 4
+
+            def _flow_text_columns(text, font, col_widths, max_lines):
+                words = text.split()
+                if not words:
+                    return [[]]
+                columns = []
+                word_idx = 0
+                for width in col_widths:
+                    lines = []
+                    current = ""
+                    while word_idx < len(words) and len(lines) < max_lines:
+                        word = words[word_idx]
+                        test_line = word if current == "" else current + " " + word
+                        if font.size(test_line)[0] <= width:
+                            current = test_line
+                            word_idx += 1
+                        else:
+                            if current:
+                                lines.append(current)
+                                current = ""
+                            else:
+                                lines.append(word)
+                                word_idx += 1
+                    if current and len(lines) < max_lines:
+                        lines.append(current)
+                    columns.append(lines)
+                    if word_idx >= len(words):
+                        break
+                return columns
+
+            max_lines_per_col = max(1, (max_text_bottom - recipe_y) // line_step)
+            desc_start_y = recipe_y
+            columns = _flow_text_columns(
+                item.get("description", ""),
+                font_small,
+                column_widths,
+                max_lines_per_col,
+            )
+            for col_idx, col_lines in enumerate(columns):
+                col_x = recipe_x + sum(column_widths[:col_idx]) + (column_gap * col_idx)
+                for line_idx, line in enumerate(col_lines):
+                    line_y = desc_start_y + (line_idx * line_step)
+                    if line_y + line_step > max_text_bottom:
+                        break
+                    desc_text = font_small.render(line, True, (0, 0, 0))
+                    screen.blit(desc_text, (col_x, line_y))
+
+            if columns:
+                max_desc_lines = max(len(col) for col in columns)
+                recipe_y = desc_start_y + (max_desc_lines * line_step)
             
-            recipe_y += 20
+            recipe_y += 10
+            if recipe_y + font_medium.get_linesize() > max_text_bottom:
+                return
             recipe_label = font_medium.render("Recipe:", True, (20, 20, 50))
-            screen.blit(recipe_label, (recipe_x, recipe_y))
+            recipe_left_shift = 0
+            recipe_list_x = max(panel_x + 10, recipe_x - recipe_left_shift)
+            screen.blit(recipe_label, (recipe_list_x, recipe_y))
             
-            recipe_y += 40
+            recipe_start_y = recipe_y + font_medium.get_linesize() + 10
+            recipe_available_width = max(0, panel_right - recipe_list_x - 10)
             if item["recipe"]:
+                recipe_lines = []
                 for requirement in item["recipe"]:
                     if "item" in requirement:
                         item_name = requirement["item"]
@@ -7688,14 +7757,98 @@ class Inventory():
                         item_name = requirement["item_tag"].replace("_", " ").title()
                         amount = requirement["amount"]
                         have = self.get_items_by_tag_count(requirement["item_tag"])
-                    
+                    else:
+                        continue
+
                     color = (50, 255, 50) if have >= amount else (255, 50, 50)
-                    req_text = font_small.render(f"{item_name}: {have}/{amount}", True, color)
-                    temp_surface = pygame.Surface((req_text.get_width() + 10, req_text.get_height() + 10), pygame.SRCALPHA)
-                    temp_surface.fill((0, 0, 0, 100))
-                    screen.blit(temp_surface, (recipe_x - 5, recipe_y -5))
-                    screen.blit(req_text, (recipe_x, recipe_y))
-                    recipe_y += 30
+                    label = f"{item_name}: {have}/{amount}"
+                    recipe_lines.append((label, color))
+
+                def _flow_colored_lines(lines, font, col_widths, max_lines):
+                    columns = [[] for _ in col_widths]
+                    col_idx = 0
+                    line_idx = 0
+                    overflowed = False
+
+                    def push_line(text, color):
+                        nonlocal col_idx, line_idx, overflowed
+                        while col_idx < len(col_widths) and line_idx >= max_lines:
+                            col_idx += 1
+                            line_idx = 0
+                        if col_idx >= len(col_widths):
+                            overflowed = True
+                            return False
+                        columns[col_idx].append((text, color))
+                        line_idx += 1
+                        return True
+
+                    for text, color in lines:
+                        words = text.split()
+                        if not words:
+                            if not push_line("", color):
+                                return columns, overflowed
+                            continue
+                        current = ""
+                        word_idx = 0
+                        while word_idx < len(words):
+                            if col_idx >= len(col_widths):
+                                overflowed = True
+                                return columns, overflowed
+                            width = col_widths[col_idx]
+                            word = words[word_idx]
+                            test_line = word if current == "" else current + " " + word
+                            if font.size(test_line)[0] <= width:
+                                current = test_line
+                                word_idx += 1
+                            else:
+                                if current:
+                                    if not push_line(current, color):
+                                        return columns, overflowed
+                                    current = ""
+                                else:
+                                    if not push_line(word, color):
+                                        return columns, overflowed
+                                    word_idx += 1
+                        if current:
+                            if not push_line(current, color):
+                                return columns, overflowed
+                    return columns, overflowed
+
+                def _choose_recipe_columns(lines, font, max_lines, avail_width, gap):
+                    if avail_width <= 0:
+                        return [1], [[]]
+                    for cols in range(1, 4):
+                        col_width = int((avail_width - gap * (cols - 1)) / cols)
+                        if col_width <= 0:
+                            continue
+                        col_widths = [col_width] * cols
+                        columns, overflowed = _flow_colored_lines(lines, font, col_widths, max_lines)
+                        if not overflowed:
+                            return col_widths, columns
+                    col_width = max(1, int((avail_width - gap * 2) / 3))
+                    col_widths = [col_width] * 3
+                    columns, _ = _flow_colored_lines(lines, font, col_widths, max_lines)
+                    return col_widths, columns
+
+                max_lines_per_col = max(1, (max_text_bottom - recipe_start_y) // line_step)
+                recipe_column_widths, columns = _choose_recipe_columns(
+                    recipe_lines,
+                    font_small,
+                    max_lines_per_col,
+                    recipe_available_width,
+                    column_gap,
+                )
+                for col_idx, col_lines in enumerate(columns):
+                    col_x = recipe_list_x + sum(recipe_column_widths[:col_idx]) + (column_gap * col_idx)
+                    for line_idx, (line, color) in enumerate(col_lines):
+                        line_y = recipe_start_y + (line_idx * line_step)
+                        if line_y + line_step > max_text_bottom:
+                            break
+                        req_text = font_small.render(line, True, color)
+                        temp_surface = pygame.Surface((req_text.get_width() + 10, req_text.get_height() + 10), pygame.SRCALPHA)
+                        temp_surface.fill((0, 0, 0, 100))
+                        screen.blit(temp_surface, (col_x - 5, line_y - 5))
+                        screen.blit(req_text, (col_x, line_y))
 
     def craft_item(self, item):
         if not self.has_materials_for_recipe(item["recipe"]):
@@ -8107,6 +8260,83 @@ class Inventory():
         
         self.close_drop_menu()
         return (None, None)
+
+    def _move_stack_to_lists(self, source_list, source_index, target_lists):
+        if source_index is None or source_index < 0 or source_index >= len(source_list):
+            return False
+        slot = source_list[source_index]
+        if slot is None:
+            return False
+
+        item_name = slot.get("item_name")
+        if not item_name:
+            return False
+        max_stack = _item_stack_lookup.get(item_name, 100)
+        remaining = slot.get("quantity", 1)
+        moved = False
+
+        # Fill existing stacks first.
+        for target_list in target_lists:
+            for target_slot in target_list:
+                if remaining <= 0:
+                    break
+                if target_slot and target_slot.get("item_name") == item_name:
+                    space = max_stack - target_slot.get("quantity", 0)
+                    if space > 0:
+                        amount = min(space, remaining)
+                        target_slot["quantity"] += amount
+                        remaining -= amount
+                        moved = True
+            if remaining <= 0:
+                break
+
+        # Then place into empty slots.
+        if remaining > 0:
+            for target_list in target_lists:
+                for idx, target_slot in enumerate(target_list):
+                    if remaining <= 0:
+                        break
+                    if target_slot is None:
+                        new_stack = slot.copy()
+                        new_stack["quantity"] = min(max_stack, remaining)
+                        target_list[idx] = new_stack
+                        remaining -= new_stack["quantity"]
+                        moved = True
+                if remaining <= 0:
+                    break
+
+        if not moved:
+            return False
+
+        if remaining <= 0:
+            source_list[source_index] = None
+        else:
+            slot["quantity"] = remaining
+
+        self.recalc_weight()
+        return True
+
+    def check_item_double_click(self, slot_index, is_hotbar):
+        now = pygame.time.get_ticks()
+        slot_type = "hotbar" if is_hotbar else "inventory"
+        if (
+            self.last_item_click_slot == slot_index
+            and self.last_item_click_type == slot_type
+            and (now - self.last_item_click_time) < self.double_click_threshold_ms
+        ):
+            self.last_item_click_slot = None
+            self.last_item_click_type = None
+            self.last_item_click_time = 0
+            return True
+        self.last_item_click_slot = slot_index
+        self.last_item_click_type = slot_type
+        self.last_item_click_time = now
+        return False
+
+    def handle_item_double_click(self, slot_index, is_hotbar):
+        source_list = self.hotbar_slots if is_hotbar else self.inventory_list
+        target_lists = [self.inventory_list if is_hotbar else self.hotbar_slots]
+        return self._move_stack_to_lists(source_list, slot_index, target_lists)
 
     def close_drop_menu(self):
         self.drop_menu_active = False
