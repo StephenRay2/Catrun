@@ -1413,35 +1413,35 @@ def draw_temperature_gauge(screen, current_temperature, gauge_index):
 
 def apply_temperature_effects(player, gauge_index, dt):
     if gauge_index == 0 or gauge_index == 6:
-        player.extreme_temp_timer += dt
+        player.extreme_temp_timer += player.apply_status_buildup(dt)
         
         if player.extreme_temp_timer >= 180:
             player.speed = int(100 * player.speed_leveler * (2/3))
         
         if gauge_index == 0:
             player.health -= dt * 1
-            player.hunger -= dt * 0.5
+            player.hunger -= player.apply_resilience_drain(dt * 0.5)
             if player.stamina_timer <= 0 and player.stamina < player.max_stamina:
                 if player.thirst == player.max_thirst:
-                    player.stamina += dt * 8
+                    player.stamina += player.apply_resilience_regen(dt * 8)
                 elif player.thirst > player.max_thirst * 0.7:
-                    player.stamina += dt * 5
+                    player.stamina += player.apply_resilience_regen(dt * 5)
                 elif player.thirst > player.max_thirst * 0.4:
-                    player.stamina += dt * 3
+                    player.stamina += player.apply_resilience_regen(dt * 3)
                 elif player.thirst > player.max_thirst * 0.1:
-                    player.stamina += dt * 1
+                    player.stamina += player.apply_resilience_regen(dt * 1)
         else:
             player.health -= dt * 1
-            player.thirst -= dt * 0.5
+            player.thirst -= player.apply_resilience_drain(dt * 0.5)
             if player.stamina_timer <= 0 and player.stamina < player.max_stamina:
                 if player.thirst == player.max_thirst:
-                    player.stamina += dt * 8
+                    player.stamina += player.apply_resilience_regen(dt * 8)
                 elif player.thirst > player.max_thirst * 0.7:
-                    player.stamina += dt * 5
+                    player.stamina += player.apply_resilience_regen(dt * 5)
                 elif player.thirst > player.max_thirst * 0.4:
-                    player.stamina += dt * 3
+                    player.stamina += player.apply_resilience_regen(dt * 3)
                 elif player.thirst > player.max_thirst * 0.1:
-                    player.stamina += dt * 1
+                    player.stamina += player.apply_resilience_regen(dt * 1)
     else:
         if player.extreme_temp_timer > 0:
             player.extreme_temp_timer -= dt
@@ -1450,9 +1450,9 @@ def apply_temperature_effects(player, gauge_index, dt):
                 player.speed = int(100 * player.speed_leveler)
         
         if gauge_index == 1:
-            player.hunger -= dt * 0.05
+            player.hunger -= player.apply_resilience_drain(dt * 0.05)
         elif gauge_index == 5:
-            player.thirst -= dt * 0.05
+            player.thirst -= player.apply_resilience_drain(dt * 0.05)
 
 
 
@@ -2186,9 +2186,13 @@ def update_placement_position():
         mouse_pos = pygame.mouse.get_pos()
         world_x = mouse_pos[0] + cam_x
         world_y = mouse_pos[1]
+
+        sprite_size, _ = get_placeable_sizes(placement_item)
+        anchor_x = world_x - (sprite_size[0] / 2)
+        anchor_y = world_y - (sprite_size[1] / 2)
         
         shift_held = pygame.key.get_pressed()[pygame.K_LSHIFT] or pygame.key.get_pressed()[pygame.K_RSHIFT]
-        snap_pos = structure_manager.get_preview_position((world_x, world_y), player_z, shift_held, placement_snap_index)
+        snap_pos = structure_manager.get_preview_position((anchor_x, anchor_y), player_z, shift_held, placement_snap_index)
         if snap_pos and len(snap_pos) == 3:
             placement_position = (snap_pos[0], snap_pos[1])
             placement_target_z = snap_pos[2]
@@ -3080,7 +3084,7 @@ while running:
             player.strength_leveler = 1
             player.strength_level_gain = 3
             player.speed_leveler = 1
-            player.defense_leveler = 1
+            player.defense_leveler = 0.0
             player.resilience_leveler = 1
             player.max_health = int(round(100 * player.health_leveler))
             player.max_stamina = int(round(100 * player.stamina_leveler))

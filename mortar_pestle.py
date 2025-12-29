@@ -762,75 +762,30 @@ class MortarPestle:
         desc_y += 40
         base_width = 200
         desired_width = int(base_width * 1.5)
-        column_gap = 12
-        min_second_col = 120
         panel_right = screen.get_width()
         if self.mortar_pestle_screen_image:
             panel_right = bg_x + self.mortar_pestle_screen_image.get_width()
         available_width = max(0, panel_right - desc_x - 10)
-        col1_width = min(
-            desired_width,
-            max(base_width, available_width - column_gap - min_second_col),
-        )
-        if col1_width > available_width:
-            col1_width = available_width
-        col2_width = available_width - col1_width - column_gap
-        column_widths = [col1_width]
-        if col2_width >= 80:
-            column_widths.append(col2_width)
+        desc_width = min(desired_width, available_width)
         grid_top = bg_y + 290
         max_bottom = grid_top - 15
         line_step = self.font_small.get_linesize() + 2
-
-        def _flow_text_columns(text, font, col_widths, max_lines):
-            words = text.split()
-            if not words:
-                return [[]]
-            columns = []
-            word_idx = 0
-            for width in col_widths:
-                lines = []
-                current = ""
-                while word_idx < len(words) and len(lines) < max_lines:
-                    word = words[word_idx]
-                    test_line = word if current == "" else current + " " + word
-                    if font.size(test_line)[0] <= width:
-                        current = test_line
-                        word_idx += 1
-                    else:
-                        if current:
-                            lines.append(current)
-                            current = ""
-                        else:
-                            lines.append(word)
-                            word_idx += 1
-                if current and len(lines) < max_lines:
-                    lines.append(current)
-                columns.append(lines)
-                if word_idx >= len(words):
-                    break
-            return columns
-
-        max_lines_per_col = max(1, (max_bottom - desc_y) // line_step)
+        max_lines = int(max(1, (max_bottom - desc_y) // line_step))
         desc_start_y = desc_y
-        columns = _flow_text_columns(
+        desc_lines = self._wrap_text(
             recipe.get("description", ""),
             self.font_small,
-            column_widths,
-            max_lines_per_col,
-        )
-        for col_idx, col_lines in enumerate(columns):
-            col_x = desc_x + sum(column_widths[:col_idx]) + (column_gap * col_idx)
-            for line_idx, line in enumerate(col_lines):
-                line_y = desc_start_y + (line_idx * line_step)
-                if line_y + line_step > max_bottom:
-                    break
-                desc_text = self.font_small.render(line, True, (235, 235, 240))
-                screen.blit(desc_text, (col_x, line_y))
+            desc_width,
+        )[:max_lines]
+        for line_idx, line in enumerate(desc_lines):
+            line_y = desc_start_y + (line_idx * line_step)
+            if line_y + line_step > max_bottom:
+                break
+            desc_text = self.font_small.render(line, True, (235, 235, 240))
+            screen.blit(desc_text, (desc_x, line_y))
 
-        if columns:
-            max_desc_lines = max(len(col) for col in columns)
-            desc_y = desc_start_y + (max_desc_lines * line_step)
+        if desc_lines:
+            desc_y = desc_start_y + (len(desc_lines) * line_step)
 
         desc_y += 8
         if desc_y + self.font_medium.get_linesize() > max_bottom:
@@ -865,6 +820,8 @@ class MortarPestle:
                 color = (50, 255, 50) if have >= amount else (255, 50, 50)
                 label = f"{item_name}: {have}/{amount}"
                 recipe_lines.append((label, color))
+
+            column_gap = 12
 
             def _flow_colored_lines(lines, font, col_widths, max_lines):
                 columns = [[] for _ in col_widths]

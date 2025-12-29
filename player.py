@@ -126,8 +126,8 @@ class Player(pygame.sprite.Sprite):
         self.base_speed = 275
         self.speed_leveler = 1
         self.speed = 100 * self.speed_leveler
-        self.defense_leveler = 1
-        self.defense = 100 * self.defense_leveler
+        self.defense_leveler = 0.0
+        self.defense = 0
         self.resilience_leveler = 1
         self.resilience = 100 * self.resilience_leveler
         self.temperature_resistance_leveler = 0
@@ -221,6 +221,22 @@ class Player(pygame.sprite.Sprite):
         self.in_lava = False
         self.lava_damage_timer = 0
         self.current_liquid = None
+
+    def _resilience_factor(self):
+        return max(0.1, float(self.resilience_leveler))
+
+    def apply_resilience_drain(self, amount):
+        if amount <= 0:
+            return amount
+        return amount / self._resilience_factor()
+
+    def apply_resilience_regen(self, amount):
+        if amount <= 0:
+            return amount
+        return amount * self._resilience_factor()
+
+    def apply_status_buildup(self, amount):
+        return self.apply_resilience_drain(amount)
 
     def attacking(self, nearby_mobs, player_world_x, player_world_y, mouse_over_hotbar=False):
         from mobs import Cat, Redmite
@@ -405,8 +421,8 @@ class Player(pygame.sprite.Sprite):
             self.speed = int(100 * self.speed_leveler)
             upgraded = True
         elif stat_key == "defense":
-            self.defense_leveler = round(self.defense_leveler + 0.1, 4)
-            self.defense = int(100 * self.defense_leveler)
+            self.defense_leveler = round(self.defense_leveler + 0.01, 4)
+            self.defense = int(round(100 * self.defense_leveler))
             upgraded = True
         elif stat_key == "resilience":
             self.resilience_leveler = round(self.resilience_leveler + 0.1, 4)
@@ -447,22 +463,22 @@ class Player(pygame.sprite.Sprite):
         if 1 <= self.health <= self.max_health:
             if not self.poison:
                 if self.hunger == self.max_hunger:
-                    self.health += dt / 2
+                    self.health += self.apply_resilience_regen(dt / 2)
                 elif self.hunger > self.max_hunger * .7:
-                    self.health += dt / 4
+                    self.health += self.apply_resilience_regen(dt / 4)
                 elif self.hunger > self.max_hunger * .4:
-                    self.health += dt / 8
+                    self.health += self.apply_resilience_regen(dt / 8)
                 elif self.hunger > self.max_hunger * .1:
-                    self.health += dt / 12
+                    self.health += self.apply_resilience_regen(dt / 12)
                 else:
                     self.health -= dt / 8
             if self.hunger == 100:
-                self.full_timer -= dt
+                self.full_timer -= self.apply_resilience_drain(dt)
                 if self.full_timer <= 0:
-                    self.hunger -= dt/100
+                    self.hunger -= self.apply_resilience_drain(dt / 100)
             else:
                 if self.hunger > 0:
-                    self.hunger -= dt / 30
+                    self.hunger -= self.apply_resilience_drain(dt / 30)
         if self.health < 0:
             self.health = 0
         if self.hunger < 0:
@@ -475,23 +491,23 @@ class Player(pygame.sprite.Sprite):
         
         if self.stamina < self.max_stamina:
             if self.thirst == self.max_thirst:
-                self.stamina += dt * 16
+                self.stamina += self.apply_resilience_regen(dt * 16)
             elif self.thirst > self.max_thirst * 0.7:
-                self.stamina += dt * 10
+                self.stamina += self.apply_resilience_regen(dt * 10)
             elif self.thirst > self.max_thirst * 0.4:
-                self.stamina += dt * 6
+                self.stamina += self.apply_resilience_regen(dt * 6)
             elif self.thirst > self.max_thirst * 0.1:
-                self.stamina += dt * 2
+                self.stamina += self.apply_resilience_regen(dt * 2)
             else:
                 self.stamina -= dt / 12
                 self.health -= dt / 12
 
         if self.thirst == 100:
-            self.thirst_full_timer -= dt
+            self.thirst_full_timer -= self.apply_resilience_drain(dt)
             if self.thirst_full_timer <= 0:
-                self.thirst -= dt / 100
+                self.thirst -= self.apply_resilience_drain(dt / 100)
         elif self.thirst > 0:
-            self.thirst -= dt / 40
+            self.thirst -= self.apply_resilience_drain(dt / 40)
 
         if self.stamina > 10 and self.speed < 100:
             self.speed = 100
@@ -530,11 +546,11 @@ class Player(pygame.sprite.Sprite):
     def lose_hunger(self, dt):
         if self.hunger > 0:
             if self.hunger == 100:
-                self.full_timer -= dt
+                self.full_timer -= self.apply_resilience_drain(dt)
                 if self.full_timer <= 0:
-                    self.hunger -= dt/100
+                    self.hunger -= self.apply_resilience_drain(dt / 100)
             else:
-                self.hunger -= dt / 100
+                self.hunger -= self.apply_resilience_drain(dt / 100)
                 self.full_timer = 60
         if self.hunger < 0:
             self.hunger = 0
@@ -543,20 +559,25 @@ class Player(pygame.sprite.Sprite):
     def lose_thirst(self, dt):
         if self.thirst > 0:
             if self.thirst == 100:
-                self.thirst_full_timer -= dt
+                self.thirst_full_timer -= self.apply_resilience_drain(dt)
                 if self.thirst_full_timer <= 0:
-                    self.thirst -= dt/100
+                    self.thirst -= self.apply_resilience_drain(dt / 100)
             else:
-                self.thirst -= dt / 100
+                self.thirst -= self.apply_resilience_drain(dt / 100)
                 self.thirst_full_timer = 60
         if self.thirst < 0:
             self.thirst = 0
 
-    def take_damage(self, damage):
-        self.health -= damage
+    def take_damage(self, damage, play_sound=True):
+        if damage <= 0:
+            return
+        defense_pct = max(0.0, min(100.0, float(self.defense)))
+        reduced = damage * (1 - defense_pct / 100.0)
+        self.health -= reduced
         if self.health < 0:
             self.health = 0
-        sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1,5)]))
+        if play_sound:
+            sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1,5)]))
 
     def clamp_stats(self):
         if self.health < 0:

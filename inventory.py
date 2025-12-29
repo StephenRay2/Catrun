@@ -326,7 +326,7 @@ items_list = [
         "weight": .025,
         "type": "raw_material",
         "description": "Purple berries found at twilight. Mysteriously satisfying. Seriously tiring.",
-        "use_effect": "player.hunger += .5; player.thirst += .5; player.torpidity += 1",
+        "use_effect": "player.hunger += .5; player.thirst += .5; player.torpidity += player.apply_status_buildup(1)",
         "placeable": False,
         "consumable": True,
         "durability": None,
@@ -662,7 +662,7 @@ items_list = [
         "weight": .05,
         "type": "raw_material",
         "description": "A toxic mushroom. Do not eat! Or do. Could be fun. Or painful. Mess around and find out, I guess. Used in alchemy.",
-        "use_effect": "player.poison = True; player.poison_time += 30; player.poison_strength += 1",
+        "use_effect": "player.poison = True; player.poison_time += player.apply_status_buildup(30); player.poison_strength += 1",
         "placeable": False,
         "consumable": True,
         "durability": None,
@@ -742,7 +742,7 @@ items_list = [
         "weight": .15,
         "type": "raw_material",
         "description": "A strange eye from a lifeless Pock. Unnerving to look at. May have qualities some might consider to be... unnatural.",
-        "use_effect": "player.poison = True; player.poison_time += 100; self.temp_attack_boost += .1",
+        "use_effect": "player.poison = True; player.poison_time += player.apply_status_buildup(100); self.temp_attack_boost += .1",
         "placeable": False,
         "consumable": True,
         "durability": None,
@@ -1594,7 +1594,7 @@ items_list = [
         "weight": .05,
         "type": "crafted_material",
         "description": "A thick and viscous liquid that keeps water out of where it's not wanted, and keeps it in where it's enslaved. I wouldn't it this if I were you.",
-        "use_effect": "player.health -= 50; player.poison = True; player.poison_time = 10; player.poison_strength += 3",
+        "use_effect": "player.health -= 50; player.poison = True; player.poison_time = player.apply_status_buildup(10); player.poison_strength += 3",
         "placeable": False,
         "consumable": True,
         "durability": None,
@@ -6824,7 +6824,7 @@ class Inventory():
                 "key": "defense",
                 "label": "Defense",
                 "base": int(player.defense),
-                "preview": int(round((player.defense_leveler + 0.1) * 100))
+                "preview": int(player.defense + 1)
             },
             {
                 "key": "resilience",
@@ -6834,6 +6834,26 @@ class Inventory():
             },
         ]
 
+        stat_help = {
+            "health": "Increases max health. Upgrading fills your health.",
+            "stamina": "Increases max stamina. Upgrading fills your stamina.",
+            "hunger": "Increases max hunger and refills it.",
+            "thirst": "Increases max thirst and refills it.",
+            "temperature_resistance": "Improves your resistence to extreme temperatures.",
+            "weight": "Increases max carry weight.",
+            "strength": f"Increases attack damage by +{player.strength_level_gain:g} per level.",
+            "speed": "Increases movement speed (about +5 per level).",
+            "defense": "Each point reduces incoming enemy hit damage by 1%.",
+            "resilience": (
+                "Reduces status buildup (poison, torpidity, extreme temp fatigue), "
+                "slows hunger/thirst drain, and boosts health/stamina regen."
+            ),
+        }
+
+        info_radius = 8
+        info_offset = info_radius * 2
+        hovered_tooltip = None
+
         for idx, stat in enumerate(stats):
             y = start_y + idx * line_height
             label_text = self.level_up_font.render(stat["label"], True, (0, 0, 0))
@@ -6841,6 +6861,20 @@ class Inventory():
             if player.unspent_stat_points > 0:
                 value_str = f"{stat['base']} -> {stat['preview']}"
             value_text = self.level_up_value_font.render(value_str, True, preview_color if player.unspent_stat_points > 0 else (0, 0, 0))
+            info_center_x = int(start_x - info_offset)
+            info_center_y = int(y + (label_text.get_height() // 2))
+            info_rect = pygame.Rect(
+                info_center_x - info_radius,
+                info_center_y - info_radius,
+                info_radius * 2,
+                info_radius * 2,
+            )
+            info_hover = info_rect.collidepoint(mouse_pos)
+            self._draw_info_icon(screen, (info_center_x, info_center_y), info_radius, info_hover)
+            if info_hover:
+                help_text = stat_help.get(stat["key"], "")
+                if help_text:
+                    hovered_tooltip = (stat["label"], help_text, info_rect)
             screen.blit(label_text, (start_x, y))
             screen.blit(value_text, (start_x + 160, y + 6))
 
@@ -6849,6 +6883,9 @@ class Inventory():
             button_image = self.level_up_skill_flash_image if (hover or flash_cycle) else self.level_up_skill_image
             screen.blit(button_image, button_rect)
             self.level_up_button_rects.append((button_rect, stat["key"]))
+
+        if hovered_tooltip:
+            self._draw_upgrade_tooltip(screen, *hovered_tooltip)
 
     def handle_level_up_event(self, event):
         if self.state != "level_up":
@@ -7021,6 +7058,59 @@ class Inventory():
         if not lines:
             lines = [""]
         return lines
+
+    def _draw_info_icon(self, screen, center, radius, hovered):
+        fill_color = (245, 245, 250) if not hovered else (255, 255, 255)
+        border_color = (90, 90, 120) if not hovered else (60, 110, 200)
+        pygame.draw.circle(screen, fill_color, center, radius)
+        pygame.draw.circle(screen, border_color, center, radius, width=2)
+        text_surface = self.tooltip_small_font.render("i", True, border_color)
+        text_rect = text_surface.get_rect(center=(center[0], center[1] - 1))
+        screen.blit(text_surface, text_rect)
+
+    def _draw_upgrade_tooltip(self, screen, title, body, anchor_rect):
+        if not body:
+            return
+        max_text_width = 260
+        lines = [(self.tooltip_title_font, title, (255, 255, 255))]
+        for line in self._wrap_text(body, self.tooltip_body_font, max_text_width):
+            lines.append((self.tooltip_body_font, line, (230, 230, 230)))
+
+        padding = 8
+        line_gap = 2
+        max_line_width = 0
+        total_height = padding * 2 - line_gap
+        for font_obj, text, _ in lines:
+            max_line_width = max(max_line_width, font_obj.size(text)[0])
+            total_height += font_obj.get_linesize() + line_gap
+        box_width = max_line_width + padding * 2
+        box_height = total_height
+
+        tooltip_x = anchor_rect.right + 12
+        tooltip_y = anchor_rect.top - 4
+        if tooltip_x + box_width > screen.get_width() - 10:
+            tooltip_x = anchor_rect.left - box_width - 12
+        if tooltip_y + box_height > screen.get_height() - 10:
+            tooltip_y = max(10, screen.get_height() - box_height - 10)
+        if tooltip_y < 10:
+            tooltip_y = 10
+
+        bg_surface = pygame.Surface((box_width, box_height), pygame.SRCALPHA)
+        bg_surface.fill((30, 30, 40, 210))
+        screen.blit(bg_surface, (tooltip_x, tooltip_y))
+        pygame.draw.rect(
+            screen,
+            (200, 200, 220),
+            (tooltip_x, tooltip_y, box_width, box_height),
+            width=1,
+            border_radius=6,
+        )
+
+        cursor_y = tooltip_y + padding
+        for font_obj, text, color in lines:
+            text_surface = font_obj.render(text, True, color)
+            screen.blit(text_surface, (tooltip_x + padding, cursor_y))
+            cursor_y += font_obj.get_linesize() + line_gap
 
     def create_item_instance(self, item_def, quantity=1):
         new_item = item_def.copy()
@@ -7667,74 +7757,29 @@ class Inventory():
             recipe_y += 40
             base_width = 400
             desired_width = int(base_width * 1.5)
-            column_gap = 12
-            min_second_col = 120
             panel_x = screen.get_width() / 2 - self.inventory_image.get_width() / 2
             panel_right = panel_x + self.inventory_image.get_width()
             available_width = max(0, panel_right - recipe_x - 10)
-            col1_width = min(
-                desired_width,
-                max(base_width, available_width - column_gap - min_second_col),
-            )
-            if col1_width > available_width:
-                col1_width = available_width
-            col2_width = available_width - col1_width - column_gap
-            column_widths = [col1_width]
-            if col2_width >= 80:
-                column_widths.append(col2_width)
+            desc_width = min(desired_width, available_width)
             panel_top = screen.get_height() / 2 - self.inventory_image.get_height() / 2
             max_text_bottom = int(panel_top + self.inventory_image.get_height() - 20)
             line_step = font_small.get_linesize() + 4
-
-            def _flow_text_columns(text, font, col_widths, max_lines):
-                words = text.split()
-                if not words:
-                    return [[]]
-                columns = []
-                word_idx = 0
-                for width in col_widths:
-                    lines = []
-                    current = ""
-                    while word_idx < len(words) and len(lines) < max_lines:
-                        word = words[word_idx]
-                        test_line = word if current == "" else current + " " + word
-                        if font.size(test_line)[0] <= width:
-                            current = test_line
-                            word_idx += 1
-                        else:
-                            if current:
-                                lines.append(current)
-                                current = ""
-                            else:
-                                lines.append(word)
-                                word_idx += 1
-                    if current and len(lines) < max_lines:
-                        lines.append(current)
-                    columns.append(lines)
-                    if word_idx >= len(words):
-                        break
-                return columns
-
-            max_lines_per_col = max(1, (max_text_bottom - recipe_y) // line_step)
+            max_lines = int(max(1, (max_text_bottom - recipe_y) // line_step))
             desc_start_y = recipe_y
-            columns = _flow_text_columns(
+            desc_lines = self._wrap_text(
                 item.get("description", ""),
                 font_small,
-                column_widths,
-                max_lines_per_col,
-            )
-            for col_idx, col_lines in enumerate(columns):
-                col_x = recipe_x + sum(column_widths[:col_idx]) + (column_gap * col_idx)
-                for line_idx, line in enumerate(col_lines):
-                    line_y = desc_start_y + (line_idx * line_step)
-                    if line_y + line_step > max_text_bottom:
-                        break
-                    desc_text = font_small.render(line, True, (0, 0, 0))
-                    screen.blit(desc_text, (col_x, line_y))
+                desc_width,
+            )[:max_lines]
+            for line_idx, line in enumerate(desc_lines):
+                line_y = desc_start_y + (line_idx * line_step)
+                if line_y + line_step > max_text_bottom:
+                    break
+                desc_text = font_small.render(line, True, (0, 0, 0))
+                screen.blit(desc_text, (recipe_x, line_y))
 
-            if columns:
-                max_desc_lines = max(len(col) for col in columns)
-                recipe_y = desc_start_y + (max_desc_lines * line_step)
+            if desc_lines:
+                recipe_y = desc_start_y + (len(desc_lines) * line_step)
             
             recipe_y += 10
             if recipe_y + font_medium.get_linesize() > max_text_bottom:
@@ -7763,6 +7808,8 @@ class Inventory():
                     color = (50, 255, 50) if have >= amount else (255, 50, 50)
                     label = f"{item_name}: {have}/{amount}"
                     recipe_lines.append((label, color))
+
+                column_gap = 12
 
                 def _flow_colored_lines(lines, font, col_widths, max_lines):
                     columns = [[] for _ in col_widths]

@@ -424,8 +424,8 @@ class Mob(pygame.sprite.Sprite):
         self.base_speed = 275
         self.speed_leveler = 1
         self.speed = 100 * self.speed_leveler
-        self.defense_leveler = 1
-        self.defense = 100 * self.defense_leveler
+        self.defense_leveler = 0.0
+        self.defense = 0
         self.resilience_leveler = 1
         self.resilience = 100 * self.resilience_leveler
         self.temperature_resistance_leveler = 0
@@ -711,8 +711,8 @@ class Mob(pygame.sprite.Sprite):
             self.speed = int(100 * self.speed_leveler)
             upgraded = True
         elif stat_key == "defense":
-            self.defense_leveler = round(self.defense_leveler + 0.1, 4)
-            self.defense = int(100 * self.defense_leveler)
+            self.defense_leveler = round(self.defense_leveler + 0.01, 4)
+            self.defense = int(round(100 * self.defense_leveler))
             upgraded = True
         elif stat_key == "resilience":
             self.resilience_leveler = round(self.resilience_leveler + 0.1, 4)
@@ -1888,8 +1888,7 @@ class Crawler(Enemy):
 
             if self.attack_timer == self.attack_duration // 2 and distance_sq < (50 * 50):
                 if player and hasattr(player, "health"):
-                    player.health -= self.attack_damage
-                    sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                    player.take_damage(self.attack_damage)
                 
                 attackers_in_range = self.get_attackers_in_range(2500)
                 for attacker in attackers_in_range:
@@ -2004,8 +2003,7 @@ class Ashhound(Enemy):
             self.attack_timer -= 1
 
             if self.attack_timer == self.attack_duration // 2 and distance_sq < (60 * 60):
-                player.health -= self.attack_damage
-                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                player.take_damage(self.attack_damage)
 
             if self.attack_timer <= 0:
                 self.attacking = False
@@ -2359,12 +2357,16 @@ class Wolf(Enemy):
                     if isinstance(target, Player) and hasattr(target, "is_in_spawn_protection") and target.is_in_spawn_protection():
                         pass  # Don't damage the player inside the spawn protection bubble.
                     else:
-                        target.health = max(0, target.health - self.attack_damage)
+                        if isinstance(target, Player) and hasattr(target, "take_damage"):
+                            target.take_damage(self.attack_damage, play_sound=False)
+                        else:
+                            target.health = max(0, target.health - self.attack_damage)
                         if hasattr(target, "register_attack"):
                             target.register_attack(self)
                 # Make sure player hit audio stays audible; use distance falloff otherwise.
-                volume_scale = 1.0 if listener_pos else self._attack_volume_scale(listener_pos)
-                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]), volume_scale=volume_scale)
+                if isinstance(target, Player):
+                    volume_scale = 1.0 if listener_pos else self._attack_volume_scale(listener_pos)
+                    sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]), volume_scale=volume_scale)
                 
                 attackers_in_range = self.get_attackers_in_range(3600)
                 for attacker in attackers_in_range:
@@ -2747,8 +2749,7 @@ class Duskwretch(Enemy):
             self.attack_timer -= 2
 
             if self.attack_timer == self.attack_duration // 2 and distance_sq < (70 * 70):
-                player.health -= self.attack_damage
-                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                player.take_damage(self.attack_damage)
 
             if self.attack_timer <= 0:
                 self.attacking = False
@@ -3079,13 +3080,12 @@ class Gorlin(Enemy):
             return
         if isinstance(target, Player) and hasattr(target, "is_in_spawn_protection") and target.is_in_spawn_protection():
             return
-        target.health = max(0, target.health - damage)
+        if isinstance(target, Player) and hasattr(target, "take_damage"):
+            target.take_damage(damage)
+        else:
+            target.health = max(0, target.health - damage)
         if hasattr(target, "register_attack"):
             target.register_attack(self)
-        try:
-            sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
-        except Exception:
-            pass
 
     def attack(self, target_world_x, target_world_y, target):
         if not self.is_alive:
@@ -3456,9 +3456,8 @@ def update_pock_rocks(dt, player_world_x, player_world_y, player, mobs):
 
         # Hit player
         if rock.rect.colliderect(player_rect):
-            player.health -= rock.damage
+            player.take_damage(rock.damage)
             rock.destroyed = True
-            sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
             pock_rock_projectiles.remove(rock)
             continue
 
@@ -3572,7 +3571,7 @@ class Redmite(Enemy):
             self.direction.xy = (0, 0)
             self.damage_timer += dt
             if self.damage_timer >= self.damage_interval and player:
-                player.health -= 1
+                player.take_damage(1, play_sound=False)
                 self.damage_timer = 0
             if player:
                 self.rect.center = (
@@ -3691,14 +3690,10 @@ class Pock(Enemy):
                 # Apply damage halfway through the swing if still in range.
                 if self.attack_timer == self.attack_duration // 2 and distance_sq <= self.melee_range_sq:
                     if hasattr(target_entity, "health"):
-                        target_entity.health = max(0, target_entity.health - self.attack_damage)
-                        # Play the regular player hit sound when hitting the player.
-                        try:
-                            if isinstance(target_entity, Player):
-                                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
-                        except NameError:
-                            # Fallback if Player is not in scope for any reason.
-                            pass
+                        if isinstance(target_entity, Player) and hasattr(target_entity, "take_damage"):
+                            target_entity.take_damage(self.attack_damage)
+                        else:
+                            target_entity.health = max(0, target_entity.health - self.attack_damage)
 
                 if self.attack_timer <= 0:
                     self.attacking = False
@@ -3927,8 +3922,7 @@ class Deer(AggressiveMob):
             self.attack_timer -= 1
             
             if self.attack_timer == self.attack_duration // 2 and distance_sq < (70 * 70):
-                player.health -= self.attack_damage
-                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                player.take_damage(self.attack_damage)
 
             if self.attack_timer <= 0:
                 self.attacking = False
@@ -4119,8 +4113,7 @@ class BlackBear(AggressiveMob):
             self.attack_timer -= 1
             
             if self.attack_timer == self.attack_duration // 2 and distance_sq < (70 * 70):
-                player.health -= self.attack_damage
-                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                player.take_damage(self.attack_damage)
             
             if self.attack_timer <= 0:
                 self.attacking = False
@@ -4317,8 +4310,7 @@ class BrownBear(AggressiveMob):
             
             if self.attack_timer == self.attack_duration // 2 and distance_sq < (70 * 70):
                 if player is not None and int(target_x) == int(player_world_x) and int(target_y) == int(player_world_y):
-                    player.health -= self.attack_damage
-                    sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                    player.take_damage(self.attack_damage)
                 else:
                     for attacker in list(getattr(self, "attackers", set())):
                         if attacker.rect.centerx == int(target_x) and attacker.rect.centery == int(target_y):
@@ -4507,8 +4499,7 @@ class PolarBear(AggressiveMob):
             
             if self.attack_timer == self.attack_duration // 2 and distance_sq < (70 * 70):
                 if player is not None and int(target_x) == int(player_world_x) and int(target_y) == int(player_world_y):
-                    player.health -= self.attack_damage
-                    sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                    player.take_damage(self.attack_damage)
                 else:
                     for attacker in list(getattr(self, "attackers", set())):
                         if attacker.rect.centerx == int(target_x) and attacker.rect.centery == int(target_y):
@@ -4763,8 +4754,7 @@ class Gila(AggressiveMob):
             self.attack_timer -= 1
             
             if self.attack_timer == self.attack_duration // 2 and distance_sq < (50 * 50):
-                player.health -= self.attack_damage
-                sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                player.take_damage(self.attack_damage)
             
             if self.attack_timer <= 0:
                 self.attacking = False
@@ -5349,16 +5339,14 @@ class Dragon(Enemy):
                         player_in_breath = player_world_x >= self.attack_start_x
                     
                     if player_in_breath:
-                        player.health -= self.breath_damage
-                        sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                        player.take_damage(self.breath_damage)
             else:
                 frames = self.bite_attack_right_images if self.last_direction == "right" else self.bite_attack_left_images
                 self.frame_index = (self.frame_index + self.animation_speed) % len(frames)
                 self.image = frames[int(self.frame_index)]
                 
                 if self.attack_timer == self.attack_duration // 2 and distance_sq < (bite_range * bite_range):
-                    player.health -= self.bite_damage
-                    sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1, 5)]))
+                    player.take_damage(self.bite_damage)
             
             self.attack_timer -= 1
             if self.attack_timer <= 0:
