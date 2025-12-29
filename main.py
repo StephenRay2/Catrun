@@ -263,6 +263,306 @@ def draw_menu_scene(dt):
         draw_menu_shadow(entry["rect"], entry["style_key"])
         screen.blit(entry["image"], entry["rect"].topleft)
 
+# Menu settings UI
+menu_settings_open = False
+menu_settings_tab = "settings"
+menu_settings_active_slider = None
+menu_settings_capture_action = None
+
+menu_settings_entries = [
+    {"id": "master_volume", "label": "Master Volume", "type": "slider", "min": 0.0, "max": 1.0, "value": 0.85},
+    {"id": "music_volume", "label": "Music Volume", "type": "slider", "min": 0.0, "max": 1.0, "value": 0.7},
+    {"id": "sfx_volume", "label": "SFX Volume", "type": "slider", "min": 0.0, "max": 1.0, "value": 0.8},
+    {"id": "brightness", "label": "Brightness", "type": "slider", "min": 0.6, "max": 1.4, "value": 1.0},
+    {"id": "ui_scale", "label": "UI Scale", "type": "slider", "min": 0.85, "max": 1.15, "value": 1.0},
+    {"id": "fullscreen", "label": "Fullscreen", "type": "toggle", "value": True},
+    {"id": "vsync", "label": "VSync", "type": "toggle", "value": False},
+    {"id": "show_fps", "label": "Show FPS", "type": "toggle", "value": False},
+    {"id": "screen_shake", "label": "Screen Shake", "type": "toggle", "value": True},
+    {"id": "tooltips", "label": "Tooltips", "type": "toggle", "value": True},
+]
+
+keybinds = {
+    "move_up": pygame.K_w,
+    "move_down": pygame.K_s,
+    "move_left": pygame.K_a,
+    "move_right": pygame.K_d,
+    "sprint": [pygame.K_LSHIFT, pygame.K_RSHIFT],
+    "interact": pygame.K_e,
+    "inventory": pygame.K_q,
+    "consume": pygame.K_f,
+    "rotate": pygame.K_r,
+    "secondary_action": pygame.K_t,
+    "placement_snap": pygame.K_SPACE,
+}
+
+menu_keybind_actions = [
+    {"action": "move_up", "label": "Move Up"},
+    {"action": "move_down", "label": "Move Down"},
+    {"action": "move_left", "label": "Move Left"},
+    {"action": "move_right", "label": "Move Right"},
+    {"action": "sprint", "label": "Sprint"},
+    {"action": "interact", "label": "Interact"},
+    {"action": "inventory", "label": "Inventory"},
+    {"action": "consume", "label": "Consume"},
+    {"action": "rotate", "label": "Rotate Placement"},
+    {"action": "secondary_action", "label": "Secondary Action"},
+    {"action": "placement_snap", "label": "Placement Snap"},
+]
+
+menu_title_font = pygame.font.Font(str(font_path), 28)
+menu_label_font = pygame.font.Font(str(font_path), 20)
+menu_small_font = pygame.font.Font(str(font_path), 16)
+
+def _action_keys(action):
+    bound = keybinds.get(action)
+    if bound is None:
+        return []
+    if isinstance(bound, (list, tuple, set)):
+        return list(bound)
+    return [bound]
+
+def action_pressed(action, keys_state):
+    keys = _action_keys(action)
+    return any(keys_state[key] for key in keys)
+
+def action_key_matches(action, key):
+    return key in _action_keys(action)
+
+def movement_active(keys_state):
+    return (
+        action_pressed("move_up", keys_state)
+        or action_pressed("move_down", keys_state)
+        or action_pressed("move_left", keys_state)
+        or action_pressed("move_right", keys_state)
+    )
+
+def _format_key_name(key):
+    name = pygame.key.name(key)
+    if len(name) == 1:
+        return name.upper()
+    return name.title()
+
+def format_action_keys(action):
+    keys = _action_keys(action)
+    if not keys:
+        return "Unbound"
+    return " / ".join(_format_key_name(key) for key in keys)
+
+def get_menu_panel_rect():
+    menu_w = pause_menu_image.get_width()
+    menu_h = pause_menu_image.get_height()
+    return pygame.Rect((width - menu_w) // 2, (height - menu_h) // 2, menu_w, menu_h)
+
+def build_menu_tabs(menu_rect):
+    tab_w = 200
+    tab_h = 38
+    tab_y = menu_rect.y + 18
+    tab_x = menu_rect.x + 50
+    settings_tab_rect = pygame.Rect(tab_x, tab_y, tab_w, tab_h)
+    keybind_tab_rect = pygame.Rect(tab_x + tab_w + 16, tab_y, tab_w, tab_h)
+    return settings_tab_rect, keybind_tab_rect
+
+def build_settings_layout(menu_rect):
+    entries_per_col = max(1, math.ceil(len(menu_settings_entries) / 2))
+    col_width = (menu_rect.width - 140) // 2
+    start_x = menu_rect.x + 60
+    start_y = menu_rect.y + 110
+    row_h = 70
+    layout = []
+    for idx, entry in enumerate(menu_settings_entries):
+        col = idx // entries_per_col
+        row = idx % entries_per_col
+        col_x = start_x + col * col_width
+        row_y = start_y + row * row_h
+        if entry["type"] == "slider":
+            track_w = col_width - 30
+            track_rect = pygame.Rect(col_x, row_y + 32, track_w, 8)
+            span = entry["max"] - entry["min"]
+            ratio = 0.0 if span <= 0 else (entry["value"] - entry["min"]) / span
+            ratio = max(0.0, min(1.0, ratio))
+            knob_x = int(track_rect.x + ratio * track_rect.width)
+            knob_rect = pygame.Rect(knob_x - 6, track_rect.y - 6, 12, 20)
+            layout.append({
+                "entry": entry,
+                "label_pos": (col_x, row_y),
+                "track_rect": track_rect,
+                "knob_rect": knob_rect,
+            })
+        else:
+            toggle_rect = pygame.Rect(col_x + col_width - 52, row_y + 14, 44, 22)
+            layout.append({
+                "entry": entry,
+                "label_pos": (col_x, row_y),
+                "toggle_rect": toggle_rect,
+            })
+    return layout
+
+def build_keybinds_layout(menu_rect):
+    entries_per_col = max(1, math.ceil(len(menu_keybind_actions) / 2))
+    col_width = (menu_rect.width - 140) // 2
+    start_x = menu_rect.x + 60
+    start_y = menu_rect.y + 110
+    row_h = 52
+    layout = []
+    for idx, entry in enumerate(menu_keybind_actions):
+        col = idx // entries_per_col
+        row = idx % entries_per_col
+        col_x = start_x + col * col_width
+        row_y = start_y + row * row_h
+        row_rect = pygame.Rect(col_x, row_y, col_width, row_h)
+        key_rect = pygame.Rect(col_x + col_width - 140, row_y + 10, 120, 28)
+        layout.append({
+            "action": entry["action"],
+            "label": entry["label"],
+            "label_pos": (col_x, row_y + 14),
+            "key_rect": key_rect,
+            "row_rect": row_rect,
+        })
+    return layout
+
+def _update_slider_value(entry, track_rect, mouse_x):
+    span = entry["max"] - entry["min"]
+    if span <= 0:
+        return
+    ratio = (mouse_x - track_rect.x) / track_rect.width
+    ratio = max(0.0, min(1.0, ratio))
+    entry["value"] = entry["min"] + ratio * span
+
+def draw_menu_settings(screen):
+    menu_rect = get_menu_panel_rect()
+    screen.blit(temp_pause_surface, pause_menu_rect.topleft)
+    screen.blit(pause_menu_image, menu_rect.topleft)
+
+    settings_tab_rect, keybind_tab_rect = build_menu_tabs(menu_rect)
+    active_color = (210, 190, 160)
+    inactive_color = (130, 120, 140)
+    tab_fill_active = (70, 60, 80)
+    tab_fill_inactive = (45, 40, 55)
+
+    pygame.draw.rect(screen, tab_fill_active if menu_settings_tab == "settings" else tab_fill_inactive, settings_tab_rect, border_radius=6)
+    pygame.draw.rect(screen, active_color if menu_settings_tab == "settings" else inactive_color, settings_tab_rect, 2, border_radius=6)
+    pygame.draw.rect(screen, tab_fill_active if menu_settings_tab == "keybinds" else tab_fill_inactive, keybind_tab_rect, border_radius=6)
+    pygame.draw.rect(screen, active_color if menu_settings_tab == "keybinds" else inactive_color, keybind_tab_rect, 2, border_radius=6)
+
+    settings_text = menu_label_font.render("Settings", True, active_color if menu_settings_tab == "settings" else inactive_color)
+    keybind_text = menu_label_font.render("Key Bindings", True, active_color if menu_settings_tab == "keybinds" else inactive_color)
+    screen.blit(settings_text, settings_text.get_rect(center=settings_tab_rect.center))
+    screen.blit(keybind_text, keybind_text.get_rect(center=keybind_tab_rect.center))
+
+    if menu_settings_tab == "settings":
+        layout = build_settings_layout(menu_rect)
+        for item in layout:
+            entry = item["entry"]
+            label_surface = menu_label_font.render(entry["label"], True, (235, 225, 210))
+            screen.blit(label_surface, item["label_pos"])
+            if entry["type"] == "slider":
+                track_rect = item["track_rect"]
+                knob_rect = item["knob_rect"]
+                pygame.draw.rect(screen, (70, 70, 90), track_rect, border_radius=4)
+                fill_rect = pygame.Rect(track_rect.x, track_rect.y, knob_rect.centerx - track_rect.x, track_rect.height)
+                pygame.draw.rect(screen, (180, 160, 130), fill_rect, border_radius=4)
+                pygame.draw.rect(screen, (230, 220, 210), knob_rect, border_radius=6)
+                value_pct = int((entry["value"] - entry["min"]) / (entry["max"] - entry["min"]) * 100) if entry["max"] > entry["min"] else 0
+                value_text = menu_small_font.render(f"{value_pct}%", True, (160, 150, 160))
+                screen.blit(value_text, (track_rect.right - value_text.get_width(), track_rect.y - 20))
+            else:
+                toggle_rect = item["toggle_rect"]
+                is_on = entry["value"]
+                toggle_color = (90, 150, 120) if is_on else (80, 80, 95)
+                pygame.draw.rect(screen, toggle_color, toggle_rect, border_radius=11)
+                knob_x = toggle_rect.right - 10 if is_on else toggle_rect.left + 10
+                pygame.draw.circle(screen, (235, 230, 220), (knob_x, toggle_rect.centery), 8)
+    else:
+        layout = build_keybinds_layout(menu_rect)
+        for item in layout:
+            label_surface = menu_label_font.render(item["label"], True, (235, 225, 210))
+            screen.blit(label_surface, item["label_pos"])
+            active = menu_settings_capture_action == item["action"]
+            key_rect = item["key_rect"]
+            pygame.draw.rect(screen, (80, 70, 90) if not active else (110, 90, 80), key_rect, border_radius=6)
+            pygame.draw.rect(screen, (200, 180, 160), key_rect, 2, border_radius=6)
+            key_text_value = "Press a key..." if active else format_action_keys(item["action"])
+            key_text = menu_small_font.render(key_text_value, True, (230, 220, 210))
+            screen.blit(key_text, key_text.get_rect(center=key_rect.center))
+
+        hint_text = menu_small_font.render("Click a binding to reassign. Esc cancels.", True, (150, 140, 150))
+        screen.blit(hint_text, (menu_rect.x + 60, menu_rect.bottom - 80))
+
+    back_rect = pygame.Rect(menu_rect.centerx - 70, menu_rect.bottom - 58, 140, 34)
+    pygame.draw.rect(screen, (70, 90, 120), back_rect, border_radius=6)
+    pygame.draw.rect(screen, (210, 210, 230), back_rect, 2, border_radius=6)
+    back_text = menu_label_font.render("Back", True, (245, 245, 245))
+    screen.blit(back_text, back_text.get_rect(center=back_rect.center))
+    return back_rect
+
+def handle_menu_settings_event(event):
+    global menu_settings_open, menu_settings_tab, menu_settings_active_slider, menu_settings_capture_action
+
+    menu_rect = get_menu_panel_rect()
+    settings_tab_rect, keybind_tab_rect = build_menu_tabs(menu_rect)
+    back_rect = pygame.Rect(menu_rect.centerx - 70, menu_rect.bottom - 58, 140, 34)
+
+    if event.type == pygame.KEYDOWN:
+        if menu_settings_capture_action:
+            if event.key == pygame.K_ESCAPE:
+                menu_settings_capture_action = None
+            else:
+                keybinds[menu_settings_capture_action] = event.key
+                menu_settings_capture_action = None
+            return
+        if event.key == pygame.K_ESCAPE:
+            menu_settings_open = False
+            menu_settings_active_slider = None
+            menu_settings_capture_action = None
+            return
+
+    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+        if back_rect.collidepoint(event.pos):
+            menu_settings_open = False
+            menu_settings_active_slider = None
+            menu_settings_capture_action = None
+            return
+        if settings_tab_rect.collidepoint(event.pos):
+            menu_settings_tab = "settings"
+            menu_settings_capture_action = None
+            return
+        if keybind_tab_rect.collidepoint(event.pos):
+            menu_settings_tab = "keybinds"
+            menu_settings_active_slider = None
+            return
+
+        if menu_settings_tab == "settings":
+            layout = build_settings_layout(menu_rect)
+            for item in layout:
+                entry = item["entry"]
+                if entry["type"] == "toggle":
+                    if item["toggle_rect"].collidepoint(event.pos):
+                        entry["value"] = not entry["value"]
+                        return
+                else:
+                    if item["track_rect"].collidepoint(event.pos) or item["knob_rect"].collidepoint(event.pos):
+                        menu_settings_active_slider = entry["id"]
+                        _update_slider_value(entry, item["track_rect"], event.pos[0])
+                        return
+        else:
+            layout = build_keybinds_layout(menu_rect)
+            for item in layout:
+                if item["row_rect"].collidepoint(event.pos) or item["key_rect"].collidepoint(event.pos):
+                    menu_settings_capture_action = item["action"]
+                    return
+
+    if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+        menu_settings_active_slider = None
+
+    if event.type == pygame.MOUSEMOTION and menu_settings_active_slider and menu_settings_tab == "settings":
+        layout = build_settings_layout(menu_rect)
+        for item in layout:
+            entry = item["entry"]
+            if entry["id"] == menu_settings_active_slider and entry["type"] == "slider":
+                _update_slider_value(entry, item["track_rect"], event.pos[0])
+                break
+
 # Cat naming system
 naming_cat = None
 cat_name_input = ""
@@ -300,7 +600,7 @@ LIGHT_THROW_ITEMS = {"Feathers", "Phoenix Feather"}
 STONE_THROW_ITEMS = {"Stone", "Redrock Stone", "Snowy Stone"}
 BREAK_ON_HIT_ITEMS = {"Throwing Star", "Throwing Knife", "Snowball"}
 
-# Hold-to-consume (F key) timing (milliseconds)
+# Hold-to-consume timing (milliseconds)
 consume_hold_active = False
 consume_hold_next_time = 0
 consume_hold_initial_delay = 350  # delay before auto-repeat kicks in
@@ -2017,8 +2317,8 @@ def handle_stair_climbing(dt):
 
     keys_state = pygame.key.get_pressed()
     move_vec_raw = pygame.Vector2(
-        (1 if keys_state[pygame.K_d] else 0) - (1 if keys_state[pygame.K_a] else 0),
-        (1 if keys_state[pygame.K_s] else 0) - (1 if keys_state[pygame.K_w] else 0),
+        (1 if action_pressed("move_right", keys_state) else 0) - (1 if action_pressed("move_left", keys_state) else 0),
+        (1 if action_pressed("move_down", keys_state) else 0) - (1 if action_pressed("move_up", keys_state) else 0),
     )
     move_vec = move_vec_raw.copy()
     world_pos_vec = pygame.Vector2(player_pos.x + cam_x, player_pos.y)
@@ -2047,7 +2347,7 @@ def handle_stair_climbing(dt):
             active_stair = None
             return
 
-        sprinting = keys_state[pygame.K_LSHIFT] or keys_state[pygame.K_RSHIFT]
+        sprinting = action_pressed("sprint", keys_state)
         speed = player.base_speed * active_stair.climb_speed_multiplier * dt
         if sprinting:
             speed *= 1.5
@@ -2234,6 +2534,7 @@ while running:
             sound_manager.play_music("assets/music/Settler's End.wav")
             menu_zoom_timer = 0.0
             menu_scene_ready = False
+            menu_settings_open = False
         elif state == "game":
             sound_manager.stop_music()
             sound_manager.play_random_ambient_music(min_delay=200, max_delay=800, volume=0.2, fade_in=4000)
@@ -2242,26 +2543,35 @@ while running:
     if state == "menu":
         draw_menu_scene(dt)
 
-        catrun_title = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/catrun_title.png").convert_alpha(), (800, 200))
-        screen.blit(catrun_title, (width/2 - catrun_title.get_width()/2, 100))
-        new_game_button.draw(screen)
-        load_button.draw(screen)
-        menu_settings_button.draw(screen)
-        menu_quit_button.draw(screen)
+        if menu_settings_open:
+            draw_menu_settings(screen)
+        else:
+            catrun_title = pygame.transform.scale(pygame.image.load("assets/sprites/buttons/catrun_title.png").convert_alpha(), (800, 200))
+            screen.blit(catrun_title, (width/2 - catrun_title.get_width()/2, 100))
+            new_game_button.draw(screen)
+            load_button.draw(screen)
+            menu_settings_button.draw(screen)
+            menu_quit_button.draw(screen)
         
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
 
-            if new_game_button.is_clicked(event):
-                state = "game"
-                game_just_started = True
-            elif load_button.is_clicked(event):
-                pass
-            elif menu_settings_button.is_clicked(event):
-                pass
-            elif menu_quit_button.is_clicked(event):
-                running = False
+            if menu_settings_open:
+                handle_menu_settings_event(event)
+            else:
+                if new_game_button.is_clicked(event):
+                    state = "game"
+                    game_just_started = True
+                elif load_button.is_clicked(event):
+                    pass
+                elif menu_settings_button.is_clicked(event):
+                    menu_settings_open = True
+                    menu_settings_tab = "settings"
+                    menu_settings_active_slider = None
+                    menu_settings_capture_action = None
+                elif menu_quit_button.is_clicked(event):
+                    running = False
         
         pygame.display.flip()
         dt = clock.tick(60) / 1000
@@ -2892,21 +3202,21 @@ while running:
                 running = False
 
             if event.type == pygame.KEYDOWN:
-                # Exit hide/sleep states with E
-                if tent_hide_active and event.key == pygame.K_e:
+                # Exit hide/sleep states with the interact key
+                if tent_hide_active and action_key_matches("interact", event.key):
                     tent_hide_active = False
                     place_player_below_tent()
                     continue
-                if sleeping_in_tent and event.key == pygame.K_e:
+                if sleeping_in_tent and action_key_matches("interact", event.key):
                     sleeping_in_tent = False
                     time_speed_multiplier = 1.0
                     place_player_below_tent()
                     continue
-                if tent_menu_active and event.key == pygame.K_e:
+                if tent_menu_active and action_key_matches("interact", event.key):
                     tent_menu_active = False
                     tent_menu_tent = None
                     continue
-                if fast_travel_menu_active and event.key == pygame.K_e:
+                if fast_travel_menu_active and action_key_matches("interact", event.key):
                     fast_travel_menu_active = False
                     continue
 
@@ -2974,8 +3284,8 @@ while running:
                     alchemy_bench.handle_key_event(event)
                 elif mortar_pestle_in_use:
                     mortar_pestle.handle_key_event(event)
-                # Allow exiting smelter/campfire with E or ESC even while UI is open
-                if (smelter_in_use or campfire_in_use or mortar_pestle_in_use or alchemy_bench_in_use or chest_in_use) and event.key not in (pygame.K_e, pygame.K_ESCAPE):
+                # Allow exiting smelter/campfire with the interact key or ESC even while UI is open
+                if (smelter_in_use or campfire_in_use or mortar_pestle_in_use or alchemy_bench_in_use or chest_in_use) and not (action_key_matches("interact", event.key) or event.key == pygame.K_ESCAPE):
                     continue
 
             if inventory_in_use:
@@ -3002,7 +3312,7 @@ while running:
                 inventory.handle_level_up_event(event)
                 inventory.handle_cats_event(event)
 
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_f and not inventory_in_use and not crafting_bench_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and not chest_in_use and player.is_alive:
+            if event.type == pygame.KEYDOWN and action_key_matches("consume", event.key) and not inventory_in_use and not crafting_bench_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and not chest_in_use and player.is_alive:
                 consumed_item = False
                 success, tags = inventory.consume_item()
                 if success:
@@ -3024,7 +3334,7 @@ while running:
                         player.thirst_full_timer = getattr(player, "thirst_full_timer", 60)
                         sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
 
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_q and not crafting_bench_in_use and not smelter_in_use and not campfire_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and not chest_in_use and not arcane_crafter_in_use:
+            if event.type == pygame.KEYDOWN and action_key_matches("inventory", event.key) and not crafting_bench_in_use and not smelter_in_use and not campfire_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and not chest_in_use and not arcane_crafter_in_use:
                 inventory_in_use = not inventory_in_use
                 inventory.ui_open = inventory_in_use
                 if not inventory_in_use:
@@ -3032,13 +3342,13 @@ while running:
                     inventory.selected_inventory_slot = None
                     inventory.close_drop_menu()
             
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_r and player.is_alive:
+            if event.type == pygame.KEYDOWN and action_key_matches("rotate", event.key) and player.is_alive:
                 if placement_mode:
                     placement_direction = (placement_direction + 1) % 4
                     placement_snap_index = 0
                     continue
             
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_t and player.is_alive:
+            if event.type == pygame.KEYDOWN and action_key_matches("secondary_action", event.key) and player.is_alive:
                 if placement_mode and placement_item and placement_item.get("structure_type") == "StoneStairs":
                     placement_descending = not placement_descending
                     continue
@@ -3102,7 +3412,7 @@ while running:
                             process_drop_result(drop_result)
                     inventory.close_drop_menu()
             
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and placement_mode and player.is_alive:
+            if event.type == pygame.KEYDOWN and action_key_matches("placement_snap", event.key) and placement_mode and player.is_alive:
                 placement_snap_index += 1
                 continue
             
@@ -3674,7 +3984,7 @@ while running:
                 menu_rect = pygame.Rect(width // 2 - 180, height // 2 - 90, 360, 180)
                 option = get_tent_menu_option(event.pos, menu_rect)
                 if option == "sleep":
-                    if time_of_day >= 18 or time_of_day < 6:
+                    if time_of_day >= 22 or time_of_day < 6:
                         sleeping_in_tent = True
                         tent_hide_active = False
                         time_speed_multiplier = 30.0
@@ -3740,7 +4050,7 @@ while running:
                     mouse_pos = pygame.mouse.get_pos()
                     mortar_pestle.handle_mouse_click(mouse_pos, event.button, screen)
 
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
+            if event.type == pygame.KEYDOWN and action_key_matches("interact", event.key):
                 # When the inventory UI is open, ignore E so we don't
                 # accidentally open or interact with world UIs underneath.
                 if inventory_in_use:
@@ -4616,7 +4926,7 @@ while running:
 
         keys = pygame.key.get_pressed()
 
-        # Hold-to-consume (F key): after an initial press that successfully
+        # Hold-to-consume: after an initial press that successfully
         # consumed an item, keep consuming while F is held down.
         if consume_hold_active:
             can_auto_consume = (
@@ -4627,7 +4937,7 @@ while running:
                 and not chest_in_use
                 and player.is_alive
             )
-            if not keys[pygame.K_f] or not can_auto_consume:
+            if not action_pressed("consume", keys) or not can_auto_consume:
                 consume_hold_active = False
             else:
                 now_ms = pygame.time.get_ticks()
@@ -4758,7 +5068,7 @@ while running:
                     offset = get_redmite_slot_offset(player.last_direction, slot)
                     # Apply optional per-frame wobble when walking left/right.
                     walk_offsets = latch_walk_offsets.get(player.last_direction, None)
-                    is_moving = keys[pygame.K_w] or keys[pygame.K_a] or keys[pygame.K_s] or keys[pygame.K_d]
+                    is_moving = movement_active(keys)
                     if walk_offsets and is_moving:
                         idx = int(player_frame_index) % len(walk_offsets)
                         wobble = walk_offsets[idx]
@@ -4818,7 +5128,7 @@ while running:
                         held_image = get_held_frame(item["held_item_images"].get(player.last_direction), item)
                         
                         if held_image and is_attacking:
-                            is_moving = keys[pygame.K_w] or keys[pygame.K_a] or keys[pygame.K_s] or keys[pygame.K_d]
+                            is_moving = movement_active(keys)
                             
                             if is_moving:
                                 if player.last_direction == "down":
@@ -4861,7 +5171,7 @@ while running:
                             
                             screen.blit(rotated_image, (held_x, held_y))
                         elif held_image:
-                            is_moving = keys[pygame.K_w] or keys[pygame.K_a] or keys[pygame.K_s] or keys[pygame.K_d]
+                            is_moving = movement_active(keys)
                             base_offset = item.get("held_item_offset", {}).get(player.last_direction, (0, 0))
                             
                             movement_rotation = 0
@@ -5343,27 +5653,26 @@ while running:
         # Default color/alpha
         R_value = G_value = B_value = A_value = 0
 
-        # ---- Sunset (18 → 19) ----
-        if 18.0 <= time_of_day < 19.0:
-            t = (time_of_day - 18.0) / 1.0
+        # ---- Sunset (22 → 23) ----
+        if 22.0 <= time_of_day < 23.0:
+            t = (time_of_day - 22.0) / 1.0
             R_value = int(lerp(0, 120, t))
             B_value = int(lerp(0, 0, t))
             A_value = int(lerp(0, 90, t))
 
-        # ---- Evening → Night (19 → 22) ----
-        elif 19.0 <= time_of_day < 22.0:
-            t = (time_of_day - 19.0) / 3.0
+        # ---- Evening → Night (23 → 1) ----
+        elif 23.0 <= time_of_day or time_of_day < 1.0:
+            if time_of_day >= 23.0:
+                t = (time_of_day - 23.0) / 2.0
+            else:
+                t = ((time_of_day + 24) - 23.0) / 2.0
             R_value = int(lerp(120, 40, t))
             B_value = int(lerp(0, 20, t))
             A_value = int(lerp(90, 200, t))    
 
-        # ---- Full Night (22 → 5) ----
-        elif 22.0 <= time_of_day or time_of_day < 5.0:
-            if time_of_day >= 22.0:
-                t = (time_of_day - 22.0) / 5.0
-            else:
-                t = ((time_of_day + 24) - 22.0) / 5.0
-
+        # ---- Full Night (1 → 5) ----
+        elif 1.0 <= time_of_day < 5.0:
+            t = (time_of_day - 1.0) / 4.0
             R_value = int(lerp(40, 0, t))
             B_value = int(lerp(20, 20, t))
             A_value = int(lerp(200, 200, t))
@@ -5464,7 +5773,7 @@ while running:
 
         if not paused and not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and not chest_in_use and not tent_menu_active and not fast_travel_menu_active and not tent_hide_active and player.dead == False:
 
-            if keys[pygame.K_e] and current_time - collect_cooldown > collect_delay:
+            if action_pressed("interact", keys) and current_time - collect_cooldown > collect_delay:
                 for obj in visible_objects:
                     if hasattr(obj, 'collect') and not obj.destroyed:
                         if hasattr(obj, 'is_empty') and obj.is_empty:
@@ -5789,13 +6098,13 @@ while running:
 
             if not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and not chest_in_use and naming_cat is None and not is_falling:
 
-                if (((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]) and (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT])) or (pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not mouse_over_hotbar)) and not player.exhausted:
+                if ((movement_active(keys) and action_pressed("sprint", keys)) or (pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not mouse_over_hotbar)) and not player.exhausted:
                     if player.lose_stamina(screen, dt):
                         stamina_depleted_message_timer = 2.0
                     player.stamina_speed()
 
-                is_moving = keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]
-                is_running = (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]) and is_moving
+                is_moving = movement_active(keys)
+                is_running = action_pressed("sprint", keys) and is_moving
                 
                 if is_moving:
                     base_delay = 0.4
@@ -5873,33 +6182,33 @@ while running:
                                 player_animation_timer = 0
                 
                 if not crafting_bench_in_use:
-                    if keys[pygame.K_w] and (player_pos.y - (size/2)) >= 0:
+                    if action_pressed("move_up", keys) and (player_pos.y - (size/2)) >= 0:
                         if not up_collision:
                             player_pos.y -= player_speed * dt * shift_multiplier
                     
                     
-                    if keys[pygame.K_s] and (player_pos.y + (size/2)) <= height:
+                    if action_pressed("move_down", keys) and (player_pos.y + (size/2)) <= height:
                         if not down_collision:
                             player_pos.y += player_speed * dt * shift_multiplier
 
                     
-                    if keys[pygame.K_a]:
+                    if action_pressed("move_left", keys):
                         if not left_collision:
                             absolute_cam_x -= player_speed * dt * shift_multiplier
                             dungeon_depth = max(0, dungeon_depth - dungeon_traversal_speed * shift_multiplier)
 
                     
-                    if keys[pygame.K_d]:
+                    if action_pressed("move_right", keys):
                         if not right_collision:
                             absolute_cam_x += player_speed * dt * shift_multiplier
                             dungeon_depth += dungeon_traversal_speed * shift_multiplier
 
                 cam_x = int(absolute_cam_x)
 
-                if not crafting_bench_in_use and (keys[pygame.K_d] and pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not mouse_over_hotbar):
+                if not crafting_bench_in_use and (action_pressed("move_right", keys) and pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not mouse_over_hotbar):
                     player.last_direction = "right"
                     player_animation_timer += dt
-                    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+                    if action_pressed("sprint", keys):
                         if player_animation_timer > .04:
                             player_frame_index = (player_frame_index + 1) % len(player_walk_right_attack_images)
                             player_current_image = player_walk_right_attack_images[player_frame_index]
@@ -5911,10 +6220,10 @@ while running:
                             player_current_image = player_walk_right_attack_images[player_frame_index]
                             player_animation_timer = 0
 
-                elif not crafting_bench_in_use and keys[pygame.K_d]:
+                elif not crafting_bench_in_use and action_pressed("move_right", keys):
                     player.last_direction = "right"
                     player_animation_timer += dt
-                    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+                    if action_pressed("sprint", keys):
                         if player_animation_timer > .04:
                             player_frame_index = (player_frame_index + 1) % len(player_walk_right_images)
                             player_current_image = player_walk_right_images[player_frame_index]
@@ -5926,10 +6235,10 @@ while running:
                             player_animation_timer = 0
                 
 
-                elif not crafting_bench_in_use and (keys[pygame.K_a] and pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not mouse_over_hotbar):
+                elif not crafting_bench_in_use and (action_pressed("move_left", keys) and pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not mouse_over_hotbar):
                     player.last_direction = "left"
                     player_animation_timer += dt
-                    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+                    if action_pressed("sprint", keys):
                         if player_animation_timer > .04:
                             player_frame_index = (player_frame_index + 1) % len(player_walk_left_attack_images)
                             player_current_image = player_walk_left_attack_images[player_frame_index]
@@ -5941,10 +6250,10 @@ while running:
                             player_current_image = player_walk_left_attack_images[player_frame_index]
                             player_animation_timer = 0
 
-                elif not crafting_bench_in_use and keys[pygame.K_a]:
+                elif not crafting_bench_in_use and action_pressed("move_left", keys):
                     player.last_direction = "left"
                     player_animation_timer += dt
-                    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+                    if action_pressed("sprint", keys):
                         if player_animation_timer > .04:
                             player_frame_index = (player_frame_index + 1) % len(player_walk_left_images)
                             player_current_image = player_walk_left_images[player_frame_index]
@@ -5957,10 +6266,10 @@ while running:
                             player_animation_timer = 0
 
 
-                elif not crafting_bench_in_use and (keys[pygame.K_w] and pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not mouse_over_hotbar):
+                elif not crafting_bench_in_use and (action_pressed("move_up", keys) and pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not mouse_over_hotbar):
                     player.last_direction = "up"
                     player_animation_timer += dt
-                    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+                    if action_pressed("sprint", keys):
                         if player_animation_timer > .04:
                             player_frame_index = (player_frame_index + 1) % len(player_walk_up_attack_images)
                             player_current_image = player_walk_up_attack_images[player_frame_index]
@@ -5972,10 +6281,10 @@ while running:
                             player_current_image = player_walk_up_attack_images[player_frame_index]
                             player_animation_timer = 0
 
-                elif not crafting_bench_in_use and keys[pygame.K_w]:
+                elif not crafting_bench_in_use and action_pressed("move_up", keys):
                     player.last_direction = "up"
                     player_animation_timer += dt
-                    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+                    if action_pressed("sprint", keys):
                         if player_animation_timer > .04:
                             player_frame_index = (player_frame_index + 1) % len(player_walk_up_images)
                             player_current_image = player_walk_up_images[player_frame_index]
@@ -5988,10 +6297,10 @@ while running:
                 
                 
 
-                elif not crafting_bench_in_use and (keys[pygame.K_s] and pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not mouse_over_hotbar):
+                elif not crafting_bench_in_use and (action_pressed("move_down", keys) and pygame.mouse.get_pressed()[0] and not mouse_attack_blocked and pygame.time.get_ticks() >= mouse_attack_block_expires and not player.exhausted and not mouse_over_hotbar):
                     player.last_direction = "down"
                     player_animation_timer += dt
-                    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+                    if action_pressed("sprint", keys):
                         if player_animation_timer > .04:
                             player_frame_index = (player_frame_index + 1) % len(player_walk_down_attack_images)
                             player_current_image = player_walk_down_attack_images[player_frame_index]
@@ -6003,10 +6312,10 @@ while running:
                             player_current_image = player_walk_down_attack_images[player_frame_index]
                             player_animation_timer = 0
 
-                elif not crafting_bench_in_use and keys[pygame.K_s]:
+                elif not crafting_bench_in_use and action_pressed("move_down", keys):
                     player.last_direction = "down"
                     player_animation_timer += dt
-                    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+                    if action_pressed("sprint", keys):
                         if player_animation_timer > .04:
                             player_frame_index = (player_frame_index + 1) % len(player_walk_down_images)
                             player_current_image = player_walk_down_images[player_frame_index]
@@ -6020,14 +6329,14 @@ while running:
                 
 
 
-                if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+                if action_pressed("sprint", keys):
                     shift_multiplier = 1.5
                     
                 else:
                     shift_multiplier = 1
 
                 step_sound_timer += dt
-                if step_sound_timer >= step_sound_delay and (keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]):
+                if step_sound_timer >= step_sound_delay and movement_active(keys):
                     sound_manager.play_sound(random.choice(grass_steps))
                     step_sound_timer = 0
 
@@ -6055,7 +6364,7 @@ while running:
         player.print_score(screen, dungeon_depth_high)
         player.is_dead(screen, dungeon_depth_high)
 
-        if (not ((keys[pygame.K_w] or keys[pygame.K_s] or keys[pygame.K_a] or keys[pygame.K_d]) and (keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT])) and ((not pygame.mouse.get_pressed()[0]) or mouse_attack_blocked or pygame.time.get_ticks() < mouse_attack_block_expires)) or player.exhausted:
+        if (not (movement_active(keys) and action_pressed("sprint", keys)) and ((not pygame.mouse.get_pressed()[0]) or mouse_attack_blocked or pygame.time.get_ticks() < mouse_attack_block_expires)) or player.exhausted:
             player.regain_stamina(dt, screen)
             player.stamina_speed()
             player.lose_thirst(dt)

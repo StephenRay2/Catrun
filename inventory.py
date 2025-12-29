@@ -6171,11 +6171,13 @@ class Inventory():
         height = screen.get_height()
         x_pos = screen.get_width() / 2 - self.inventory_image.get_width() / 2
         y_pos = screen.get_height() / 2 - self.inventory_image.get_height() / 2
+        panel_x = x_pos
+        panel_y = y_pos - 20
         if self.state == "inventory":
             inventory_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
             pygame.draw.rect(inventory_surface, (0, 0, 0, 150), screen.get_rect())
             screen.blit(inventory_surface, (0, 0))
-            screen.blit(self.inventory_image, (x_pos, y_pos - 20))
+            screen.blit(self.inventory_image, (panel_x, panel_y))
             screen.blit(player_inventory_image, (700, 90))
 
             screen.blit(inventory_tab, (width // 2 - 533, height // 2 - 303))
@@ -6187,7 +6189,7 @@ class Inventory():
             inventory_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
             pygame.draw.rect(inventory_surface, (0, 0, 0, 150), screen.get_rect())
             screen.blit(inventory_surface, (0, 0))
-            screen.blit(self.crafting_image, (x_pos, y_pos - 20))
+            screen.blit(self.crafting_image, (panel_x, panel_y))
 
             inventory_tab_unused.draw(screen)
             screen.blit(crafting_tab, (width // 2 - 397, height // 2 - 303))
@@ -6200,7 +6202,7 @@ class Inventory():
             inventory_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
             pygame.draw.rect(inventory_surface, (0, 0, 0, 150), screen.get_rect())
             screen.blit(inventory_surface, (0, 0))
-            screen.blit(self.level_up_image, (x_pos, y_pos - 20))
+            screen.blit(self.level_up_image, (panel_x, panel_y))
             screen.blit(player_inventory_image, (700, 90))
             self.draw_level_up(screen)
 
@@ -6213,10 +6215,10 @@ class Inventory():
             inventory_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
             pygame.draw.rect(inventory_surface, (0, 0, 0, 150), screen.get_rect())
             screen.blit(inventory_surface, (0, 0))
-            screen.blit(self.cat_screen_image, (x_pos, y_pos - 20))
-            self.draw_cats_tab(screen, x_pos, y_pos - 20)
+            screen.blit(self.cat_screen_image, (panel_x, panel_y))
+            self.draw_cats_tab(screen, panel_x, panel_y)
             if self.selected_cat_id:
-                self.draw_selected_cat_info(screen, x_pos, y_pos - 20)
+                self.draw_selected_cat_info(screen, panel_x, panel_y)
 
             inventory_tab_unused.draw(screen)
             crafting_tab_unused.draw(screen)
@@ -6224,29 +6226,29 @@ class Inventory():
             screen.blit(cats_tab, (width // 2 - 125, height // 2 - 303))
 
         # Common player info (level / weight / temp)
-        self.draw_player_info(screen)
+        self.draw_player_info(screen, panel_x, panel_y)
 
-    def draw_player_info(self, screen):
+    def draw_player_info(self, screen, panel_x, panel_y):
         """Render basic player info shared across inventory tabs."""
         font = pygame.font.Font(font_path, 14)
         self.recalc_weight()
         player.weight = self.total_inventory_weight
-        total_weight_pos_x = screen.get_width()/2 + 15
-        info_y = 70
+        info_x = panel_x + (self.inventory_image.get_width() / 2) + 15
+        info_y = panel_y + 30
 
         level_text = font.render(f"Level: {player.level}", True, (200, 220, 255))
-        screen.blit(level_text, (total_weight_pos_x, info_y))
+        screen.blit(level_text, (info_x, info_y))
         info_y += 22
 
         weight_label = font.render("Weight:", True, (200, 200, 50))
         weight_value = font.render(f"{round(self.total_inventory_weight, 1)} / {player.max_weight}", True, (200, 200, 50))
-        screen.blit(weight_label, (total_weight_pos_x, info_y))
-        screen.blit(weight_value, (total_weight_pos_x, info_y + 16))
+        screen.blit(weight_label, (info_x, info_y))
+        screen.blit(weight_value, (info_x, info_y + 16))
         info_y += 36
 
         temp_display = int(player.current_temperature) if hasattr(player, "current_temperature") else "N/A"
         temp_text = font.render(f"Temp: {temp_display}", True, (255, 200, 120))
-        screen.blit(temp_text, (total_weight_pos_x, info_y + 6))
+        screen.blit(temp_text, (info_x, info_y + 6))
 
     def draw_cats_tab(self, screen, x_pos, y_pos):
         """Draw cat cards for every tamed cat the player owns."""
@@ -6718,8 +6720,8 @@ class Inventory():
             {
                 "key": "strength",
                 "label": "Strength",
-                "base": int(player.attack),
-                "preview": int(player.damage + (player.strength_leveler) * player.strength_level_gain)
+                "base": int(round(player.damage + (player.strength_leveler - 1) * player.strength_level_gain)),
+                "preview": int(round(player.damage + (player.strength_leveler) * player.strength_level_gain))
             },
             {
                 "key": "speed",
