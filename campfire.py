@@ -1,6 +1,7 @@
 import pygame
 from inventory import items_list, hotbar_image
 from debug import font_path, font
+from ui_helpers import draw_close_button
 
 
 class Campfire:
@@ -95,6 +96,7 @@ class Campfire:
 
         self.slot_size = 64
         self.gap_size = 4
+        self.close_rect = None
 
     def open(self, campfire_pos):
         self.active = True
@@ -645,6 +647,11 @@ class Campfire:
 
         if self.campfire_screen:
             screen.blit(self.campfire_screen, (int(campfire_screen_x), int(campfire_screen_y)))
+
+        panel_width = self.campfire_screen.get_width() if self.campfire_screen else 1100
+        panel_height = self.campfire_screen.get_height() if self.campfire_screen else 600
+        panel_rect = pygame.Rect(int(campfire_screen_x), int(campfire_screen_y), panel_width, panel_height)
+        self.close_rect = draw_close_button(screen, panel_rect)
 
         inv_start_x = layout["inv_start_x"]
         inv_start_y = layout["inv_start_y"]

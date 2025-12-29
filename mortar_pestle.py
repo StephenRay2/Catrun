@@ -2,6 +2,7 @@ import pygame
 from inventory import items_list, hotbar_image
 from buttons import inventory_tab
 from debug import font_path, font
+from ui_helpers import draw_close_button
 
 class MortarPestle:
     def __init__(self, inventory_obj):
@@ -43,6 +44,7 @@ class MortarPestle:
         self.font_small = pygame.font.Font(font_path, 14)
         self.font_medium = pygame.font.Font(font_path, 18)
         self.font_large = pygame.font.Font(font_path, 22)
+        self.close_rect = None
     
     def _load_mortar_pestle_recipes(self):
         recipes = []
@@ -489,6 +491,11 @@ class MortarPestle:
         else:
             x_pos = width / 2 - 550
             y_pos = height / 2 - 300
+
+        panel_width = self.mortar_pestle_screen_image.get_width() if self.mortar_pestle_screen_image else 1100
+        panel_height = self.mortar_pestle_screen_image.get_height() if self.mortar_pestle_screen_image else 600
+        panel_rect = pygame.Rect(x_pos, y_pos - 20, panel_width, panel_height)
+        self.close_rect = draw_close_button(screen, panel_rect)
         
         self._draw_inventory_items(screen, x_pos, y_pos)
         self._draw_recipe_preview(screen, x_pos, y_pos)

@@ -3,6 +3,7 @@ import pygame
 from inventory import items_list, hotbar_image
 from buttons import inventory_tab
 from debug import font_path
+from ui_helpers import draw_close_button
 
 
 class ChestUI:
@@ -30,6 +31,7 @@ class ChestUI:
 
         self.font_small = pygame.font.Font(font_path, 14)
         self.font_medium = pygame.font.Font(font_path, 18)
+        self.close_rect = None
 
         self.slot_size = 64
         self.gap_size = 4
@@ -271,6 +273,11 @@ class ChestUI:
         else:
             x_pos = width / 2 - 550
             y_pos = height / 2 - 300
+
+        panel_width = self.chest_screen_image.get_width() if self.chest_screen_image else 1100
+        panel_height = self.chest_screen_image.get_height() if self.chest_screen_image else 600
+        panel_rect = pygame.Rect(x_pos, y_pos - 20, panel_width, panel_height)
+        self.close_rect = draw_close_button(screen, panel_rect)
 
         self._draw_inventory_items(screen, x_pos, y_pos)
         self._draw_chest_items(screen, x_pos, y_pos)

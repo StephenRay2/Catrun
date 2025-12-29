@@ -226,6 +226,8 @@ def alert_gorlins_to_food_thief(corpse, offender, max_distance=900):
     """
     if corpse is None or offender is None:
         return
+    if offender.__class__.__name__ == "Gorlin":
+        return
 
     def _offender_is_protected(offender_obj):
         """Skip aggro if offender is the player inside the spawn-safe bubble."""
@@ -2098,6 +2100,9 @@ class Wolf(Enemy):
         self.decision_timer = random.uniform(0.5, 1.5)
         self.pack_state = "idle"
         self.pack_chase_timeout = 0.0
+        self.retaliation_target = None
+        self.retaliation_timer = 0.0
+        self.retaliation_timeout = self.aggro_timeout
 
     def get_collision_rect(self, cam_x):
         rect = self.rect
@@ -2193,6 +2198,26 @@ class Wolf(Enemy):
         if hasattr(target, "is_alive") and not getattr(target, "is_alive", True):
             return False
         return True
+
+    def register_attack(self, attacker):
+        super().register_attack(attacker)
+        if attacker is None:
+            return
+        if getattr(attacker, "destroyed", False):
+            return
+        if hasattr(attacker, "is_alive") and not getattr(attacker, "is_alive", True):
+            return
+        if not hasattr(attacker, "rect") and not hasattr(attacker, "world_x"):
+            return
+
+        self.retaliation_target = attacker
+        self.retaliation_timer = self.retaliation_timeout
+        self.chasing = True
+        self.pack_state = "chase"
+        self.pack_chase_timeout = max(self.pack_chase_timeout, self.retaliation_timeout)
+
+        if not isinstance(attacker, Player):
+            Wolf.pack_targets[self.pack_id] = attacker
 
     def _is_enemy(self, obj):
         return getattr(obj, "enemy", False)
@@ -2419,6 +2444,21 @@ class Wolf(Enemy):
             )
             if self._valid_target(target_obj) and not isinstance(target_obj, Player):
                 Wolf.pack_targets[self.pack_id] = target_obj
+
+        if self.retaliation_timer > 0:
+            self.retaliation_timer = max(0.0, self.retaliation_timer - dt)
+            if self.retaliation_timer <= 0:
+                self.retaliation_target = None
+
+        if self._valid_target(self.retaliation_target):
+            target_obj = self.retaliation_target
+            target_x = getattr(target_obj, "world_x", target_obj.rect.centerx)
+            target_y = getattr(target_obj, "world_y", target_obj.rect.centery)
+            self.chasing = True
+            if not isinstance(target_obj, Player):
+                Wolf.pack_targets[self.pack_id] = target_obj
+                self.pack_state = "chase"
+                self.pack_chase_timeout = max(self.pack_chase_timeout, self.retaliation_timer)
 
         # Cohesion: stay near pack center
         coh_vector = pygame.Vector2(0, 0)
@@ -3035,6 +3075,8 @@ class Gorlin(Enemy):
     def _apply_damage(self, target, damage):
         if target is None or not hasattr(target, "health"):
             return
+        if isinstance(target, Gorlin):
+            return
         if isinstance(target, Player) and hasattr(target, "is_in_spawn_protection") and target.is_in_spawn_protection():
             return
         target.health = max(0, target.health - damage)
@@ -3067,6 +3109,14 @@ class Gorlin(Enemy):
                 target_world_y = effective_target.rect.centery
             else:
                 self.current_target = None
+
+        if isinstance(effective_target, Gorlin):
+            self.current_target = None
+            self.roll_on_alert = False
+            self.chasing = False
+            self.want_to_roll = False
+            self.roll_strike_used = False
+            return
 
         dx = target_world_x - self.rect.centerx
         dy = target_world_y - self.rect.centery
@@ -3207,7 +3257,13 @@ class Gorlin(Enemy):
 
         # Refresh targets
         if self.current_target is not None:
-            if getattr(self.current_target, "destroyed", False) or not getattr(self.current_target, "is_alive", True):
+            if isinstance(self.current_target, Gorlin):
+                self.current_target = None
+                self.roll_on_alert = False
+                self.chasing = False
+                self.want_to_roll = False
+                self.roll_strike_used = False
+            elif getattr(self.current_target, "destroyed", False) or not getattr(self.current_target, "is_alive", True):
                 self.current_target = None
                 self.roll_on_alert = False
                 self.roll_strike_used = False

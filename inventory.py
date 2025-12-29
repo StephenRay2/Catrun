@@ -6,6 +6,7 @@ import math
 import copy
 import mob_placement
 from debug import font_path, font
+from ui_helpers import draw_close_button
 
 HARVEST_TOOL_MULTS = {
     "wood": {"normal": 2, "special": 2},
@@ -6013,6 +6014,83 @@ _explicit_dur_overrides = {
     "Wooden Crossbow": 1200,
 }
 
+def get_weapon_tier_from_name(name):
+    tiers = ["dragon", "obsidian", "metal", "gold", "bone", "stone", "wood"]
+    for tier in tiers:
+        if tier in name:
+            return tier
+    return None
+
+def compute_weapon_attack(base_attack, held_item):
+    """Return effective attack after weapon multipliers/flat bonuses."""
+    if not held_item:
+        return base_attack
+
+    name = held_item.get("item_name", "").lower()
+    tier = get_weapon_tier_from_name(name)
+
+    if "throwing knife" in name:
+        return max(1, int(base_attack + 15))
+
+    if "shovel" in name:
+        shovel_bonus = {
+            "wood": 5,
+            "stone": 7,
+            "metal": 12,
+            "bone": 12,
+            "gold": 12,
+            "obsidian": 15,
+            "dragon": 20
+        }
+        bonus = shovel_bonus.get(tier, 0)
+        if bonus > 0:
+            return max(1, int(base_attack + bonus))
+
+    sword_mults = {
+        "wood": (1.1, 5),
+        "stone": (1.3, 9),
+        "metal": (1.4, 13),
+        "bone": (2.1, 2),
+        "obsidian": (1.4, 25),
+        "dragon": (2.2, 20),
+    }
+    spear_flats = {
+        "wood": 9,
+        "stone": 15,
+        "metal": 22,
+        "bone": 19,
+        "obsidian": 40,
+        "dragon": 55,
+    }
+
+    if "spiked wooden club" in name:
+        return max(1, int(math.floor(base_attack * 1.5) + 12))
+    if "wooden club" in name:
+        return max(1, int(math.floor(base_attack * 1.3) + 4))
+
+    if "sword" in name and tier in sword_mults:
+        mult, flat = sword_mults[tier]
+        return max(1, int(math.floor(base_attack * mult) + flat))
+
+    if "mace" in name and tier in sword_mults:
+        mult, flat = sword_mults[tier]
+        return max(1, int(math.floor(base_attack * mult) + flat))
+
+    if "axe" in name and "pickaxe" not in name and tier in sword_mults:
+        mult, flat = sword_mults[tier]
+        reduced_base = base_attack // 1.5
+        return max(1, int(math.floor(reduced_base * mult) + flat))
+
+    if "pickaxe" in name and tier in sword_mults:
+        mult, flat = sword_mults[tier]
+        reduced_base = base_attack // 3
+        return max(1, int(math.floor(reduced_base * mult) + flat))
+
+    if "spear" in name and tier in spear_flats:
+        return max(1, int(base_attack + spear_flats[tier]))
+
+    return base_attack
+
 for item in items_list:
     name = item.get("item_name", "")
     if name in _explicit_dur_overrides:
@@ -6089,6 +6167,7 @@ class Inventory():
         self.selected_inventory_slot = None
         self.selection_mode = "hotbar"
         self.ui_open = False
+        self.close_rect = None
         self.inventory_full_message_timer = 0
         self.hotbar_name_display_until = 0
         self.hotbar_name_display_text = ""
@@ -6096,7 +6175,7 @@ class Inventory():
         self.tooltip_title_font = pygame.font.Font(font_path, 18)
         self.tooltip_body_font = pygame.font.Font(font_path, 14)
         self.tooltip_small_font = pygame.font.Font(font_path, 12)
-        self.tooltip_delay_ms = 1000
+        self.tooltip_delay_ms = 350
         self.tooltip_mode_active = False
         self._hover_candidate = None
         self._hover_active_id = None
@@ -6169,10 +6248,15 @@ class Inventory():
         
         width = screen.get_width()
         height = screen.get_height()
-        x_pos = screen.get_width() / 2 - self.inventory_image.get_width() / 2
-        y_pos = screen.get_height() / 2 - self.inventory_image.get_height() / 2
-        panel_x = x_pos
-        panel_y = y_pos - 20
+        panel_image = self.inventory_image
+        if self.state == "crafting":
+            panel_image = self.crafting_image
+        elif self.state == "level_up":
+            panel_image = self.level_up_image
+        elif self.state == "cats":
+            panel_image = self.cat_screen_image
+        panel_x = screen.get_width() / 2 - panel_image.get_width() / 2
+        panel_y = screen.get_height() / 2 - panel_image.get_height() / 2 - 20
         if self.state == "inventory":
             inventory_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
             pygame.draw.rect(inventory_surface, (0, 0, 0, 150), screen.get_rect())
@@ -6226,6 +6310,8 @@ class Inventory():
             screen.blit(cats_tab, (width // 2 - 125, height // 2 - 303))
 
         # Common player info (level / weight / temp)
+        panel_rect = pygame.Rect(panel_x, panel_y, panel_image.get_width(), panel_image.get_height())
+        self.close_rect = draw_close_button(screen, panel_rect)
         self.draw_player_info(screen, panel_x, panel_y)
 
     def draw_player_info(self, screen, panel_x, panel_y):
@@ -6871,8 +6957,14 @@ class Inventory():
             return
 
         durability = item_def.get("durability")
+        max_durability = item_def.get("durability")
         if slot_data is not None and slot_data.get("durability") is not None:
             durability = slot_data.get("durability")
+        if slot_data is not None:
+            if slot_data.get("max_durability") is not None:
+                max_durability = slot_data.get("max_durability")
+            elif max_durability is None and slot_data.get("durability") is not None:
+                max_durability = slot_data.get("durability")
 
         status_effects = None
         if slot_data is not None:
@@ -6887,6 +6979,7 @@ class Inventory():
             "item_def": item_def,
             "rect": rect,
             "durability": durability,
+            "max_durability": max_durability,
             "status": status_effects,
             "recipe": recipe,
         }
@@ -6980,7 +7073,7 @@ class Inventory():
         data = self._hover_display_data
         item_def = data["item_def"]
         rect_x, rect_y, rect_w, rect_h = data["rect"]
-        max_text_width = 280
+        max_text_width = 320
 
         lines = []
         lines.append((self.tooltip_title_font, item_def.get("item_name", "Unknown"), (255, 255, 255)))
@@ -6989,9 +7082,51 @@ class Inventory():
         for line in self._wrap_text(description, self.tooltip_body_font, max_text_width):
             lines.append((self.tooltip_body_font, line, (230, 230, 230)))
 
-        durability_label = "Durability" if data.get("recipe") is None else "Max Durability"
+        base_attack = int(round(player.damage + (player.strength_leveler - 1) * player.strength_level_gain))
+        equipped_item = None
+        if 0 <= self.selected_hotbar_slot < len(self.hotbar_slots):
+            equipped_item = self.hotbar_slots[self.selected_hotbar_slot]
+        equipped_attack = compute_weapon_attack(base_attack, equipped_item)
+        hovered_attack = compute_weapon_attack(base_attack, item_def)
+        name_lower = item_def.get("item_name", "").lower()
+        tags = item_def.get("tags") or []
+        item_type = item_def.get("type", "")
+        show_strength = (
+            item_type in ("weapon", "tool")
+            or "weapon" in tags
+            or "tool" in tags
+            or any(k in name_lower for k in _weaponish_keywords)
+        )
+        if show_strength:
+            diff = hovered_attack - equipped_attack
+            if diff > 0:
+                strength_color = (180, 255, 180)
+            elif diff < 0:
+                strength_color = (255, 190, 190)
+            else:
+                strength_color = (210, 210, 210)
+            lines.append(
+                (self.tooltip_small_font,
+                 f"Strength: {equipped_attack} -> {hovered_attack}",
+                 strength_color)
+            )
+
+        durability_label = "Durability"
         durability_value = data.get("durability")
-        dur_text = f"{durability_label}: {durability_value}" if durability_value is not None else f"{durability_label}: N/A"
+        max_durability = data.get("max_durability")
+        if durability_value is not None:
+            if max_durability is None:
+                dur_text = f"{durability_label}: {durability_value}/?"
+            else:
+                try:
+                    cur_dur = int(max(0, min(durability_value, max_durability)))
+                    max_dur = int(max_durability)
+                except (TypeError, ValueError):
+                    cur_dur = durability_value
+                    max_dur = max_durability
+                dur_text = f"{durability_label}: {cur_dur}/{max_dur}"
+        else:
+            dur_text = f"{durability_label}: N/A"
         lines.append((self.tooltip_small_font, dur_text, (210, 210, 210)))
 
         is_pickaxe = self._is_pickaxe_item(item_def)
@@ -7037,9 +7172,9 @@ class Inventory():
             max_width = max(max_width, surface.get_width())
             line_height += surface.get_height() + 4
 
-        padding = 10
+        padding = 12
         box_width = max_width + padding * 2
-        box_height = line_height + padding
+        box_height = line_height + padding * 2
 
         tooltip_x = rect_x + rect_w + 12
         tooltip_y = rect_y
@@ -7053,7 +7188,7 @@ class Inventory():
         bg_surface.fill((0, 0, 0, 230))
         pygame.draw.rect(bg_surface, (255, 255, 255, 200), (0, 0, box_width, box_height), 1, border_radius=6)
 
-        current_y = padding // 2
+        current_y = padding
         for surf in rendered:
             bg_surface.blit(surf, (padding, current_y))
             current_y += surf.get_height() + 4
@@ -7947,6 +8082,9 @@ class Inventory():
         if hasattr(event, 'key') and event.key in key_to_index:
             idx = key_to_index[event.key]
             self.select_hotbar_slot(idx, do_use=use_on_press, screen=screen)
+            self.selection_mode = "hotbar"
+            self.selected_inventory_slot = None
+            self.show_selected_hotbar_name()
         elif hasattr(event, 'key'):
             pass
 

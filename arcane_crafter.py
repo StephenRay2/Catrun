@@ -5,6 +5,7 @@ from inventory import hotbar_image, items_list
 from buttons import Button
 from world import width, height
 from debug import font_path, font
+from ui_helpers import draw_close_button
 
 
 class ArcaneCrafter(CraftingBench):
@@ -121,6 +122,7 @@ class ArcaneCrafter(CraftingBench):
 
         # Current screen mode: "crafting" (like workbench) or "enchanting"
         self.mode = "crafting"
+        self.close_rect = None
 
         # Simple placeholders for enchanting slots (no logic yet)
         self.enchant_input_rect = None
@@ -202,6 +204,14 @@ class ArcaneCrafter(CraftingBench):
 
         if self.workbench_screen_image:
             screen.blit(self.workbench_screen_image, (x_pos, y_pos - 20))
+
+        panel_rect = pygame.Rect(
+            x_pos,
+            y_pos - 20,
+            self.workbench_screen_image.get_width(),
+            self.workbench_screen_image.get_height(),
+        )
+        self.close_rect = draw_close_button(screen, panel_rect)
 
         # Reuse workbench rendering for inventory/recipes/hotbar
         self._draw_inventory_items(screen, x_pos, y_pos)
@@ -542,6 +552,8 @@ class ArcaneCrafter(CraftingBench):
             )
             draw_rect = layout_rect.move(0, -30)
             pygame.draw.rect(screen, (30, 30, 60), draw_rect)
+
+        self.close_rect = draw_close_button(screen, draw_rect)
 
         # Inventory at the bottom: 4 rows of 16 (based on layout_rect, so it stays put)
         self._draw_enchanting_inventory(screen, layout_rect)

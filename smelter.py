@@ -1,6 +1,7 @@
 import pygame
 from inventory import items_list, hotbar_image
 from debug import font_path, font
+from ui_helpers import draw_close_button
 
 class Smelter:
     def __init__(self, inventory_obj):
@@ -86,9 +87,10 @@ class Smelter:
         
         self.font_small = pygame.font.Font(font_path, 16)
         self.font_medium = pygame.font.Font(font_path, 18)
-        
+
         self.slot_size = 64
         self.gap_size = 4
+        self.close_rect = None
     
     def open(self, smelter_pos):
         self.active = True
@@ -665,6 +667,11 @@ class Smelter:
         
         if self.smelter_screen:
             screen.blit(self.smelter_screen, (int(smelter_screen_x), int(smelter_screen_y)))
+
+        panel_width = self.smelter_screen.get_width() if self.smelter_screen else 1100
+        panel_height = self.smelter_screen.get_height() if self.smelter_screen else 600
+        panel_rect = pygame.Rect(int(smelter_screen_x), int(smelter_screen_y), panel_width, panel_height)
+        self.close_rect = draw_close_button(screen, panel_rect)
         
         inv_start_x = layout["inv_start_x"]
         inv_start_y = layout["inv_start_y"]

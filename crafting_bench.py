@@ -2,6 +2,7 @@ import pygame
 from inventory import items_list, hotbar_image
 from buttons import inventory_tab
 from debug import font_path, font
+from ui_helpers import draw_close_button
 
 class CraftingBench:
     def __init__(self, inventory_obj):
@@ -43,6 +44,7 @@ class CraftingBench:
         self.font_small = pygame.font.Font(font_path, 14)
         self.font_medium = pygame.font.Font(font_path, 18)
         self.font_large = pygame.font.Font(font_path, 22)
+        self.close_rect = None
     
     def _load_workbench_recipes(self):
         recipes = []
@@ -502,6 +504,9 @@ class CraftingBench:
         
         if self.workbench_screen_image:
             screen.blit(self.workbench_screen_image, (x_pos, y_pos - 20))
+
+        panel_rect = pygame.Rect(x_pos, y_pos - 20, self.workbench_screen_image.get_width(), self.workbench_screen_image.get_height())
+        self.close_rect = draw_close_button(screen, panel_rect)
         
         self._draw_inventory_items(screen, x_pos, y_pos)
         self._draw_recipe_preview(screen, x_pos, y_pos)

@@ -16,6 +16,7 @@ from chest import ChestUI
 from alchemy_bench import AlchemyBench
 from world import DroppedItem, dropped_items, Bank, banks
 from debug import font_path, font
+from ui_helpers import draw_close_button
 from mobs import hud_font, apply_wild_mob_level_scaling
 from player import *
 from cats import Cat, cat_types
@@ -268,6 +269,7 @@ menu_settings_open = False
 menu_settings_tab = "settings"
 menu_settings_active_slider = None
 menu_settings_capture_action = None
+menu_settings_close_rect = None
 
 menu_settings_entries = [
     {"id": "master_volume", "label": "Master Volume", "type": "slider", "min": 0.0, "max": 1.0, "value": 0.85},
@@ -430,9 +432,11 @@ def _update_slider_value(entry, track_rect, mouse_x):
     entry["value"] = entry["min"] + ratio * span
 
 def draw_menu_settings(screen):
+    global menu_settings_close_rect
     menu_rect = get_menu_panel_rect()
     screen.blit(temp_pause_surface, pause_menu_rect.topleft)
     screen.blit(pause_menu_image, menu_rect.topleft)
+    menu_settings_close_rect = draw_close_button(screen, menu_rect)
 
     settings_tab_rect, keybind_tab_rect = build_menu_tabs(menu_rect)
     active_color = (210, 190, 160)
@@ -497,11 +501,22 @@ def draw_menu_settings(screen):
     return back_rect
 
 def handle_menu_settings_event(event):
-    global menu_settings_open, menu_settings_tab, menu_settings_active_slider, menu_settings_capture_action
+    global menu_settings_open, menu_settings_tab, menu_settings_active_slider, menu_settings_capture_action, menu_settings_close_rect
 
     menu_rect = get_menu_panel_rect()
     settings_tab_rect, keybind_tab_rect = build_menu_tabs(menu_rect)
     back_rect = pygame.Rect(menu_rect.centerx - 70, menu_rect.bottom - 58, 140, 34)
+
+    if (
+        event.type == pygame.MOUSEBUTTONDOWN
+        and event.button == 1
+        and menu_settings_close_rect
+        and menu_settings_close_rect.collidepoint(event.pos)
+    ):
+        menu_settings_open = False
+        menu_settings_active_slider = None
+        menu_settings_capture_action = None
+        return
 
     if event.type == pygame.KEYDOWN:
         if menu_settings_capture_action:
@@ -568,6 +583,7 @@ naming_cat = None
 cat_name_input = ""
 
 paused = False
+pause_close_rect = None
 inventory_in_use = False
 mouse_attack_blocked = False
 mouse_attack_block_expires = 0
@@ -621,9 +637,11 @@ placement_target_z = 0
 placed_structures = []
 tent_menu_active = False
 tent_menu_tent = None
+tent_menu_close_rect = None
 tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
 tent_hold_threshold = 0.6
 fast_travel_menu_active = False
+fast_travel_close_rect = None
 sleeping_in_tent = False
 sleeping_tent_x = 0
 
@@ -1741,84 +1759,6 @@ def get_special_yield_multiplier(tool_item):
     tier = get_tool_tier(tool_item)
     mults = HARVEST_TOOL_MULTS.get(tier, {"special": 1})
     return mults.get("special", 1)
-
-def get_weapon_tier_from_name(name):
-    tiers = ["dragon", "obsidian", "metal", "gold", "bone", "stone", "wood"]
-    for tier in tiers:
-        if tier in name:
-            return tier
-    return None
-
-def compute_weapon_attack(base_attack, held_item):
-    """Return effective attack after weapon multipliers/flat bonuses."""
-    if not held_item:
-        return base_attack
-
-    name = held_item.get("item_name", "").lower()
-    tier = get_weapon_tier_from_name(name)
-
-    if "throwing knife" in name:
-        return max(1, int(base_attack + 15))
-
-    if "shovel" in name:
-        shovel_bonus = {
-            "wood": 5,
-            "stone": 7,
-            "metal": 12,
-            "bone": 12,
-            "gold": 12,
-            "obsidian": 15,
-            "dragon": 20
-        }
-        bonus = shovel_bonus.get(tier, 0)
-        if bonus > 0:
-            return max(1, int(base_attack + bonus))
-
-    sword_mults = {
-        "wood": (1.1, 5),
-        "stone": (1.3, 9),
-        "metal": (1.4, 13),
-        "bone": (2.1, 2),
-        "obsidian": (1.4, 25),
-        "dragon": (2.2, 20),
-    }
-    spear_flats = {
-        "wood": 9,
-        "stone": 15,
-        "metal": 22,
-        "bone": 19,
-        "obsidian": 40,
-        "dragon": 55,
-    }
-
-    # Clubs
-    if "spiked wooden club" in name:
-        return max(1, int(math.floor(base_attack * 1.5) + 12))
-    if "wooden club" in name:
-        return max(1, int(math.floor(base_attack * 1.3) + 4))
-
-    # Swords
-    if "sword" in name and tier in sword_mults:
-        mult, flat = sword_mults[tier]
-        return max(1, int(math.floor(base_attack * mult) + flat))
-
-    # Axes (not pickaxes): same as sword multipliers, but lower base damage
-    if "axe" in name and "pickaxe" not in name and tier in sword_mults:
-        mult, flat = sword_mults[tier]
-        reduced_base = base_attack // 1.5
-        return max(1, int(math.floor(reduced_base * mult) + flat))
-
-    # Pickaxes: similar scaling to axes but using one-third base damage
-    if "pickaxe" in name and tier in sword_mults:
-        mult, flat = sword_mults[tier]
-        reduced_base = base_attack // 3
-        return max(1, int(math.floor(reduced_base * mult) + flat))
-
-    # Spears: flat bonuses only
-    if "spear" in name and tier in spear_flats:
-        return max(1, int(base_attack + spear_flats[tier]))
-
-    return base_attack
 
 def get_tool_tier(item):
     """Return a normalized tier name for resource multipliers."""
@@ -3200,6 +3140,57 @@ while running:
             
             if event.type == pygame.QUIT:
                 running = False
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if paused and pause_close_rect and pause_close_rect.collidepoint(event.pos):
+                    paused = False
+                    continue
+                if tent_menu_active and tent_menu_close_rect and tent_menu_close_rect.collidepoint(event.pos):
+                    tent_menu_active = False
+                    tent_menu_tent = None
+                    tent_hover_timers = {"pickup": 0.0, "demolish": 0.0}
+                    tent_hover_highlight_surface = None
+                    tent_hover_highlight_rect = None
+                    current_tent_hover_option = None
+                    continue
+                if fast_travel_menu_active and fast_travel_close_rect and fast_travel_close_rect.collidepoint(event.pos):
+                    fast_travel_menu_active = False
+                    continue
+                if inventory_in_use and inventory.close_rect and inventory.close_rect.collidepoint(event.pos):
+                    inventory_in_use = False
+                    inventory.ui_open = False
+                    inventory.selection_mode = "hotbar"
+                    inventory.selected_inventory_slot = None
+                    inventory.close_drop_menu()
+                    continue
+                if crafting_bench_in_use and crafting_bench.close_rect and crafting_bench.close_rect.collidepoint(event.pos):
+                    crafting_bench.close()
+                    crafting_bench_in_use = False
+                    continue
+                if arcane_crafter_in_use and arcane_crafter.close_rect and arcane_crafter.close_rect.collidepoint(event.pos):
+                    arcane_crafter.close()
+                    arcane_crafter_in_use = False
+                    continue
+                if campfire_in_use and campfire.close_rect and campfire.close_rect.collidepoint(event.pos):
+                    campfire.close()
+                    campfire_in_use = False
+                    continue
+                if smelter_in_use and smelter.close_rect and smelter.close_rect.collidepoint(event.pos):
+                    smelter.close()
+                    smelter_in_use = False
+                    continue
+                if mortar_pestle_in_use and mortar_pestle.close_rect and mortar_pestle.close_rect.collidepoint(event.pos):
+                    mortar_pestle.close()
+                    mortar_pestle_in_use = False
+                    continue
+                if alchemy_bench_in_use and alchemy_bench.close_rect and alchemy_bench.close_rect.collidepoint(event.pos):
+                    alchemy_bench.close()
+                    alchemy_bench_in_use = False
+                    continue
+                if chest_in_use and chest_ui.close_rect and chest_ui.close_rect.collidepoint(event.pos):
+                    chest_ui.close()
+                    chest_in_use = False
+                    continue
 
             if event.type == pygame.KEYDOWN:
                 # Exit hide/sleep states with the interact key
@@ -5292,7 +5283,7 @@ while running:
             return options[row][col]
 
         def draw_tent_menu(screen, dt_local):
-            global tent_hover_timers, tent_hover_highlight_surface, tent_hover_highlight_rect, current_tent_hover_option
+            global tent_hover_timers, tent_hover_highlight_surface, tent_hover_highlight_rect, current_tent_hover_option, tent_menu_close_rect
             overlay = pygame.Surface((width, height), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 140))
             screen.blit(overlay, (0, 0))
@@ -5302,6 +5293,7 @@ while running:
             rect = pygame.Rect(menu_x, menu_y, menu_w, menu_h)
             pygame.draw.rect(screen, (40, 40, 60), rect, border_radius=8)
             pygame.draw.rect(screen, (200, 200, 220), rect, 2, border_radius=8)
+            tent_menu_close_rect = draw_close_button(screen, rect)
             # grid lines
             pygame.draw.line(screen, (120, 120, 140), (menu_x + menu_w // 3, menu_y), (menu_x + menu_w // 3, menu_y + menu_h), 2)
             pygame.draw.line(screen, (120, 120, 140), (menu_x + 2 * menu_w // 3, menu_y), (menu_x + 2 * menu_w // 3, menu_y + menu_h), 2)
@@ -5375,6 +5367,7 @@ while running:
             return rect
 
         def draw_fast_travel_placeholder(screen):
+            global fast_travel_close_rect
             overlay = pygame.Surface((width, height), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 140))
             screen.blit(overlay, (0, 0))
@@ -5384,6 +5377,7 @@ while running:
             box_rect = pygame.Rect(box_x, box_y, box_w, box_h)
             pygame.draw.rect(screen, (30, 40, 60), box_rect, border_radius=10)
             pygame.draw.rect(screen, (200, 200, 220), box_rect, 2, border_radius=10)
+            fast_travel_close_rect = draw_close_button(screen, box_rect)
             title = pygame.font.Font(font_path, 22).render("Fast Travel (Coming Soon)", True, (255, 255, 255))
             body = pygame.font.Font(font_path, 18).render("Fast travel destinations will appear here.", True, (220, 220, 220))
             button_rect = pygame.Rect(box_x + box_w//2 - 60, box_y + box_h - 60, 120, 34)
@@ -6436,7 +6430,14 @@ while running:
 
         if paused:
             screen.blit(temp_pause_surface, pause_menu_rect.topleft)
-            screen.blit(pause_menu_image, (((width - pause_menu_image.get_width())//2), ((height - pause_menu_image.get_height())//2)))
+            pause_panel_rect = pygame.Rect(
+                (width - pause_menu_image.get_width()) // 2,
+                (height - pause_menu_image.get_height()) // 2,
+                pause_menu_image.get_width(),
+                pause_menu_image.get_height(),
+            )
+            screen.blit(pause_menu_image, pause_panel_rect.topleft)
+            pause_close_rect = draw_close_button(screen, pause_panel_rect)
             resume_button.draw(screen)
             quit_button.draw(screen)
 
