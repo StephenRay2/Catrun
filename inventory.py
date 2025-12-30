@@ -1700,7 +1700,7 @@ items_list = [
         "recipe": [{"item": "Gold Ingot", "amount": 1}],
         "crafting_medium": "workbench",
         "tags": ["item"],
-        "output_amount": 12
+        "output_amount": 6
     },
     {
         "item_name": "Resurrection Coin",
@@ -2092,7 +2092,7 @@ items_list = [
         "stack_size": 100,
         "weight": 1.5,
         "type": "tool",
-        "description": "A bright lantern. Lights up large areas. Impervious to inclement weather. I think that means it won't go out in the rain. The wicked witch of the west doesn't do that either. I think that means she's impervious to inclement weather. Just kidding, it's becasue she's dead.",
+        "description": "A bright lantern. Lights up large areas. Impervious to inclement weather. I think that means it won't go out in the rain. The wicked witch of the west doesn't do that either. I think that means she's impervious to inclement weather. Just kidding, it's because she's dead.",
         "use_effect": "provide_light; provide_heat",
         "placeable": True,
         "consumable": False,

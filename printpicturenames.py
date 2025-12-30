@@ -43,5 +43,5 @@ def print_creature_list():
         print(f"{i}. {name}")
 
 
-print_creature_list()
-# print_items_list()
+# print_creature_list()
+print_items_list()

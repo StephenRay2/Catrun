@@ -235,6 +235,7 @@ num_black_bears = 20
 num_brown_bears = 20
 num_polar_bears = 20
 num_pandas = 20
+merchant_variants = [1, 2, 3]
 
 num_ashhounds = 20
 num_wastedogs = 20
@@ -320,6 +321,17 @@ for _ in range(num_cats):
     mob = Cat(x, y, "Cat")
     mob.level = _random_level_for_position(x, y, 1, 3)
     cats.append(mob)
+
+merchants = []
+merchant_offsets = [-120, 0, 120]
+spawn_x, spawn_y = SPAWN_PROTECTION_CENTER
+spawn_y = min(height - 32, spawn_y + 120)
+for idx, variant in enumerate(merchant_variants):
+    offset_x = merchant_offsets[idx % len(merchant_offsets)]
+    x = max(32, min(spawn_x + offset_x, width - 32))
+    y = max(32, spawn_y)
+    mob = Merchant(x, y, f"Merchant {variant}", variant)
+    merchants.append(mob)
 
 allowed_cow_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah]
 

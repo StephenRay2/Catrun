@@ -12,6 +12,49 @@ large_font = pygame.font.Font(font_path, 28)
 xl_font = pygame.font.Font(font_path, 72)
 size = 64
 
+_merchant_image_cache = {}
+
+
+def _load_merchant_images(variant):
+    cached = _merchant_image_cache.get(variant)
+    if cached:
+        return cached
+
+    prefix = f"Merchant{variant}"
+
+    def load_scaled(path):
+        return pygame.transform.scale(pygame.image.load(path).convert_alpha(), (size, size))
+
+    right_walk = [
+        load_scaled(f"assets/sprites/player/{prefix}RightWalk{i}.png")
+        for i in range(1, 9)
+    ]
+    right_idle = [
+        load_scaled(f"assets/sprites/player/{prefix}RightIdle{i}.png")
+        for i in range(1, 4)
+    ]
+    front_idle = [
+        load_scaled(f"assets/sprites/player/{prefix}FrontIdle{i}.png")
+        for i in range(1, 4)
+    ]
+    dead_right = load_scaled(f"assets/sprites/player/{prefix}RightDead.png")
+
+    left_walk = [pygame.transform.flip(img, True, False) for img in right_walk]
+    left_idle = [pygame.transform.flip(img, True, False) for img in right_idle]
+    dead_left = pygame.transform.flip(dead_right, True, False)
+
+    cached = {
+        "right_walk": right_walk,
+        "left_walk": left_walk,
+        "right_idle": right_idle,
+        "left_idle": left_idle,
+        "front_idle": front_idle,
+        "dead_right": dead_right,
+        "dead_left": dead_left,
+    }
+    _merchant_image_cache[variant] = cached
+    return cached
+
 def draw_text_with_background(screen, text_surface, x, y, padding=4):
     """Draw text with a semi-transparent black background box."""
     bg_rect = text_surface.get_rect(topleft=(x, y)).inflate(padding * 2, padding)
@@ -1657,6 +1700,159 @@ class Chicken(Mob):
                 self.image = self.dead_chicken_right_image
             else:
                 self.image = self.dead_chicken_left_image
+
+
+class Merchant(Mob):
+    def __init__(self, x, y, name, variant=1):
+        super().__init__(x, y, name)
+
+        images = _load_merchant_images(variant)
+        self.merchant_variant = variant
+        self.shop_items = None
+        self.last_refresh_hour = None
+
+        self.walk_right_images = images["right_walk"]
+        self.walk_left_images = images["left_walk"]
+        # Use front-facing idle frames for a welcoming stance.
+        self.stand_right_images = images["front_idle"]
+        self.stand_left_images = images["front_idle"]
+        self.dead_right_image = images["dead_right"]
+        self.dead_left_image = images["dead_left"]
+
+        self.image = self.stand_right_images[0]
+        self.rect = self.image.get_rect(center=(x, y))
+
+        self.frame_index = 0
+        self.animation_speed = 0.12
+        self.direction = pygame.Vector2(0, 0)
+        self.last_direction = "right"
+        self.disable_autonomous_movement = False
+        self.base_speed = 90
+        self.speed = 1.0
+        self.walk_away_speed = 1.1
+        self.run_away_speed = 1.6
+        self.attack_flee_range_sq = 420 * 420
+        self.avoid_enemy_range_sq = 220 * 220
+        self.last_nearby_mobs = []
+
+        self.full_health = 120
+        self.health = self.full_health
+        self.death_experience = 0
+        self.resource = None
+        self.resource_amount = 0
+
+    def _is_valid_threat(self, mob):
+        if mob is None:
+            return False
+        if getattr(mob, "destroyed", False):
+            return False
+        if hasattr(mob, "is_alive") and not getattr(mob, "is_alive", True):
+            return False
+        if not hasattr(mob, "rect"):
+            return False
+        return True
+
+    def _pick_attacker_threat(self):
+        threats = []
+        for attacker in getattr(self, "attackers", set()):
+            if not self._is_valid_threat(attacker):
+                continue
+            dx = attacker.rect.centerx - self.rect.centerx
+            dy = attacker.rect.centery - self.rect.centery
+            dist_sq = dx * dx + dy * dy
+            if dist_sq <= self.attack_flee_range_sq:
+                threats.append((dist_sq, attacker))
+        if not threats:
+            return None
+        if self._is_valid_threat(getattr(self, "last_attacker", None)):
+            for _, attacker in threats:
+                if attacker is self.last_attacker:
+                    return attacker
+        return min(threats, key=lambda t: t[0])[1]
+
+    def _pick_enemy_threat(self):
+        if not self.last_nearby_mobs:
+            return None
+        threats = []
+        for mob in self.last_nearby_mobs:
+            if mob is self:
+                continue
+            if not self._is_valid_threat(mob):
+                continue
+            if not getattr(mob, "enemy", False):
+                continue
+            dx = mob.rect.centerx - self.rect.centerx
+            dy = mob.rect.centery - self.rect.centery
+            dist_sq = dx * dx + dy * dy
+            if dist_sq <= self.avoid_enemy_range_sq:
+                threats.append((dist_sq, mob))
+        if not threats:
+            return None
+        return min(threats, key=lambda t: t[0])[1]
+
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
+        self.last_nearby_mobs = list(nearby_mobs) if nearby_mobs else []
+        super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
+
+        if not self.is_alive:
+            if self.last_direction == "right":
+                self.image = self.dead_right_image
+            else:
+                self.image = self.dead_left_image
+
+    def flee(self, player_world_x, player_world_y, dt, player_sleeping=False):
+        if not self.is_alive:
+            return
+
+        threat = self._pick_attacker_threat()
+        flee_mode = "attacked" if threat is not None else None
+        if threat is None:
+            threat = self._pick_enemy_threat()
+            if threat is not None:
+                flee_mode = "avoid"
+
+        if threat is not None:
+            self.fleeing = True
+            self.move_timer = 0
+            self.flee_timer = max(self.flee_timer, 8 if flee_mode == "attacked" else 3)
+            self.speed = self.run_away_speed if flee_mode == "attacked" else self.walk_away_speed
+            dx = threat.rect.centerx - self.rect.centerx
+            dy = threat.rect.centery - self.rect.centery
+            direction = pygame.Vector2(-dx, -dy)
+            if direction.length_squared() > 0:
+                direction = direction.normalize()
+            self.direction = direction
+            return
+
+        if self.flee_timer > 0:
+            self.flee_timer -= dt
+            self.fleeing = True
+            return
+
+        self.fleeing = False
+        self.speed = 1.0
+
+    def harvest(self, player=None, harvest_power=1, special_chance_mult=1.0, special_yield_mult=1.0):
+        if self.destroyed or self.is_alive:
+            return []
+
+        if self.death_time is None:
+            self.death_time = pygame.time.get_ticks()
+        elapsed = pygame.time.get_ticks() - self.death_time
+        if elapsed < self.harvest_grace_ms:
+            return []
+
+        resources = []
+        for listing in getattr(self, "shop_items", []) or []:
+            item_name = listing.get("item_name")
+            stock = int(listing.get("stock", 0) or 0)
+            if item_name and stock > 0:
+                resources.extend([item_name] * stock)
+
+        self.shop_items = []
+        self.resource_amount = 0
+        self.destroyed = True
+        return resources
 
 
 class Enemy(Mob):
