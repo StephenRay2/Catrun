@@ -1496,7 +1496,7 @@ items_list = [
         "item_name": "Workbench",
         "icon": "Workbench.png",
         "stack_size": 1,
-        "weight": 15,
+        "weight": 7,
         "type": "structure",
         "description": "A sturdy workbench. Enables advanced crafting.",
         "use_effect": None,
@@ -1512,7 +1512,7 @@ items_list = [
         "item_name": "Arcane Crafter",
         "icon": "ArcaneCrafter.png",
         "stack_size": 1,
-        "weight": 20,
+        "weight": 5,
         "type": "structure",
         "description": "An advanced arcane crafting station. Enables magical crafting.",
         "use_effect": None,
@@ -1528,7 +1528,7 @@ items_list = [
         "item_name": "Campfire",
         "icon": "Campfire.png",
         "stack_size": 100,
-        "weight": 1,
+        "weight": 3,
         "type": "structure",
         "description": "A simple campfire. Used for cooking, light, and warmth.",
         "use_effect": None,
@@ -1686,6 +1686,22 @@ items_list = [
 
     # Crafted Items at Workbench
     
+    {
+        "item_name": "Gold Coin",
+        "icon": "GoldCoin.png",
+        "stack_size": 999,
+        "weight": .05,
+        "type": "crafted_material",
+        "description": "A shiny gold coin. Small, valuable, and easy to trade.",
+        "use_effect": None,
+        "placeable": False,
+        "consumable": False,
+        "durability": None,
+        "recipe": [{"item": "Gold Ingot", "amount": 1}],
+        "crafting_medium": "workbench",
+        "tags": ["item"],
+        "output_amount": 12
+    },
     {
         "item_name": "Resurrection Coin",
         "icon": "ResurrectionCoin.png",
@@ -1946,7 +1962,7 @@ items_list = [
         "item_name": "Cooking Pot",
         "icon": "CookingPot.png",
         "stack_size": 1,
-        "weight": 5,
+        "weight": 7,
         "type": "structure",
         "description": "A large cooking pot. Used for making massive stews. Like, huge.",
         "use_effect": None,
@@ -1962,7 +1978,7 @@ items_list = [
         "item_name": "Smelter",
         "icon": "Smelter.png",
         "stack_size": 1,
-        "weight": 25,
+        "weight": 10,
         "type": "structure",
         "description": "A stone smelter. Refines raw materials. ",
         "use_effect": None,
@@ -1978,7 +1994,7 @@ items_list = [
         "item_name": "Empty Cage",
         "icon": "EmptyCage.png",
         "stack_size": 1,
-        "weight": 7.5,
+        "weight": 7,
         "type": "structure",
         "description": "An empty cage. Can hold captured animals.",
         "use_effect": None,
@@ -1994,7 +2010,7 @@ items_list = [
         "item_name": "Alchemy Bench",
         "icon": "AlchemyBench.png",
         "stack_size": 1,
-        "weight": 15,
+        "weight": 4,
         "type": "structure",
         "description": "An alchemy bench. Used for brewing potions.",
         "use_effect": None,
@@ -2026,7 +2042,7 @@ items_list = [
         "item_name": "Chest",
         "icon": "Chest.png",
         "stack_size": 1,
-        "weight": 5,
+        "weight": 3,
         "type": "structure",
         "description": "A storage chest. Holds many items safely.",
         "use_effect": None,
@@ -5307,7 +5323,7 @@ items_list = [
         "item_name": "Metal Floor",
         "icon": "MetalFloor.png",
         "stack_size": 100,
-        "weight": 2.5,
+        "weight": 7,
         "type": "building_material",
         "description": "A metal floor tile. Used for building and construction.",
         "use_effect": None,
@@ -5352,7 +5368,7 @@ items_list = [
         "item_name": "Metal Ladder",
         "icon": "MetalLadder.png",
         "stack_size": 100,
-        "weight": 2,
+        "weight": 7,
         "type": "building_material",
         "description": "A metal ladder. Used for climbing and construction.",
         "use_effect": None,
@@ -5484,7 +5500,7 @@ items_list = [
         "item_name": "Metal Stairs",
         "icon": "MetalStairs.png",
         "stack_size": 100,
-        "weight": 15,
+        "weight": 7,
         "type": "building_material",
         "description": "Metal stairs. Used for building and construction.",
         "use_effect": None,
@@ -5561,7 +5577,7 @@ items_list = [
         "item_name": "Oak Wood Stairs",
         "icon": "OakWoodStairs.png",
         "stack_size": 100,
-        "weight": 12.5,
+        "weight": 2.5,
         "type": "building_material",
         "description": "Oak wood stairs. Strong and reliable for building.",
         "use_effect": None,
@@ -5718,7 +5734,7 @@ items_list = [
         "item_name": "Stone Floor",
         "icon": "StoneFloor.png",
         "stack_size": 100,
-        "weight": 2,
+        "weight": 5,
         "type": "building_material",
         "description": "A stone floor tile. Durable and looks solid.",
         "use_effect": None,
@@ -5734,7 +5750,7 @@ items_list = [
         "item_name": "Stone Stairs",
         "icon": "StoneStairs.png",
         "stack_size": 100,
-        "weight": 2.5,
+        "weight": 5,
         "type": "building_material",
         "description": "Stone stairs. Sturdy and reliable.",
         "use_effect": None,
@@ -5782,7 +5798,7 @@ items_list = [
         "item_name": "Water Well",
         "icon": "WaterWell.png",
         "stack_size": 1,
-        "weight": 10,
+        "weight": 5,
         "type": "placeable",
         "description": "A well for drawing water. Can be placed pretty much anywhere to get some of that moist, dank water your body so desperately craves.",
         "use_effect": None,
@@ -5847,7 +5863,7 @@ items_list = [
         "item_name": "Wood Floor",
         "icon": "WoodFloor.png",
         "stack_size": 100,
-        "weight": 1,
+        "weight": 2.5,
         "type": "building_material",
         "description": "A wooden floor tile. Warm and natural.",
         "use_effect": None,
@@ -5863,7 +5879,7 @@ items_list = [
         "item_name": "Wood Ladder",
         "icon": "WoodLadder.png",
         "stack_size": 100,
-        "weight": 1,
+        "weight": 2.5,
         "type": "building_material",
         "description": "A wooden ladder. Simple and effective.",
         "use_effect": None,
@@ -5921,23 +5937,6 @@ items_list = [
         "output_amount": 1
     },
     {
-        "item_name": "Stone Floor",
-        "icon": "StoneFloor.png",
-        "stack_size": 999,
-        "weight": 5.0,
-        "type": "structure",
-        "description": "A flat stone floor tile. Place to build up.",
-        "use_effect": None,
-        "placeable": True,
-        "consumable": False,
-        "durability": None,
-        "recipe": None,
-        "crafting_medium": None,
-        "tags": ["structure", "building", "floor"],
-        "output_amount": 1,
-        "structure_type": "StoneFloor"
-    },
-    {
         "item_name": "Stone Wall",
         "icon": "StoneWall.png",
         "stack_size": 999,
@@ -5954,24 +5953,6 @@ items_list = [
         "output_amount": 1,
         "structure_type": "StoneWall"
     },
-    {
-        "item_name": "Stone Stairs",
-        "icon": "StoneStairs.png",
-        "stack_size": 999,
-        "weight": 10.0,
-        "type": "structure",
-        "description": "Stone stairs. Rotate (R) to change direction. Provides vertical z-level transitions.",
-        "use_effect": None,
-        "placeable": True,
-        "consumable": False,
-        "durability": None,
-        "recipe": None,
-        "crafting_medium": None,
-        "tags": ["structure", "building", "stairs"],
-        "output_amount": 1,
-        "structure_type": "StoneStairs"
-    }
-
 ]
 _item_weight_lookup = {item["item_name"]: item.get("weight", 0) for item in items_list if "item_name" in item}
 _item_stack_lookup = {item["item_name"]: item.get("stack_size", 100) for item in items_list if "item_name" in item}
@@ -6324,7 +6305,7 @@ class Inventory():
         font = pygame.font.Font(font_path, 14)
         self.recalc_weight()
         player.weight = self.total_inventory_weight
-        info_x = panel_x + (self.inventory_image.get_width() / 2) + 15
+        info_x = panel_x + (self.inventory_image.get_width() / 2) + 12
         info_y = panel_y + 30
 
         level_text = font.render(f"Level: {player.level}", True, (200, 220, 255))
