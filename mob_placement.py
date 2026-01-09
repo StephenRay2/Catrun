@@ -323,6 +323,7 @@ for _ in range(num_cats):
     cats.append(mob)
 
 merchants = []
+merchant_guards = []
 merchant_offsets = [-120, 0, 120]
 spawn_x, spawn_y = SPAWN_PROTECTION_CENTER
 spawn_y = min(height - 32, spawn_y + 120)
@@ -330,8 +331,14 @@ for idx, variant in enumerate(merchant_variants):
     offset_x = merchant_offsets[idx % len(merchant_offsets)]
     x = max(32, min(spawn_x + offset_x, width - 32))
     y = max(32, spawn_y)
-    mob = Merchant(x, y, f"Merchant {variant}", variant)
+    mob = Merchant(x, y, "Merchant", variant)
     merchants.append(mob)
+    mob.guards = []
+    guard_offsets = [(-50, 40), (50, 40)]
+    for guard_idx, (gx, gy) in enumerate(guard_offsets):
+        guard = MerchantGuard(x + gx, y + gy, "Merchant Guard", variant, mob)
+        merchant_guards.append(guard)
+        mob.guards.append(guard)
 
 allowed_cow_tiles = [bg_grass, bg_dirt, bg_compact, bg_savannah]
 

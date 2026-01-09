@@ -135,6 +135,29 @@ class ArcaneCrafter(CraftingBench):
         self.enchant_catalyst_slot = None
         self.enchant_output_slot = None
 
+        self.enchant_slot_size = 72
+        self.weapon_input_image = None
+        self.magic_item_input_image = None
+        try:
+            img = pygame.image.load(
+                "assets/sprites/buttons/weapon_input.png"
+            ).convert_alpha()
+            self.weapon_input_image = pygame.transform.scale(
+                img, (self.enchant_slot_size, self.enchant_slot_size)
+            )
+        except Exception:
+            self.weapon_input_image = None
+
+        try:
+            img = pygame.image.load(
+                "assets/sprites/buttons/magic_item_input.png"
+            ).convert_alpha()
+            self.magic_item_input_image = pygame.transform.scale(
+                img, (self.enchant_slot_size, self.enchant_slot_size)
+            )
+        except Exception:
+            self.magic_item_input_image = None
+
         # Arcane crafter recipes only
         self.recipes = self._load_arcane_recipes()
 
@@ -313,6 +336,7 @@ class ArcaneCrafter(CraftingBench):
         self._draw_recipe_preview(screen, x_pos, y_pos)
         self._draw_recipe_grid(screen, x_pos, y_pos)
         self._draw_recipe_description(screen, x_pos, y_pos)
+        self._draw_arcane_tabs(screen)
 
     def _draw_recipe_description(self, screen, bg_x, bg_y):
         super()._draw_recipe_description(screen, bg_x, bg_y)
@@ -708,7 +732,7 @@ class ArcaneCrafter(CraftingBench):
 
     def _draw_enchanting_slots_and_button(self, screen, bg_rect):
         # Layout: input slot on the left upper half, catalyst underneath, output on the right
-        slot_size = 72
+        slot_size = self.enchant_slot_size
         # Make vertical gap between input and catalyst much smaller
         gap_y = 6
 
@@ -738,6 +762,11 @@ class ArcaneCrafter(CraftingBench):
         ]:
             pygame.draw.rect(screen, (80, 80, 80), rect)
             pygame.draw.rect(screen, (200, 200, 220), rect, 3)
+
+        if self.enchant_input_slot is None and self.weapon_input_image:
+            screen.blit(self.weapon_input_image, self.enchant_input_rect.topleft)
+        if self.enchant_catalyst_slot is None and self.magic_item_input_image:
+            screen.blit(self.magic_item_input_image, self.enchant_catalyst_rect.topleft)
 
         # Draw items in enchant slots (no mechanics yet)
         font = pygame.font.Font(font_path, 14)

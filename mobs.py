@@ -13,6 +13,108 @@ xl_font = pygame.font.Font(font_path, 72)
 size = 64
 
 _merchant_image_cache = {}
+_merchant_guard_image_cache = {}
+_guard_weapon_image_cache = {}
+
+_GUARD_WEAPON_OFFSETS = {
+    "right": (18, 12),
+    "left": (-18, 12),
+    "up": (4, 6),
+    "down": (10, 16),
+}
+
+_DRAGON_SCALE_WEAPON_NAMES = [
+    f"{element} Dragon Scale {weapon}"
+    for element in ("Dusk", "Fire", "Ice", "Electric", "Poison")
+    for weapon in ("Axe", "Mace", "Sword")
+]
+
+_GUARD_WEAPON_ELEMENT_BY_VARIANT = {
+    1: "Fire",
+    2: "Ice",
+    3: "Dusk",
+}
+
+def _get_guard_weapon_options(variant):
+    element = _GUARD_WEAPON_ELEMENT_BY_VARIANT.get(variant)
+    if element:
+        return [f"{element} Dragon Scale {weapon}" for weapon in ("Axe", "Mace", "Sword")]
+    return list(_DRAGON_SCALE_WEAPON_NAMES)
+
+_GUARD_WEAPON_MOVEMENT_FRAME_DATA = {
+    "right": [
+        {"offset": (15, 19), "rotation": 2},
+        {"offset": (21, 16), "rotation": 7},
+        {"offset": (17, 1), "rotation": 45},
+        {"offset": (21, 16), "rotation": 7},
+        {"offset": (15, 19), "rotation": 0},
+        {"offset": (11, 19), "rotation": 0},
+        {"offset": (7, 19), "rotation": 0},
+        {"offset": (11, 19), "rotation": 0},
+    ],
+    "left": [
+        {"offset": (5, 19), "rotation": 0},
+        {"offset": (9, 19), "rotation": 2},
+        {"offset": (11, 19), "rotation": 4},
+        {"offset": (9, 19), "rotation": 2},
+        {"offset": (5, 19), "rotation": 0},
+        {"offset": (-5, 14), "rotation": -9},
+        {"offset": (-13, 0), "rotation": -45},
+        {"offset": (-5, 14), "rotation": -9},
+    ],
+    "up": [
+        {"offset": (13, 18), "rotation": 0},
+        {"offset": (9, 15), "rotation": 2},
+        {"offset": (8, 9), "rotation": 5},
+        {"offset": (9, 15), "rotation": 2},
+        {"offset": (13, 18), "rotation": 0},
+        {"offset": (9, 15), "rotation": 2},
+        {"offset": (8, 13), "rotation": 5},
+        {"offset": (9, 15), "rotation": 2},
+    ],
+    "down": [
+        {"offset": (0, 18), "rotation": 0},
+        {"offset": (1, 16), "rotation": -5},
+        {"offset": (3, 14), "rotation": 0},
+        {"offset": (1, 16), "rotation": 5},
+        {"offset": (0, 18), "rotation": 0},
+        {"offset": (1, 16), "rotation": -5},
+        {"offset": (3, 14), "rotation": 0},
+        {"offset": (1, 16), "rotation": 5},
+    ],
+}
+
+_GUARD_WEAPON_ATTACK_FRAME_DATA = {
+    "right": [
+        {"offset": (7, -2), "rotation": 45},
+        {"offset": (-7, -18), "rotation": 135},
+        {"offset": (30, 2), "rotation": 90},
+        {"offset": (16, 3), "rotation": 45},
+    ],
+    "left": [
+        {"offset": (0, -2), "rotation": 45},
+        {"offset": (14, -18), "rotation": 135},
+        {"offset": (-8, -2), "rotation": 90},
+        {"offset": (-9, 4), "rotation": 45},
+    ],
+    "up": [
+        {"offset": (8, 9), "rotation": -5},
+        {"offset": (5, 1), "rotation": -10},
+        {"offset": (9, 15), "rotation": 2},
+        {"offset": (13, 18), "rotation": 0},
+    ],
+    "down": [
+        {"offset": (-2, 2), "rotation": -5},
+        {"offset": (2, -3), "rotation": -10},
+        {"offset": (0, 18), "rotation": 2},
+        {"offset": (2, 14), "rotation": 0},
+    ],
+}
+
+_GUARD_WEAPON_IDLE_OFFSETS = {
+    direction: frames[0]["offset"]
+    for direction, frames in _GUARD_WEAPON_MOVEMENT_FRAME_DATA.items()
+}
 
 
 def _load_merchant_images(variant):
@@ -29,8 +131,20 @@ def _load_merchant_images(variant):
         load_scaled(f"assets/sprites/player/{prefix}RightWalk{i}.png")
         for i in range(1, 9)
     ]
+    down_walk = [
+        load_scaled(f"assets/sprites/player/{prefix}DownWalk{i}.png")
+        for i in range(1, 9)
+    ]
+    up_walk = [
+        load_scaled(f"assets/sprites/player/{prefix}UpWalk{i}.png")
+        for i in range(1, 9)
+    ]
     right_idle = [
         load_scaled(f"assets/sprites/player/{prefix}RightIdle{i}.png")
+        for i in range(1, 4)
+    ]
+    up_idle = [
+        load_scaled(f"assets/sprites/player/{prefix}UpIdle{i}.png")
         for i in range(1, 4)
     ]
     front_idle = [
@@ -41,19 +155,149 @@ def _load_merchant_images(variant):
 
     left_walk = [pygame.transform.flip(img, True, False) for img in right_walk]
     left_idle = [pygame.transform.flip(img, True, False) for img in right_idle]
+    down_idle = front_idle
     dead_left = pygame.transform.flip(dead_right, True, False)
 
     cached = {
         "right_walk": right_walk,
         "left_walk": left_walk,
+        "down_walk": down_walk,
+        "up_walk": up_walk,
         "right_idle": right_idle,
         "left_idle": left_idle,
+        "down_idle": down_idle,
+        "up_idle": up_idle,
         "front_idle": front_idle,
         "dead_right": dead_right,
         "dead_left": dead_left,
     }
     _merchant_image_cache[variant] = cached
     return cached
+
+
+def _load_merchant_guard_images(variant):
+    cached = _merchant_guard_image_cache.get(variant)
+    if cached:
+        return cached
+
+    prefix = f"MerchantGuard{variant}"
+
+    def load_scaled(path):
+        return pygame.transform.scale(pygame.image.load(path).convert_alpha(), (size, size))
+
+    right_walk = [
+        load_scaled(f"assets/sprites/player/{prefix}RightWalk{i}.png")
+        for i in range(1, 9)
+    ]
+    down_walk = [
+        load_scaled(f"assets/sprites/player/{prefix}DownWalk{i}.png")
+        for i in range(1, 9)
+    ]
+    up_walk = [
+        load_scaled(f"assets/sprites/player/{prefix}UpWalk{i}.png")
+        for i in range(1, 9)
+    ]
+    right_walk_attack = [
+        load_scaled(f"assets/sprites/player/{prefix}RightWalkAttack{i}.png")
+        for i in range(1, 9)
+    ]
+    down_walk_attack = [
+        load_scaled(f"assets/sprites/player/{prefix}DownWalkAttack{i}.png")
+        for i in range(1, 9)
+    ]
+    up_walk_attack = [
+        load_scaled(f"assets/sprites/player/{prefix}UpWalkAttack{i}.png")
+        for i in range(1, 9)
+    ]
+    right_attack = [
+        load_scaled(f"assets/sprites/player/{prefix}RightAttack{i}.png")
+        for i in range(1, 5)
+    ]
+    down_attack = [
+        load_scaled(f"assets/sprites/player/{prefix}DownAttack{i}.png")
+        for i in range(1, 5)
+    ]
+    up_attack = [
+        load_scaled(f"assets/sprites/player/{prefix}UpAttack{i}.png")
+        for i in range(1, 5)
+    ]
+    right_idle = [
+        load_scaled(f"assets/sprites/player/{prefix}RightIdle{i}.png")
+        for i in range(1, 4)
+    ]
+    up_idle = [
+        load_scaled(f"assets/sprites/player/{prefix}UpIdle{i}.png")
+        for i in range(1, 4)
+    ]
+    front_idle = [
+        load_scaled(f"assets/sprites/player/{prefix}FrontIdle{i}.png")
+        for i in range(1, 4)
+    ]
+    dead_right = load_scaled(f"assets/sprites/player/{prefix}RightDead.png")
+
+    left_walk = [pygame.transform.flip(img, True, False) for img in right_walk]
+    left_walk_attack = [pygame.transform.flip(img, True, False) for img in right_walk_attack]
+    left_attack = [pygame.transform.flip(img, True, False) for img in right_attack]
+    left_idle = [pygame.transform.flip(img, True, False) for img in right_idle]
+    down_idle = front_idle
+    dead_left = pygame.transform.flip(dead_right, True, False)
+
+    cached = {
+        "right_walk": right_walk,
+        "left_walk": left_walk,
+        "down_walk": down_walk,
+        "up_walk": up_walk,
+        "right_walk_attack": right_walk_attack,
+        "left_walk_attack": left_walk_attack,
+        "down_walk_attack": down_walk_attack,
+        "up_walk_attack": up_walk_attack,
+        "right_attack": right_attack,
+        "left_attack": left_attack,
+        "down_attack": down_attack,
+        "up_attack": up_attack,
+        "right_idle": right_idle,
+        "left_idle": left_idle,
+        "down_idle": down_idle,
+        "up_idle": up_idle,
+        "front_idle": front_idle,
+        "dead_right": dead_right,
+        "dead_left": dead_left,
+    }
+    _merchant_guard_image_cache[variant] = cached
+    return cached
+
+
+def _load_guard_weapon_images(weapon_name, scale_factor=1.0):
+    if not weapon_name:
+        return None
+    cache_key = (weapon_name, scale_factor)
+    cached = _guard_weapon_image_cache.get(cache_key)
+    if cached:
+        return cached
+
+    base_name = weapon_name.replace(" ", "")
+    base_path = "assets/sprites/itemFrames"
+
+    def load_image(frame_name):
+        try:
+            image = pygame.image.load(f"{base_path}/{frame_name}").convert_alpha()
+        except Exception:
+            return None
+        if scale_factor != 1.0:
+            scaled_size = (
+                int(image.get_width() * scale_factor),
+                int(image.get_height() * scale_factor),
+            )
+            image = pygame.transform.scale(image, scaled_size)
+        return image
+
+    images = {
+        "right": load_image(f"{base_name}RightHeld.png"),
+        "up": load_image(f"{base_name}UpHeld.png"),
+        "down": load_image(f"{base_name}DownHeld.png"),
+    }
+    _guard_weapon_image_cache[cache_key] = images
+    return images
 
 def draw_text_with_background(screen, text_surface, x, y, padding=4):
     """Draw text with a semi-transparent black background box."""
@@ -1128,6 +1372,7 @@ class Mob(pygame.sprite.Sprite):
         self.current_liquid = None
         self.snowball_slow_stacks = 0
         self.snowball_slow_timer = 0.0
+        self.is_humanoid = False
 
 
     def handle_lava_damage(self, dt):
@@ -1292,36 +1537,94 @@ class Mob(pygame.sprite.Sprite):
         speed *= getattr(self, "ground_slow_factor", 1.0)
         return speed
 
+    def get_water_feet_y(self):
+        feet_offset = getattr(self, "_water_feet_offset", None)
+        if self.image:
+            try:
+                visible_rect = self.image.get_bounding_rect()
+                if visible_rect.height > 0:
+                    candidate = visible_rect.bottom
+                    if feet_offset is None or candidate > feet_offset:
+                        feet_offset = candidate
+                        self._water_feet_offset = candidate
+            except Exception:
+                pass
+        if feet_offset is None:
+            return self.rect.bottom
+        return self.rect.top + feet_offset
+
     def draw(self, screen, cam_x):
         if self.swimming:
             if hasattr(self, 'current_liquid') and self.current_liquid:
                 liquid_rect = self.current_liquid.rect
                 liquid_mask = self.current_liquid.mask
+                if not self.image:
+                    return
+
                 mob_feet_x = self.rect.centerx
-                mob_feet_y = self.rect.centery
+                mob_feet_y = self.get_water_feet_y()
+                visible_rect = None
+                try:
+                    visible_rect = self.image.get_bounding_rect()
+                except Exception:
+                    visible_rect = None
 
-                liquid_local_x = mob_feet_x - liquid_rect.left
-                liquid_local_y = mob_feet_y - liquid_rect.top
+                liquid_local_x = int(mob_feet_x - liquid_rect.left)
+                liquid_local_y = int(mob_feet_y - liquid_rect.top)
 
-                liquid_surface_y = liquid_rect.height
-                if 0 <= liquid_local_x < liquid_mask.get_size()[0]:
-                    for y in range(liquid_mask.get_size()[1]):
-                        if liquid_mask.get_at((liquid_local_x, y)):
-                            liquid_surface_y = y
-                            break
+                mask_width, mask_height = liquid_mask.get_size()
+                min_edge_distance = float("inf")
+                if (
+                    0 <= liquid_local_x < mask_width
+                    and 0 <= liquid_local_y < mask_height
+                    and liquid_mask.get_at((liquid_local_x, liquid_local_y))
+                ):
+                    max_search = max(mask_width, mask_height)
+                    for angle in range(0, 360, 15):
+                        rad = math.radians(angle)
+                        dx = math.cos(rad)
+                        dy = math.sin(rad)
+                        for distance in range(1, max_search):
+                            check_x = int(liquid_local_x + dx * distance)
+                            check_y = int(liquid_local_y + dy * distance)
+                            if (
+                                check_x < 0
+                                or check_x >= mask_width
+                                or check_y < 0
+                                or check_y >= mask_height
+                            ):
+                                min_edge_distance = min(min_edge_distance, distance)
+                                break
+                            if not liquid_mask.get_at((check_x, check_y)):
+                                min_edge_distance = min(min_edge_distance, distance)
+                                break
 
-                sinking_depth = max(0, liquid_surface_y - liquid_local_y)
-                max_sinking_depth = liquid_rect.height * 0.75
-                sinking_ratio = min(1.0, sinking_depth / max_sinking_depth)
-                
-                # Clip image from bottom based on sinking depth
-                clip_pixels = int(sinking_ratio * self.image.get_height())
-                
-                if clip_pixels > 0 and self.image:
-                    clipped_image = self.image.subsurface(pygame.Rect(0, 0, self.image.get_width(), self.image.get_height() - clip_pixels))
-                    screen.blit(clipped_image, (self.rect.x - cam_x, self.rect.y))
-                else:
-                    screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
+                if min_edge_distance == float("inf"):
+                    min_edge_distance = 0
+
+                max_distance_for_center = min(liquid_rect.width, liquid_rect.height) * 0.4
+                if max_distance_for_center <= 0:
+                    max_distance_for_center = 1
+                sinking_ratio = min(0.75, min_edge_distance / max_distance_for_center)
+
+                clip_height = int(self.image.get_height() * (1 - sinking_ratio))
+                if visible_rect and visible_rect.height > 0:
+                    min_clip_height = min(self.image.get_height(), visible_rect.top + 1)
+                    clip_height = max(min_clip_height, clip_height)
+                clip_height = max(1, min(self.image.get_height(), clip_height))
+
+                clip_rect = pygame.Rect(0, 0, self.image.get_width(), clip_height)
+                clipped_image = self.image.subsurface(clip_rect)
+                y_offset = sinking_ratio * 8
+                half_w = self.image.get_width() / 2
+                half_h = clip_height / 2
+                screen.blit(
+                    clipped_image,
+                    (
+                        int(self.rect.centerx - cam_x - half_w),
+                        int(self.rect.centery - half_h + y_offset),
+                    ),
+                )
             else:
                 screen.blit(self.image, (self.rect.x - cam_x, self.rect.y))
         else:
@@ -1710,30 +2013,41 @@ class Merchant(Mob):
         self.merchant_variant = variant
         self.shop_items = None
         self.last_refresh_hour = None
+        self.is_humanoid = True
+        self.is_merchant = True
+        self.gold_coins = random.randint(25, 75)
 
         self.walk_right_images = images["right_walk"]
         self.walk_left_images = images["left_walk"]
-        # Use front-facing idle frames for a welcoming stance.
-        self.stand_right_images = images["front_idle"]
-        self.stand_left_images = images["front_idle"]
+        self.walk_down_images = images["down_walk"]
+        self.walk_up_images = images["up_walk"]
+        self.stand_right_images = images["right_idle"]
+        self.stand_left_images = images["left_idle"]
+        self.stand_down_images = images["down_idle"]
+        self.stand_up_images = images["up_idle"]
         self.dead_right_image = images["dead_right"]
         self.dead_left_image = images["dead_left"]
 
-        self.image = self.stand_right_images[0]
+        self.image = self.stand_down_images[0]
         self.rect = self.image.get_rect(center=(x, y))
 
         self.frame_index = 0
         self.animation_speed = 0.12
         self.direction = pygame.Vector2(0, 0)
-        self.last_direction = "right"
+        self.last_direction = "down"
         self.disable_autonomous_movement = False
         self.base_speed = 90
         self.speed = 1.0
         self.walk_away_speed = 1.1
         self.run_away_speed = 1.6
-        self.attack_flee_range_sq = 420 * 420
+        self.attack_flee_range_sq = 600 * 600
         self.avoid_enemy_range_sq = 220 * 220
         self.last_nearby_mobs = []
+        self.guards = []
+        self.recent_attacks = {}
+        self.panic_window_ms = 120000
+        self.panic_attacker = None
+        self.panic_expires_ms = 0
 
         self.full_health = 120
         self.health = self.full_health
@@ -1753,22 +2067,15 @@ class Merchant(Mob):
         return True
 
     def _pick_attacker_threat(self):
-        threats = []
-        for attacker in getattr(self, "attackers", set()):
-            if not self._is_valid_threat(attacker):
-                continue
-            dx = attacker.rect.centerx - self.rect.centerx
-            dy = attacker.rect.centery - self.rect.centery
-            dist_sq = dx * dx + dy * dy
-            if dist_sq <= self.attack_flee_range_sq:
-                threats.append((dist_sq, attacker))
-        if not threats:
+        panic_attacker = self._get_active_panic_attacker()
+        if panic_attacker is None:
             return None
-        if self._is_valid_threat(getattr(self, "last_attacker", None)):
-            for _, attacker in threats:
-                if attacker is self.last_attacker:
-                    return attacker
-        return min(threats, key=lambda t: t[0])[1]
+        dx = panic_attacker.rect.centerx - self.rect.centerx
+        dy = panic_attacker.rect.centery - self.rect.centery
+        dist_sq = dx * dx + dy * dy
+        if dist_sq <= self.attack_flee_range_sq:
+            return panic_attacker
+        return None
 
     def _pick_enemy_threat(self):
         if not self.last_nearby_mobs:
@@ -1792,6 +2099,7 @@ class Merchant(Mob):
 
     def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
         self.last_nearby_mobs = list(nearby_mobs) if nearby_mobs else []
+        self._prune_recent_attacks(pygame.time.get_ticks())
         super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
 
         if not self.is_alive:
@@ -1800,22 +2108,123 @@ class Merchant(Mob):
             else:
                 self.image = self.dead_left_image
 
+    def animate_walk(self, animation_speed_multiplier=1.0):
+        if self.direction.length_squared() > 0:
+            if abs(self.direction.y) >= abs(self.direction.x):
+                self.last_direction = "down" if self.direction.y > 0 else "up"
+            else:
+                self.last_direction = "right" if self.direction.x > 0 else "left"
+
+        if self.last_direction == "right":
+            frames = self.walk_right_images
+        elif self.last_direction == "left":
+            frames = self.walk_left_images
+        elif self.last_direction == "up":
+            frames = self.walk_up_images
+        else:
+            frames = self.walk_down_images
+
+        effective_animation_speed = self.animation_speed * animation_speed_multiplier
+        self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
+        self.image = frames[int(self.frame_index)]
+
+    def animate_stand(self, animation_speed_multiplier=1.0):
+        if self.last_direction == "right":
+            frames = self.stand_right_images
+        elif self.last_direction == "left":
+            frames = self.stand_left_images
+        elif self.last_direction == "up":
+            frames = self.stand_up_images
+        else:
+            frames = self.stand_down_images
+
+        effective_animation_speed = self.animation_speed * animation_speed_multiplier
+        self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
+        self.image = frames[int(self.frame_index)]
+
+    def _prune_recent_attacks(self, now_ms):
+        expired = []
+        for attacker, info in self.recent_attacks.items():
+            if not self._is_valid_threat(attacker):
+                expired.append(attacker)
+                continue
+            if now_ms - info.get("last_ms", 0) > self.panic_window_ms:
+                expired.append(attacker)
+        for attacker in expired:
+            self.recent_attacks.pop(attacker, None)
+        if self.panic_attacker is not None:
+            if not self._is_valid_threat(self.panic_attacker) or now_ms > self.panic_expires_ms:
+                self.panic_attacker = None
+                self.panic_expires_ms = 0
+
+    def _get_active_panic_attacker(self):
+        if self.panic_attacker is None:
+            return None
+        if not self._is_valid_threat(self.panic_attacker):
+            return None
+        if pygame.time.get_ticks() > self.panic_expires_ms:
+            return None
+        return self.panic_attacker
+
+    def _trigger_panic(self, attacker, now_ms):
+        self.panic_attacker = attacker
+        self.panic_expires_ms = now_ms + self.panic_window_ms
+        self.flee_timer = max(self.flee_timer, 6)
+        for guard in list(self.guards):
+            if hasattr(guard, "set_guard_target"):
+                guard.set_guard_target(attacker, self.panic_expires_ms)
+
+    def register_attack(self, attacker):
+        super().register_attack(attacker)
+        if attacker is None:
+            return
+        if not self._is_valid_threat(attacker):
+            return
+        now_ms = pygame.time.get_ticks()
+        self._prune_recent_attacks(now_ms)
+        info = self.recent_attacks.get(attacker)
+        if info and now_ms - info.get("last_ms", 0) <= self.panic_window_ms:
+            first_ms = info.get("first_ms", now_ms)
+            if now_ms - first_ms > self.panic_window_ms:
+                count = 1
+                first_ms = now_ms
+            else:
+                count = info.get("count", 0) + 1
+        else:
+            count = 1
+            first_ms = now_ms
+        self.recent_attacks[attacker] = {
+            "count": count,
+            "first_ms": first_ms,
+            "last_ms": now_ms,
+        }
+        if count >= 2 and now_ms - first_ms <= self.panic_window_ms:
+            self._trigger_panic(attacker, now_ms)
+
     def flee(self, player_world_x, player_world_y, dt, player_sleeping=False):
         if not self.is_alive:
             return
 
-        threat = self._pick_attacker_threat()
-        flee_mode = "attacked" if threat is not None else None
-        if threat is None:
-            threat = self._pick_enemy_threat()
-            if threat is not None:
-                flee_mode = "avoid"
+        panic_attacker = self._pick_attacker_threat()
+        if panic_attacker is not None:
+            self.fleeing = True
+            self.move_timer = 0
+            self.flee_timer = max(self.flee_timer, 8)
+            self.speed = self.run_away_speed
+            dx = panic_attacker.rect.centerx - self.rect.centerx
+            dy = panic_attacker.rect.centery - self.rect.centery
+            direction = pygame.Vector2(-dx, -dy)
+            if direction.length_squared() > 0:
+                direction = direction.normalize()
+            self.direction = direction
+            return
 
+        threat = self._pick_enemy_threat()
         if threat is not None:
             self.fleeing = True
             self.move_timer = 0
-            self.flee_timer = max(self.flee_timer, 8 if flee_mode == "attacked" else 3)
-            self.speed = self.run_away_speed if flee_mode == "attacked" else self.walk_away_speed
+            self.flee_timer = max(self.flee_timer, 3)
+            self.speed = self.walk_away_speed
             dx = threat.rect.centerx - self.rect.centerx
             dy = threat.rect.centery - self.rect.centery
             direction = pygame.Vector2(-dx, -dy)
@@ -1853,6 +2262,454 @@ class Merchant(Mob):
         self.resource_amount = 0
         self.destroyed = True
         return resources
+
+
+def _guard_weapon_damage(weapon_name, base_attack):
+    base_attack = max(1, int(round(base_attack)))
+    if not weapon_name:
+        return base_attack
+    try:
+        from inventory import compute_weapon_attack
+    except Exception:
+        return base_attack
+    try:
+        return compute_weapon_attack(base_attack, {"item_name": weapon_name})
+    except Exception:
+        return base_attack
+
+
+class MerchantGuard(Mob):
+    def __init__(self, x, y, name, variant=1, leader=None):
+        super().__init__(x, y, name)
+
+        images = _load_merchant_guard_images(variant)
+        self.is_humanoid = True
+        self.walk_right_images = images["right_walk"]
+        self.walk_left_images = images["left_walk"]
+        self.walk_down_images = images["down_walk"]
+        self.walk_up_images = images["up_walk"]
+        self.walk_right_attack_images = images["right_walk_attack"]
+        self.walk_left_attack_images = images["left_walk_attack"]
+        self.walk_down_attack_images = images["down_walk_attack"]
+        self.walk_up_attack_images = images["up_walk_attack"]
+        self.attack_right_images = images["right_attack"]
+        self.attack_left_images = images["left_attack"]
+        self.attack_down_images = images["down_attack"]
+        self.attack_up_images = images["up_attack"]
+        self.stand_right_images = images["right_idle"]
+        self.stand_left_images = images["left_idle"]
+        self.stand_down_images = images["down_idle"]
+        self.stand_up_images = images["up_idle"]
+        self.dead_right_image = images["dead_right"]
+        self.dead_left_image = images["dead_left"]
+
+        self.image = self.stand_down_images[0]
+        self.rect = self.image.get_rect(center=(x, y))
+
+        self.frame_index = 0
+        self.animation_speed = 0.12
+        self.direction = pygame.Vector2(0, 0)
+        self.last_direction = "down"
+        self.disable_autonomous_movement = True
+        self.weapon_direction = "down"
+        self._anim_frame_index = 0
+        self._anim_frames_len = 1
+        self._anim_is_moving = False
+        self._anim_is_attacking = False
+
+        self.base_speed = 140
+        self.speed = 1.0
+        self.leader = leader
+        self.follow_offset = (random.randint(-50, 50), random.randint(-40, 40))
+        self.follow_retarget_timer = random.uniform(0.6, 1.4)
+        self.follow_stop_distance = 50
+        self.follow_catchup_distance = 220
+        self.leash_radius = 220
+        self.roam_radius = 150
+        self.roam_timer = 0.0
+        self.roam_direction = pygame.Vector2(0, 0)
+        self.roam_speed = 0.6
+        self.return_speed = 1.3
+
+        self.guard_target = None
+        self.guard_target_expires = 0
+        self.attacking = False
+        self.attack_anim_timer = 0.0
+        self.attack_anim_duration = 0.35
+        self.attack_range_sq = 70 * 70
+        self.attack_cooldown_ms = 600
+        self.last_attack_ms = 0
+
+        self.level = 100
+        self.full_health = 500
+        self.health = self.full_health
+        self.death_experience = 0
+        self.resource = None
+        self.resource_amount = 0
+
+        weapon_options = _get_guard_weapon_options(variant)
+        if not weapon_options:
+            weapon_options = ["Fire Dragon Scale Sword"]
+        self.weapon_name = random.choice(weapon_options)
+        base_damage = getattr(self, "damage", 1)
+        strength_leveler = getattr(self, "strength_leveler", 1)
+        strength_level_gain = getattr(self, "strength_level_gain", 0)
+        base_attack = int(round(base_damage + (strength_leveler - 1) * strength_level_gain))
+        base_attack = max(1, base_attack)
+        self.attack_damage = _guard_weapon_damage(self.weapon_name, base_attack)
+        self.special_drops = [
+            {"item": self.weapon_name, "chance": 1.0, "min": 1, "max": 1}
+        ]
+
+    def _valid_target(self, target):
+        if target is None:
+            return False
+        if getattr(target, "destroyed", False):
+            return False
+        if hasattr(target, "is_alive") and not getattr(target, "is_alive", True):
+            return False
+        if not hasattr(target, "rect"):
+            return False
+        return True
+
+    def _get_target_position(self, target):
+        if target is None:
+            return None, None
+        if isinstance(target, Player):
+            world_x = getattr(target, "world_x", None)
+            world_y = getattr(target, "world_y", None)
+            if world_x is not None and world_y is not None:
+                return world_x, world_y
+        return target.rect.centerx, target.rect.centery
+
+    def set_guard_target(self, target, expires_ms):
+        if not self._valid_target(target):
+            return
+        self.guard_target = target
+        self.guard_target_expires = max(int(expires_ms), pygame.time.get_ticks())
+
+    def register_attack(self, attacker):
+        super().register_attack(attacker)
+        if not self._valid_target(attacker):
+            return
+        now_ms = pygame.time.get_ticks()
+        self.set_guard_target(attacker, now_ms + 120000)
+
+    def _try_attack(self, target):
+        if target is None:
+            return
+        target_x, target_y = self._get_target_position(target)
+        if target_x is None or target_y is None:
+            return
+        dx = target_x - self.rect.centerx
+        dy = target_y - self.rect.centery
+        dist_sq = dx * dx + dy * dy
+        if dist_sq > self.attack_range_sq:
+            return
+        now_ms = pygame.time.get_ticks()
+        if now_ms - self.last_attack_ms < self.attack_cooldown_ms:
+            return
+
+        if isinstance(target, Player) and hasattr(target, "is_in_spawn_protection"):
+            try:
+                if target.is_in_spawn_protection():
+                    return
+            except Exception:
+                pass
+
+        self.last_attack_ms = now_ms
+        self.attacking = True
+        self.attack_anim_timer = self.attack_anim_duration
+
+        if isinstance(target, Player) and hasattr(target, "take_damage"):
+            target.take_damage(self.attack_damage, play_sound=False)
+        elif hasattr(target, "health"):
+            target.health = max(0, target.health - self.attack_damage)
+        if hasattr(target, "register_attack"):
+            target.register_attack(self)
+
+    def _pick_roam_direction(self, bias_direction=None, bias_strength=0.0):
+        bias_strength = max(0.0, min(bias_strength, 0.9))
+        if bias_direction is not None and bias_direction.length_squared() > 0:
+            bias_direction = bias_direction.normalize()
+        else:
+            bias_direction = None
+
+        if random.random() < 0.55:
+            if bias_direction is not None and random.random() < bias_strength:
+                self.roam_direction = bias_direction
+                self.roam_timer = random.uniform(0.6, 1.2)
+                return
+            self.roam_direction.xy = (0, 0)
+            self.roam_timer = random.uniform(0.6, 1.6)
+            return
+
+        angle = random.uniform(0.0, 2 * math.pi)
+        rand_dir = pygame.Vector2(math.cos(angle), math.sin(angle))
+        if bias_direction is not None and bias_strength > 0:
+            blended = rand_dir * (1 - bias_strength) + bias_direction * bias_strength
+            if blended.length_squared() > 0:
+                self.roam_direction = blended.normalize()
+            else:
+                self.roam_direction = rand_dir
+        else:
+            self.roam_direction = rand_dir
+        self.roam_timer = random.uniform(0.5, 1.2)
+
+    def update(self, dt, player=None, nearby_objects=None, nearby_mobs=None, player_sleeping=False):
+        if not self.is_alive:
+            self.direction.xy = (0, 0)
+            self.image = self.dead_right_image if self.last_direction == "right" else self.dead_left_image
+            return
+
+        now_ms = pygame.time.get_ticks()
+        if self.guard_target and (
+            now_ms > self.guard_target_expires or not self._valid_target(self.guard_target)
+        ):
+            self.guard_target = None
+
+        target = self.guard_target if self._valid_target(self.guard_target) else None
+        if target is not None:
+            target_x, target_y = self._get_target_position(target)
+            if target_x is None or target_y is None:
+                target = None
+            else:
+                dx = target_x - self.rect.centerx
+                dy = target_y - self.rect.centery
+                if dx > 0:
+                    self.last_direction = "right"
+                elif dx < 0:
+                    self.last_direction = "left"
+                if dx != 0 or dy != 0:
+                    direction = pygame.Vector2(dx, dy).normalize()
+                    self.direction = direction
+                else:
+                    self.direction.xy = (0, 0)
+                self.speed = 1.7
+                self._try_attack(target)
+        if target is None:
+            leader = self.leader if self._valid_target(getattr(self, "leader", None)) else None
+            if leader is not None:
+                to_leader = pygame.Vector2(
+                    leader.rect.centerx - self.rect.centerx,
+                    leader.rect.centery - self.rect.centery,
+                )
+                dist_sq = to_leader.length_squared()
+                leash_sq = self.leash_radius * self.leash_radius
+
+                return_bias = 0.0
+                return_vector = to_leader
+                if dist_sq > leash_sq:
+                    self.follow_retarget_timer -= dt
+                    if self.follow_retarget_timer <= 0:
+                        self.follow_offset = (random.randint(-50, 50), random.randint(-40, 40))
+                        self.follow_retarget_timer = random.uniform(0.6, 1.4)
+                    target_x = leader.rect.centerx + self.follow_offset[0]
+                    target_y = leader.rect.centery + self.follow_offset[1]
+                    return_vector = pygame.Vector2(target_x - self.rect.centerx, target_y - self.rect.centery)
+                    distance = math.sqrt(dist_sq) if dist_sq > 0 else 0.0
+                    extra = max(0.0, distance - self.leash_radius)
+                    return_bias = min(0.85, 0.35 + (extra / max(self.leash_radius, 1)) * 0.5)
+
+                self.roam_timer -= dt
+                if self.roam_timer <= 0:
+                    bias_dir = return_vector if return_bias > 0 else None
+                    self._pick_roam_direction(bias_dir, return_bias)
+
+                direction = self.roam_direction
+                if direction.length_squared() > 0:
+                    roam_sq = self.roam_radius * self.roam_radius
+                    if dist_sq > roam_sq and to_leader.length_squared() > 0:
+                        if direction.dot(to_leader) < 0:
+                            leader_dir = to_leader.normalize()
+                            blended = direction * 0.6 + leader_dir * 0.4
+                            if blended.length_squared() > 0:
+                                direction = blended.normalize()
+                    if dist_sq < self.follow_stop_distance * self.follow_stop_distance:
+                        if to_leader.length_squared() > 0 and direction.dot(to_leader) > 0:
+                            direction = pygame.Vector2(0, 0)
+
+                if return_bias > 0 and return_vector.length_squared() > 0:
+                    leader_dir = return_vector.normalize()
+                    if direction.length_squared() == 0:
+                        direction = leader_dir
+                    else:
+                        blended = direction * (1 - return_bias) + leader_dir * return_bias
+                        if blended.length_squared() > 0:
+                            direction = blended.normalize()
+
+                self.direction = direction
+                if direction.length_squared() > 0:
+                    desired_speed = self.roam_speed + (self.return_speed - self.roam_speed) * return_bias
+                    self.speed = max(self.roam_speed, desired_speed)
+                else:
+                    self.speed = 1.0
+            else:
+                self.direction.xy = (0, 0)
+                self.speed = 1.0
+
+        if self.attack_anim_timer > 0:
+            self.attack_anim_timer = max(0.0, self.attack_anim_timer - dt)
+            if self.attack_anim_timer == 0:
+                self.attacking = False
+
+        super().update(dt, player, nearby_objects, nearby_mobs, player_sleeping)
+
+    def animate_walk(self, animation_speed_multiplier=1.0):
+        if self.direction.length_squared() > 0:
+            if abs(self.direction.y) >= abs(self.direction.x):
+                self.last_direction = "down" if self.direction.y > 0 else "up"
+            else:
+                self.last_direction = "right" if self.direction.x > 0 else "left"
+        if self.attacking:
+            if self.last_direction == "right":
+                frames = self.walk_right_attack_images
+            elif self.last_direction == "left":
+                frames = self.walk_left_attack_images
+            elif self.last_direction == "up":
+                frames = self.walk_up_attack_images
+            else:
+                frames = self.walk_down_attack_images
+        else:
+            if self.last_direction == "right":
+                frames = self.walk_right_images
+            elif self.last_direction == "left":
+                frames = self.walk_left_images
+            elif self.last_direction == "up":
+                frames = self.walk_up_images
+            else:
+                frames = self.walk_down_images
+        effective_animation_speed = self.animation_speed * animation_speed_multiplier
+        self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
+        frame_index = int(self.frame_index)
+        self.image = frames[frame_index]
+        self._anim_frame_index = frame_index
+        self._anim_frames_len = len(frames)
+        self._anim_is_moving = True
+        self._anim_is_attacking = self.attacking
+
+    def animate_stand(self, animation_speed_multiplier=1.0):
+        if self.attacking:
+            if self.last_direction == "right":
+                frames = self.attack_right_images
+            elif self.last_direction == "left":
+                frames = self.attack_left_images
+            elif self.last_direction == "up":
+                frames = self.attack_up_images
+            else:
+                frames = self.attack_down_images
+        else:
+            if self.last_direction == "right":
+                frames = self.stand_right_images
+            elif self.last_direction == "left":
+                frames = self.stand_left_images
+            elif self.last_direction == "up":
+                frames = self.stand_up_images
+            else:
+                frames = self.stand_down_images
+        effective_animation_speed = self.animation_speed * animation_speed_multiplier * 0.7
+        self.frame_index = (self.frame_index + effective_animation_speed) % len(frames)
+        frame_index = int(self.frame_index)
+        self.image = frames[frame_index]
+        self._anim_frame_index = frame_index
+        self._anim_frames_len = len(frames)
+        self._anim_is_moving = False
+        self._anim_is_attacking = self.attacking
+
+    def flee(self, player_world_x, player_world_y, dt, player_sleeping=False):
+        self.fleeing = False
+
+    def _get_weapon_direction(self):
+        if self.last_direction in ("left", "right", "up", "down"):
+            self.weapon_direction = self.last_direction
+        elif not self.weapon_direction:
+            self.weapon_direction = "down"
+        return self.weapon_direction
+
+    def _draw_weapon(self, screen, cam_x, weapon_direction=None):
+        if not self.weapon_name or not self.is_alive or getattr(self, "destroyed", False):
+            return
+        images = _load_guard_weapon_images(self.weapon_name)
+        if not images:
+            return
+
+        direction = weapon_direction or self._get_weapon_direction()
+        if direction == "left":
+            base_image = images.get("right") or images.get("down") or images.get("up")
+        else:
+            base_image = images.get(direction) or images.get("right")
+        if base_image is None:
+            return
+
+        is_moving = getattr(self, "_anim_is_moving", self.direction.length_squared() > 0)
+        is_attacking = getattr(self, "_anim_is_attacking", self.attacking)
+        frame_index = getattr(self, "_anim_frame_index", int(self.frame_index))
+        anim_frames_len = getattr(
+            self,
+            "_anim_frames_len",
+            len(self.walk_right_images) if self.walk_right_images else 1,
+        )
+        sprite_half_w = self.image.get_width() / 2
+        sprite_half_h = self.image.get_height() / 2
+        guard_pos_x = self.rect.centerx - cam_x + sprite_half_w + 27
+        guard_pos_y = self.rect.centery + 12 + sprite_half_h + 25
+
+        if is_attacking:
+            num_frames = max(1, anim_frames_len)
+            frame_index = frame_index % num_frames
+            attack_frame_data = _GUARD_WEAPON_ATTACK_FRAME_DATA.get(direction, _GUARD_WEAPON_ATTACK_FRAME_DATA["right"])
+            frame_info = attack_frame_data[frame_index % len(attack_frame_data)]
+            swing_offset = frame_info["offset"]
+            rotation_angle = frame_info["rotation"]
+
+            weapon_image = pygame.transform.rotate(base_image, rotation_angle)
+            if direction == "left":
+                weapon_image = pygame.transform.flip(weapon_image, True, False)
+
+            scale_factor = 0.65
+            scaled_size = (int(weapon_image.get_width() * scale_factor), int(weapon_image.get_height() * scale_factor))
+            weapon_image = pygame.transform.scale(weapon_image, scaled_size)
+
+            held_x = int(guard_pos_x - size - 28 + swing_offset[0])
+            held_y = int(guard_pos_y - size - 34 + swing_offset[1])
+            screen.blit(weapon_image, (held_x, held_y))
+            return
+
+        movement_rotation = 0
+        if is_moving:
+            movement_frame_data = _GUARD_WEAPON_MOVEMENT_FRAME_DATA.get(direction, _GUARD_WEAPON_MOVEMENT_FRAME_DATA["right"])
+            num_frames = max(1, anim_frames_len)
+            frame_index = frame_index % num_frames
+            frame_info = movement_frame_data[frame_index % len(movement_frame_data)]
+            offset = frame_info["offset"]
+            movement_rotation = frame_info["rotation"]
+        else:
+            offset = _GUARD_WEAPON_IDLE_OFFSETS.get(direction, (0, 0))
+
+        move_nudge = -3 if is_moving else -2
+        held_x = int(guard_pos_x - size - 28 + offset[0])
+        held_y = int(guard_pos_y - size - 34 + offset[1] + move_nudge)
+
+        weapon_image = base_image
+        if direction == "left":
+            weapon_image = pygame.transform.flip(weapon_image, True, False)
+
+        scale_factor = 0.65
+        scaled_size = (int(weapon_image.get_width() * scale_factor), int(weapon_image.get_height() * scale_factor))
+        weapon_image = pygame.transform.scale(weapon_image, scaled_size)
+
+        if movement_rotation != 0:
+            weapon_image = pygame.transform.rotate(weapon_image, movement_rotation)
+
+        screen.blit(weapon_image, (held_x, held_y))
+
+    def draw(self, screen, cam_x):
+        weapon_direction = self._get_weapon_direction()
+        if weapon_direction in ("left", "up"):
+            self._draw_weapon(screen, cam_x, weapon_direction)
+        super().draw(screen, cam_x)
+        if weapon_direction in ("right", "down"):
+            self._draw_weapon(screen, cam_x, weapon_direction)
 
 
 class Enemy(Mob):
@@ -2140,7 +2997,7 @@ class Ashhound(Enemy):
         self.attack_damage = 6
         self.base_speed = 170
         self.speed = 1
-        self.full_health = 220 + (random.randint(10, 16) * self.level)
+        self.full_health = 180 + (random.randint(8, 12) * self.level)
         self.health = self.full_health
         self.resource = "Monster Meat"
         self.resource_amount = random.randint(3, 6)
@@ -2270,10 +3127,10 @@ class Wolf(Enemy):
         self.attack_timer = 0
         self.attack_duration = 22
 
-        self.attack_damage = 4
+        self.attack_damage = 3
         self.base_speed = 150
         self.speed = 1
-        self.full_health = 180 + (random.randint(8, 14) * self.level)
+        self.full_health = 100 + (random.randint(8, 14) * self.level)
         self.health = self.full_health
         self.resource = "Raw Small Meat"
         self.resource_amount = random.randint(2, 4)
@@ -3132,6 +3989,7 @@ class AggressiveMob(Mob):
 class Gorlin(Enemy):
     def __init__(self, x, y, name, variant="mudrustle"):
         super().__init__(x, y, name)
+        self.is_humanoid = True
         variant_key = (variant or "mudrustle").lower()
         if variant_key not in gorlin_variants:
             variant_key = "mudrustle"

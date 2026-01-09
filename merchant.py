@@ -813,6 +813,9 @@ class MerchantUI:
                 break
             if price > 0:
                 self.inventory.remove_item("Gold Coin", price)
+                if self.merchant is not None:
+                    current_coins = getattr(self.merchant, "gold_coins", 0) or 0
+                    self.merchant.gold_coins = int(current_coins) + price
             listing["stock"] = max(0, int(listing.get("stock", 0)) - 1)
             purchased = True
 
