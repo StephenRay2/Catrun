@@ -137,6 +137,7 @@ class Player(pygame.sprite.Sprite):
         self.req_multiplier = .5
         self.next_level_exp = 100
         self.level_up_timer = 0
+        self.last_level_up_level = self.level
         self.stamina_timer = 0
         self.stamina_message_timer = 0
         self.unspent_stat_points = 0
@@ -344,13 +345,10 @@ class Player(pygame.sprite.Sprite):
             self.experience -= self.next_level_exp
             self.level_up(screen)
 
-        if self.level_up_timer > 0:
-            self.show_level_up_message(screen)
-            self.level_up_timer -= dt
-
     def level_up(self, screen):
         lvl = self.level
         self.level += 1
+        self.last_level_up_level = self.level
         self.exp_total += self.next_level_exp
         if self.level > 0:
             self.next_level_exp += (self.next_level_exp * self.req_multiplier)
@@ -372,7 +370,6 @@ class Player(pygame.sprite.Sprite):
                 self.req_multiplier -= 0.00007
             elif lvl < 100:
                 self.req_multiplier -= 0.00003
-        self.level_up_timer = 10
         self.unspent_stat_points += 1
         sound_manager.play_sound("level_up")
 

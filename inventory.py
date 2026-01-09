@@ -7398,9 +7398,9 @@ class Inventory():
         title_height = 18
         padding = 10
         options = [
-            ("drop_one", "Drop one (R)"),
+            ("drop_one", "Drop one"),
             ("drop_amount", "Drop amount..."),
-            ("drop_all", "Drop all"),
+            ("drop_all", "Drop all (R)"),
             ("split_one", "Split one to new stack"),
             ("split_half", "Split half"),
             ("split_amount", "Split amount..."),

@@ -292,9 +292,9 @@ keybinds = {
     "move_left": pygame.K_a,
     "move_right": pygame.K_d,
     "sprint": [pygame.K_LSHIFT, pygame.K_RSHIFT],
-    "interact": pygame.K_e,
+    "interact": pygame.K_f,
     "inventory": pygame.K_q,
-    "consume": pygame.K_f,
+    "consume": pygame.K_e,
     "rotate": pygame.K_r,
     "secondary_action": pygame.K_t,
     "placement_snap": pygame.K_SPACE,
@@ -308,7 +308,7 @@ menu_keybind_actions = [
     {"action": "sprint", "label": "Sprint"},
     {"action": "interact", "label": "Interact"},
     {"action": "inventory", "label": "Inventory"},
-    {"action": "consume", "label": "Consume"},
+    {"action": "consume", "label": "Use / Consume"},
     {"action": "rotate", "label": "Rotate Placement"},
     {"action": "secondary_action", "label": "Secondary Action"},
     {"action": "placement_snap", "label": "Placement Snap"},
@@ -609,7 +609,7 @@ throw_charge_start = None
 max_throw_charge = 1.0
 min_throw_power = 2
 max_throw_power = 8
-min_throw_hold_time = 0.2  # Minimum hold time (in seconds) to trigger throw instead of pickup
+min_throw_hold_time = 0.2  # Minimum hold time (in seconds) to trigger throw with spacebar
 thrown_items = []
 loaded_item_sprites = {}  # Cache for loaded item sprites
 placeable_animation_cache = {}  # Cache for animated placeable sprites (keyed by name and size)
@@ -617,6 +617,8 @@ light_mask_cache = {}  # Cache for radial light masks
 LIGHT_THROW_ITEMS = {"Feathers", "Phoenix Feather"}
 STONE_THROW_ITEMS = {"Stone", "Redrock Stone", "Snowy Stone"}
 BREAK_ON_HIT_ITEMS = {"Throwing Star", "Throwing Knife", "Snowball"}
+right_collect_active = False
+right_collect_requested = False
 
 # Hold-to-consume timing (milliseconds)
 consume_hold_active = False
@@ -2652,6 +2654,7 @@ while running:
             menu_settings_button.draw(screen)
             menu_quit_button.draw(screen)
         
+        interact_requested = False
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -2804,54 +2807,49 @@ while running:
                 apply_wild_mob_level_scaling(cat)
                 cats.append(cat)
 
-            merchant_offsets = [-120, 0, 120]
             min_spawn_x = world.spawn_min_x + 64
             max_spawn_x = world.spawn_max_x - 64
             if max_spawn_x <= min_spawn_x:
                 min_spawn_x = 64
                 max_spawn_x = width - 64
-            base_x = max(min_spawn_x, min(max_spawn_x, width / 2))
-            base_y = min(height - 64, height / 2 + 120)
-            for idx, variant in enumerate(merchant_variants):
-                offset_x = merchant_offsets[idx % len(merchant_offsets)]
-                x = max(min_spawn_x, min(max_spawn_x, base_x + offset_x))
-                y = max(32, base_y)
-                merchant = Merchant(x, y, "Merchant", variant)
-                merchants.append(merchant)
-                merchant.guards = []
-                guard_offsets = [(-50, 40), (50, 40)]
-                for guard_idx, (gx, gy) in enumerate(guard_offsets):
-                    guard = MerchantGuard(
-                        x + gx,
-                        y + gy,
-                        "Merchant Guard",
-                        variant,
-                        merchant,
-                    )
-                    merchant_guards.append(guard)
-                    merchant.guards.append(guard)
+            min_spawn_y = 32
+            max_spawn_y = height - 64
+            spawn_center_x = width / 2
+            spawn_center_y = height / 2
+            min_merchant_distance_sq = 900 * 900
 
-            corpse_x = max(min_spawn_x, min(max_spawn_x, base_x + 220))
-            corpse_y = max(32, base_y + 140)
-            corpse_merchant = Merchant(corpse_x, corpse_y, "Merchant", 1)
-            refresh_merchant_stock(corpse_merchant, time_of_day)
-            corpse_merchant.is_alive = False
-            corpse_merchant.health = 0
-            corpse_merchant.death_time = pygame.time.get_ticks()
-            merchants.append(corpse_merchant)
-            corpse_merchant.guards = []
-            corpse_guard = MerchantGuard(
-                corpse_x + 50,
-                corpse_y + 40,
-                "Merchant Guard",
-                1,
-                corpse_merchant,
-            )
-            corpse_guard.is_alive = False
-            corpse_guard.health = 0
-            corpse_guard.death_time = pygame.time.get_ticks()
-            merchant_guards.append(corpse_guard)
-            corpse_merchant.guards.append(corpse_guard)
+            def random_merchant_position():
+                for _ in range(20):
+                    x = random.randint(int(min_spawn_x), int(max_spawn_x))
+                    y = random.randint(int(min_spawn_y), int(max_spawn_y))
+                    dx = x - spawn_center_x
+                    dy = y - spawn_center_y
+                    if (dx * dx + dy * dy) >= min_merchant_distance_sq:
+                        return x, y
+                return (
+                    random.randint(int(min_spawn_x), int(max_spawn_x)),
+                    random.randint(int(min_spawn_y), int(max_spawn_y)),
+                )
+
+            for variant in merchant_variants:
+                for _ in range(2):
+                    x, y = random_merchant_position()
+                    merchant = Merchant(x, y, "Merchant", variant)
+                    merchants.append(merchant)
+                    merchant.guards = []
+                    guard_offsets = [(-50, 40), (50, 40)]
+                    for guard_idx, (gx, gy) in enumerate(guard_offsets):
+                        guard_x = max(min_spawn_x, min(max_spawn_x, x + gx))
+                        guard_y = max(32, min(height - 32, y + gy))
+                        guard = MerchantGuard(
+                            guard_x,
+                            guard_y,
+                            "Merchant Guard",
+                            variant,
+                            merchant,
+                        )
+                        merchant_guards.append(guard)
+                        merchant.guards.append(guard)
 
             for _ in range(num_squirrels):
                 tile_x, tile_image = random.choice(weighted_squirrel_tiles)
@@ -3208,6 +3206,7 @@ while running:
             player.level = 1
             player.next_level_exp = 100
             player.level_up_timer = 0
+            player.last_level_up_level = player.level
             player.temp_weight_increase = 1
 
             player.health_leveler = 1
@@ -3244,6 +3243,15 @@ while running:
             
             inventory.inventory_list = [None] * inventory.capacity
             inventory.hotbar_slots = [None] * inventory.hotbar_size
+            inventory.selected_hotbar_slot = 0
+            inventory.selected_inventory_slot = None
+            inventory.selection_mode = "hotbar"
+            inventory.close_drop_menu()
+            inventory.dragging = False
+            inventory.dragged_item = None
+            inventory.dragged_from_slot = None
+            inventory.dragged_from_hotbar = False
+            inventory.recalc_weight()
 
             globals()['crafting_bench'] = CraftingBench(inventory)
             globals()['arcane_crafter'] = ArcaneCrafter(inventory)
@@ -3268,7 +3276,6 @@ while running:
             placement_direction = 0
 
             inventory.state = "inventory"
-            populate_test_inventory()
             # starting_items = ("Mortar And Pestle", "Smelter")
 
             # for target_name in starting_items:
@@ -3298,9 +3305,6 @@ while running:
             #     else:
             #         print(f"Warning: starting item '{target_name}' not found in items_list")
             
-            from world import gemstone_rocks, GemstoneRock
-            gemstone_rocks.append(GemstoneRock(int(player_pos.x + cam_x + 100), int(player_pos.y + 50)))
-
             game_just_started = False 
 
         for merchant in merchants:
@@ -3462,6 +3466,27 @@ while running:
                     continue
 
                 if (
+                    event.key == pygame.K_SPACE
+                    and not placement_mode
+                    and player.is_alive
+                    and not inventory_in_use
+                    and not crafting_bench_in_use
+                    and not arcane_crafter_in_use
+                    and not smelter_in_use
+                    and not campfire_in_use
+                    and not mortar_pestle_in_use
+                    and not alchemy_bench_in_use
+                    and not chest_in_use
+                    and not enemy_inventory_in_use
+                    and not merchant_in_use
+                    and not tent_menu_active
+                    and not fast_travel_menu_active
+                ):
+                    if throw_charge_start is None:
+                        throw_charge_start = pygame.time.get_ticks()
+                    continue
+
+                if (
                     inventory_in_use
                     and inventory.state == "inventory"
                     and event.key == pygame.K_r
@@ -3471,7 +3496,13 @@ while running:
                     mouse_pos = pygame.mouse.get_pos()
                     slot_index, is_hotbar = inventory.get_slot_at_mouse(mouse_pos, screen)
                     if slot_index is not None:
-                        drop_result = inventory.remove_quantity_from_slot(slot_index, is_hotbar, 1)
+                        slots = inventory.hotbar_slots if is_hotbar else inventory.inventory_list
+                        slot = slots[slot_index] if 0 <= slot_index < len(slots) else None
+                        if slot:
+                            drop_amount = slot.get("quantity", 1)
+                            drop_result = inventory.remove_quantity_from_slot(slot_index, is_hotbar, drop_amount)
+                        else:
+                            drop_result = None
                         if drop_result:
                             process_drop_result(drop_result)
                     continue
@@ -3534,6 +3565,118 @@ while running:
                 if (smelter_in_use or campfire_in_use or mortar_pestle_in_use or alchemy_bench_in_use or chest_in_use or enemy_inventory_in_use or merchant_in_use) and not (action_key_matches("interact", event.key) or event.key == pygame.K_ESCAPE):
                     continue
 
+            if event.type == pygame.KEYUP and event.key == pygame.K_SPACE:
+                if (
+                    throw_charge_start is not None
+                    and not placement_mode
+                    and player.is_alive
+                    and not inventory_in_use
+                    and not crafting_bench_in_use
+                    and not arcane_crafter_in_use
+                    and not smelter_in_use
+                    and not campfire_in_use
+                    and not mortar_pestle_in_use
+                    and not alchemy_bench_in_use
+                    and not chest_in_use
+                    and not enemy_inventory_in_use
+                    and not merchant_in_use
+                    and not tent_menu_active
+                    and not fast_travel_menu_active
+                ):
+                    charge_duration = (pygame.time.get_ticks() - throw_charge_start) / 1000.0
+                    throw_power = min(charge_duration / max_throw_charge, 1.0)
+                    if charge_duration >= min_throw_hold_time:
+                        mouse_pos = pygame.mouse.get_pos()
+                        mouse_world_x = mouse_pos[0] + cam_x
+                        mouse_world_y = mouse_pos[1]
+
+                        # Check only the selected hotbar slot for a cat to throw
+                        cat_in_inventory = None
+                        cat_slot_index = None
+                        cat_is_hotbar = False
+
+                        selected_hotbar = inventory.hotbar_slots[inventory.selected_hotbar_slot]
+                        if selected_hotbar:
+                            cat_object_candidate = selected_hotbar.get("cat_object")
+                            if cat_object_candidate:
+                                cat_in_inventory = selected_hotbar
+                                cat_slot_index = inventory.selected_hotbar_slot
+                                cat_is_hotbar = True
+
+                        if cat_in_inventory:
+                            cat_object = cat_in_inventory["cat_object"]
+                            start_x = player_world_x
+                            start_y = player_world_y
+
+                            delta_x = mouse_world_x - start_x
+                            delta_y = mouse_world_y - start_y
+                            distance = (delta_x**2 + delta_y**2) ** 0.5
+
+                            if distance > 0:
+                                velocity = min_throw_power + (throw_power * (max_throw_power - min_throw_power))
+                                vel_x = (delta_x / distance) * velocity * 4
+                                vel_y = (delta_y / distance) * velocity * 4
+                            else:
+                                vel_x = 0
+                                vel_y = 0
+
+                            spawn_thrown_item(
+                                start_x,
+                                start_y,
+                                vel_x,
+                                vel_y,
+                                cat_object.get_item_data(),
+                                is_cat=True,
+                                throw_power=throw_power,
+                            )
+
+                            if cat_is_hotbar:
+                                inventory.hotbar_slots[cat_slot_index] = None
+                            else:
+                                inventory.inventory_list[cat_slot_index] = None
+                            if cat_object in cats:
+                                cats.remove(cat_object)
+
+                            sound_manager.play_sound(random.choice(["cat_thrown1"]))
+                        else:
+                            item = inventory.get_selected_item()
+                            if item:
+                                success, tags, thrown_instance = inventory.throw_item()
+                                if success:
+                                    start_x = player_world_x
+                                    start_y = player_world_y
+                                    delta_x = mouse_world_x - start_x
+                                    delta_y = mouse_world_y - start_y
+                                    distance = (delta_x**2 + delta_y**2) ** 0.5
+
+                                    if distance > 0:
+                                        velocity = min_throw_power + (throw_power * (max_throw_power - min_throw_power))
+                                        vel_x = (delta_x / distance) * velocity * 4
+                                        vel_y = (delta_y / distance) * velocity * 4
+                                    else:
+                                        velocity = min_throw_power + (throw_power * (max_throw_power - min_throw_power))
+                                        direction = 1 if player.last_direction in ["right", "down"] else -1
+                                        vel_x = velocity * direction * 4
+                                        vel_y = 0
+
+                                    thrown_payload = thrown_instance or item
+                                    is_cat_item = "cat_type" in thrown_payload if thrown_payload else False
+                                    spawn_thrown_item(
+                                        start_x,
+                                        start_y,
+                                        vel_x,
+                                        vel_y,
+                                        thrown_payload,
+                                        is_cat=is_cat_item,
+                                        throw_power=throw_power,
+                                    )
+
+                                    if "food" in tags:
+                                        sound_manager.play_sound(random.choice([f"consume_item{i}" for i in range(1, 7)]))
+                                    elif any(tag in tags for tag in ["liquid", "consumable"]):
+                                        sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
+                throw_charge_start = None
+
             if inventory_in_use:
                 tab_clicked = False
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -3559,6 +3702,26 @@ while running:
                 inventory.handle_cats_event(event)
 
             if event.type == pygame.KEYDOWN and action_key_matches("consume", event.key) and not inventory_in_use and not crafting_bench_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and not chest_in_use and not enemy_inventory_in_use and not merchant_in_use and player.is_alive:
+                selected_item = inventory.get_selected_item()
+                selected_slot = None
+                if inventory.selection_mode == "hotbar":
+                    selected_slot = inventory.hotbar_slots[inventory.selected_hotbar_slot]
+                elif inventory.selection_mode == "inventory" and inventory.selected_inventory_slot is not None:
+                    selected_slot = inventory.inventory_list[inventory.selected_inventory_slot]
+
+                placeable_item = None
+                if selected_item and selected_item.get("placeable"):
+                    placeable_item = selected_item
+                elif selected_slot and selected_slot.get("placeable"):
+                    item_name = selected_slot.get("item_name")
+                    placeable_item = next((itm for itm in items_list if itm.get("item_name") == item_name), selected_slot)
+
+                if placeable_item:
+                    consume_hold_active = False
+                    if not placement_mode:
+                        start_placement(placeable_item)
+                    continue
+
                 consumed_item = False
                 success, tags = inventory.consume_item()
                 if success:
@@ -3756,7 +3919,7 @@ while running:
                     inventory.close_drop_menu()
                     continue
 
-            # Placement system - toggle placement mode with right-click
+            # Right-click: collect once on tap; collect continuously while held.
             if (
                 event.type == pygame.MOUSEBUTTONDOWN
                 and event.button == 3
@@ -3771,216 +3934,14 @@ while running:
                 and not enemy_inventory_in_use
                 and not merchant_in_use
                 and not inventory_in_use
+                and not placement_mode
             ):
-                if placement_mode:
-                    # Cancel placement mode
-                    cancel_placement()
-                else:
-                    # Check if selected item is placeable (prefer hotbar when UI closed)
-                    if not inventory_in_use:
-                        selected_slot = inventory.hotbar_slots[inventory.selected_hotbar_slot]
-                    else:
-                        selected_slot = inventory.get_selected_item()
-                    if selected_slot and selected_slot.get("placeable", False):
-                        # Use the canonical item def if available so structure_type is guaranteed
-                        item_name = selected_slot.get("item_name")
-                        item_def = next((itm for itm in items_list if itm.get("item_name") == item_name), selected_slot)
-                        start_placement(item_def)
-                    else:
-                        # Fall back to throw mechanic
-                        throw_charge_start = pygame.time.get_ticks()
+                right_collect_active = True
+                right_collect_requested = True
+                interact_requested = True
 
-
-
-            # Throw mechanic - release and throw
-            elif event.type == pygame.MOUSEBUTTONUP and event.button == 3 and player.is_alive and not placement_mode and not inventory_in_use:
-                if throw_charge_start is not None:
-                    charge_duration = (pygame.time.get_ticks() - throw_charge_start) / 1000.0
-                    throw_power = min(charge_duration / max_throw_charge, 1.0)
-                    mouse_pos = pygame.mouse.get_pos()
-                    
-                    # Quick click (< min_throw_hold_time): try to place cat from inventory or pick up nearby cat
-                    if charge_duration < min_throw_hold_time:
-                        # Check only the selected hotbar slot for a cat
-                        cat_in_inventory = None
-                        cat_slot_index = None
-                        cat_is_hotbar = False
-                        
-                        # Check ONLY the selected hotbar slot
-                        selected_hotbar = inventory.hotbar_slots[inventory.selected_hotbar_slot]
-                        if selected_hotbar:
-                            cat_object_candidate = selected_hotbar.get("cat_object")
-                            if cat_object_candidate:
-                                cat_in_inventory = selected_hotbar
-                                cat_slot_index = inventory.selected_hotbar_slot
-                                cat_is_hotbar = True
-                        
-                        # If cat found in selected hotbar slot, place it
-                        if cat_in_inventory:
-                            cat_object = cat_in_inventory["cat_object"]
-                            
-                            # Place cat in front of player based on facing direction
-                            placement_distance = 50
-                            if player.last_direction == "right":
-                                place_x = player_world_x + placement_distance
-                                place_y = player_world_y
-                            elif player.last_direction == "left":
-                                place_x = player_world_x - placement_distance
-                                place_y = player_world_y
-                            elif player.last_direction == "up":
-                                place_x = player_world_x
-                                place_y = player_world_y - placement_distance
-                            else:  # "down"
-                                place_x = player_world_x
-                                place_y = player_world_y + placement_distance
-                            
-                            # Update cat position
-                            cat_object.rect.centerx = place_x
-                            cat_object.rect.centery = place_y
-                            # Prevent immediate pickup on next frame
-                            cat_object.placement_time = pygame.time.get_ticks()
-                            
-                            # Add cat back to world
-                            cats.append(cat_object)
-                            
-                            # Remove cat from inventory
-                            if cat_is_hotbar:
-                                inventory.hotbar_slots[cat_slot_index] = None
-                            else:
-                                inventory.inventory_list[cat_slot_index] = None
-                            
-                            sound_manager.play_sound(random.choice(["cat_meow1", "cat_meow2", "cat_meow3"]))
-                        
-                        # Otherwise, try to pick up a nearby tamed cat into inventory
-                        else:
-                            closest_cat = None
-                            closest_distance = 150  # Pickup range in pixels
-                            
-                            for cat in cats:
-                                if cat.tame >= 50:  # Only tamed cats
-                                    # Skip cats that were just placed (prevent immediate re-pickup)
-                                    if hasattr(cat, 'placement_time'):
-                                        time_since_placement = pygame.time.get_ticks() - cat.placement_time
-                                        if time_since_placement < 500:  # 500ms cooldown after placement
-                                            continue
-                                    
-                                    dist_x = abs(cat.rect.centerx - player_world_x)
-                                    dist_y = abs(cat.rect.centery - player_world_y)
-                                    distance = (dist_x**2 + dist_y**2) ** 0.5
-                                    if distance < closest_distance:
-                                        closest_distance = distance
-                                        closest_cat = cat
-                            
-                            # Pick up the closest cat into inventory
-                            if closest_cat:
-                                cat_item_data = closest_cat.get_item_data()
-                                # Try to add to hotbar first
-                                added_to_hotbar = False
-                                for i in range(inventory.hotbar_size):
-                                    if inventory.hotbar_slots[i] is None:
-                                        inventory.hotbar_slots[i] = cat_item_data
-                                        added_to_hotbar = True
-                                        break
-                                
-                                # If hotbar full, try main inventory
-                                if not added_to_hotbar:
-                                    for i in range(inventory.capacity):
-                                        if inventory.inventory_list[i] is None:
-                                            inventory.inventory_list[i] = cat_item_data
-                                            break
-                                
-                                # Remove cat from world
-                                cats.remove(closest_cat)
-                                sound_manager.play_sound(random.choice(["cat_meow1", "cat_meow2", "cat_meow3"]))
-                    
-                    # Held click (>= min_throw_hold_time): throw toward mouse
-                    elif charge_duration >= min_throw_hold_time:
-                        # Calculate trajectory toward mouse
-                        mouse_world_x = mouse_pos[0] + cam_x
-                        mouse_world_y = mouse_pos[1]
-                        
-                        # Check only the selected hotbar slot for a cat to throw
-                        cat_in_inventory = None
-                        cat_slot_index = None
-                        cat_is_hotbar = False
-                        
-                        # Check ONLY the selected hotbar slot
-                        selected_hotbar = inventory.hotbar_slots[inventory.selected_hotbar_slot]
-                        if selected_hotbar:
-                            cat_object_candidate = selected_hotbar.get("cat_object")
-                            if cat_object_candidate:
-                                cat_in_inventory = selected_hotbar
-                                cat_slot_index = inventory.selected_hotbar_slot
-                                cat_is_hotbar = True
-                        
-                        # If cat in selected hotbar slot, throw it
-                        if cat_in_inventory:
-                            cat_object = cat_in_inventory["cat_object"]
-                            # Throw from player position, not from cat's stored position
-                            start_x = player_world_x
-                            start_y = player_world_y
-                            
-                            # Calculate direction to mouse
-                            delta_x = mouse_world_x - start_x
-                            delta_y = mouse_world_y - start_y
-                            distance = (delta_x**2 + delta_y**2) ** 0.5
-                            
-                            if distance > 0:
-                                # Normalize and apply velocity in straight line to mouse
-                                velocity = min_throw_power + (throw_power * (max_throw_power - min_throw_power))
-                                vel_x = (delta_x / distance) * velocity * 4
-                                vel_y = (delta_y / distance) * velocity * 4
-                            else:
-                                vel_x = 0
-                                vel_y = 0
-                            
-                            spawn_thrown_item(start_x, start_y, vel_x, vel_y, 
-                                        cat_object.get_item_data(), is_cat=True, throw_power=throw_power)
-                            
-                            # Remove cat from inventory and world
-                            if cat_is_hotbar:
-                                inventory.hotbar_slots[cat_slot_index] = None
-                            else:
-                                inventory.inventory_list[cat_slot_index] = None
-                            if cat_object in cats:
-                                cats.remove(cat_object)
-                            
-                            sound_manager.play_sound(random.choice(["cat_thrown1"]))
-                        
-                        else:
-                            # Throw selected inventory item toward mouse
-                            item = inventory.get_selected_item()
-                            if item:
-                                success, tags, thrown_instance = inventory.throw_item()
-                                if success:
-                                    # Calculate direction to mouse
-                                    start_x = player_world_x
-                                    start_y = player_world_y
-                                    delta_x = mouse_world_x - start_x
-                                    delta_y = mouse_world_y - start_y
-                                    distance = (delta_x**2 + delta_y**2) ** 0.5
-                                    
-                                    if distance > 0:
-                                        velocity = min_throw_power + (throw_power * (max_throw_power - min_throw_power))
-                                        vel_x = (delta_x / distance) * velocity * 4
-                                        vel_y = (delta_y / distance) * velocity * 4
-                                    else:
-                                        # Fallback to direction-based throw 
-                                        velocity = min_throw_power + (throw_power * (max_throw_power - min_throw_power))
-                                        direction = 1 if player.last_direction in ["right", "down"] else -1
-                                        vel_x = velocity * direction * 4
-                                        vel_y = 0  # Straight horizontal throw
-                                    
-                                    thrown_payload = thrown_instance or item
-                                    is_cat_item = "cat_type" in thrown_payload if thrown_payload else False
-                                    spawn_thrown_item(start_x, start_y, vel_x, vel_y, thrown_payload, is_cat=is_cat_item, throw_power=throw_power)
-                                    
-                                    if "food" in tags:
-                                        sound_manager.play_sound(random.choice([f"consume_item{i}" for i in range(1, 7)]))
-                                    elif any(tag in tags for tag in ["liquid", "consumable"]):
-                                        sound_manager.play_sound(random.choice([f"consume_water{i}" for i in range(1, 5)]))
-                
-                throw_charge_start = None
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 3:
+                right_collect_active = False
 
             # Campfire UI drag handling
             if campfire_in_use:
@@ -4387,8 +4348,19 @@ while running:
                     mouse_pos = pygame.mouse.get_pos()
                     merchant_ui.handle_mouse_click(mouse_pos, event.button, screen)
 
-            if event.type == pygame.KEYDOWN and action_key_matches("interact", event.key):
-                # When the inventory UI is open, ignore E so we don't
+            if (event.type == pygame.KEYDOWN and action_key_matches("interact", event.key)) or interact_requested:
+                interact_requested = False
+                # Exit hide/sleep states with an interact tap.
+                if tent_hide_active:
+                    tent_hide_active = False
+                    place_player_below_tent()
+                    continue
+                if sleeping_in_tent:
+                    sleeping_in_tent = False
+                    time_speed_multiplier = 1.0
+                    place_player_below_tent()
+                    continue
+                # When the inventory UI is open, ignore interact so we don't
                 # accidentally open or interact with world UIs underneath.
                 if inventory_in_use:
                     continue
@@ -5406,7 +5378,7 @@ while running:
         keys = pygame.key.get_pressed()
 
         # Hold-to-consume: after an initial press that successfully
-        # consumed an item, keep consuming while F is held down.
+        # consumed an item, keep consuming while the consume key is held down.
         if consume_hold_active:
             can_auto_consume = (
                 not inventory_in_use
@@ -5732,8 +5704,10 @@ while running:
                 height_mult = 0.2
             elif name == "Torch":
                 y_offset = rect.height * 0.05
-            if name in ("Rock", "RedrockRock", "SnowyRock", "MetalOreRock", "MetalVeinRock", "GoldOreRock", "GoldVeinRock", "GemstoneRock"):
-                y_offset = 0
+            if name in ("MetalOreRock", "MetalVeinRock", "GoldOreRock", "GoldVeinRock"):
+                y_offset = -12
+            elif name in ("Rock", "GemstoneRock", "RedrockRock", "SnowyRock"):
+                y_offset = -3
             if name in ("Boulder","RedrockBoulder", "SnowyBoulder"):
                 y_offset = -25
             if name in ("Squirrel",):
@@ -6256,10 +6230,38 @@ while running:
 
         inventory.draw_hotbar(screen)
 
+        collect_blocked = (
+            paused
+            or inventory_in_use
+            or smelter_in_use
+            or campfire_in_use
+            or crafting_bench_in_use
+            or mortar_pestle_in_use
+            or alchemy_bench_in_use
+            or chest_in_use
+            or enemy_inventory_in_use
+            or merchant_in_use
+            or tent_menu_active
+            or fast_travel_menu_active
+            or tent_hide_active
+            or placement_mode
+            or player.dead
+        )
+        if collect_blocked:
+            right_collect_requested = False
+            right_collect_active = False
+
 
         if not paused and not inventory_in_use and not smelter_in_use and not campfire_in_use and not crafting_bench_in_use and not mortar_pestle_in_use and not alchemy_bench_in_use and not chest_in_use and not enemy_inventory_in_use and not merchant_in_use and not tent_menu_active and not fast_travel_menu_active and not tent_hide_active and player.dead == False:
 
-            if action_pressed("interact", keys) and current_time - collect_cooldown > collect_delay:
+            right_collect_triggered = False
+            if right_collect_requested:
+                right_collect_triggered = True
+                right_collect_requested = False
+            if right_collect_active:
+                right_collect_triggered = True
+
+            if right_collect_triggered and current_time - collect_cooldown > harvest_delay:
                 for obj in visible_objects:
                     if hasattr(obj, 'collect') and not obj.destroyed:
                         if hasattr(obj, 'is_empty') and obj.is_empty:
@@ -6849,6 +6851,38 @@ while running:
         player.lose_hunger(dt)
         player.lose_thirst(dt)
         player.clamp_stats()
+
+        level_notice_offset = 0
+        notice_y = 10
+        if player.unspent_stat_points > 0:
+            player_level = getattr(player, "last_level_up_level", player.level)
+            player_text = large_font.render(
+                f"You leveled up to level {player_level}! Upgrade stats in inventory!",
+                True,
+                (20, 255, 20),
+            )
+            px = screen.get_width() // 2 - player_text.get_width() // 2
+            bg_surface = pygame.Surface((player_text.get_width() + 12, player_text.get_height() + 8), pygame.SRCALPHA)
+            bg_surface.fill((0, 0, 0, 150))
+            screen.blit(bg_surface, (px - 6, notice_y - 4))
+            screen.blit(player_text, (px, notice_y))
+            notice_y += player_text.get_height() + 12
+
+        cat_notice = any(
+            getattr(cat, "tamed", False) and getattr(cat, "unspent_stat_points", 0) > 0
+            for cat in cats
+        )
+        if cat_notice:
+            cat_text = font.render("Your cat has level up points available", True, (120, 220, 120))
+            cx = screen.get_width() // 2 - cat_text.get_width() // 2
+            cat_bg = pygame.Surface((cat_text.get_width() + 10, cat_text.get_height() + 8), pygame.SRCALPHA)
+            cat_bg.fill((0, 0, 0, 150))
+            screen.blit(cat_bg, (cx - 5, notice_y - 4))
+            screen.blit(cat_text, (cx, notice_y))
+            notice_y += cat_text.get_height() + 10
+
+        if notice_y > 10:
+            level_notice_offset = notice_y - 10
     
         
         if dungeon_depth >= dungeon_depth_high:
@@ -6866,7 +6900,7 @@ while running:
         if stamina_depleted_message_timer > 0:
             tired_text = font.render("Too tired. Rest to regain stamina", True, (40, 255, 20))
             x = screen.get_width()//2 - tired_text.get_width()//2
-            y = 20
+            y = 20 + level_notice_offset
             temp_surface = pygame.Surface((tired_text.get_width() + 10, tired_text.get_height() + 10), pygame.SRCALPHA)
             temp_surface.fill((0, 0, 0, 20))
             screen.blit(temp_surface, (x - 5, y - 5))
@@ -6875,7 +6909,7 @@ while running:
         if need_pickaxe_message_timer > 0:
             pickaxe_text = font.render("Use a pickaxe to harvest this.", True, (255, 220, 80))
             x = screen.get_width()//2 - pickaxe_text.get_width()//2
-            y = 80
+            y = 80 + level_notice_offset
             temp_surface = pygame.Surface((pickaxe_text.get_width() + 10, pickaxe_text.get_height() + 10), pygame.SRCALPHA)
             temp_surface.fill((0, 0, 0, 120))
             screen.blit(temp_surface, (x - 5, y - 5))
@@ -6884,7 +6918,7 @@ while running:
         if need_shovel_message_timer > 0:
             shovel_text = font.render("Use a shovel to harvest this.", True, (180, 220, 255))
             x = screen.get_width()//2 - shovel_text.get_width()//2
-            y = 110
+            y = 110 + level_notice_offset
             temp_surface = pygame.Surface((shovel_text.get_width() + 10, shovel_text.get_height() + 10), pygame.SRCALPHA)
             temp_surface.fill((0, 0, 0, 120))
             screen.blit(temp_surface, (x - 5, y - 5))
@@ -6893,7 +6927,7 @@ while running:
         if inventory.inventory_full_message_timer > 0:
             full_text = font.render("Inventory Full! Cannot pick up items.", True, (255, 50, 50))
             x = screen.get_width()//2 - full_text.get_width()//2
-            y = 50
+            y = 50 + level_notice_offset
             temp_surface = pygame.Surface((full_text.get_width() + 10, full_text.get_height() + 10), pygame.SRCALPHA)
             temp_surface.fill((0, 0, 0, 150))
             screen.blit(temp_surface, (x - 5, y - 5))
@@ -6904,7 +6938,7 @@ while running:
             if not in_range:
                 range_text = font.render("Out of placement range.", True, (255, 120, 120))
                 x = screen.get_width()//2 - range_text.get_width()//2
-                y = 140
+                y = 140 + level_notice_offset
                 temp_surface = pygame.Surface((range_text.get_width() + 10, range_text.get_height() + 10), pygame.SRCALPHA)
                 temp_surface.fill((0, 0, 0, 150))
                 screen.blit(temp_surface, (x - 5, y - 5))
