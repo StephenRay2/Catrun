@@ -169,6 +169,9 @@ class Player(pygame.sprite.Sprite):
         self.lava_damage_timer = 0
         self.current_liquid = None
         self.ground_slow_factor = 1.0
+        self.screen_shake_timer = 0.0
+        self.screen_shake_duration = 0.0
+        self.screen_shake_intensity = 0.0
 
     def is_in_spawn_protection(self):
         return False
@@ -573,6 +576,11 @@ class Player(pygame.sprite.Sprite):
         self.health -= reduced
         if self.health < 0:
             self.health = 0
+        shake_duration = 0.18
+        shake_intensity = 4.0
+        self.screen_shake_duration = max(self.screen_shake_duration, shake_duration)
+        self.screen_shake_timer = max(self.screen_shake_timer, shake_duration)
+        self.screen_shake_intensity = max(self.screen_shake_intensity, shake_intensity)
         if play_sound:
             sound_manager.play_sound(random.choice([f"player_get_hit{i}" for i in range(1,5)]))
 

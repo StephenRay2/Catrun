@@ -346,6 +346,7 @@ class Cat(Mob):
         """Feed the cat with food item. Returns the tame increase amount."""
         tame_increase = 0
         health_increase = 0
+        was_tamed = self.tamed
         
         if item_name in ["Fish", "Raw Venison", "Raw Lizard Meat", "Raw Beef", "Raw Chicken", "Raw Small Meat", "Raw Bear Meat"]:
             tame_increase = 20
@@ -383,7 +384,8 @@ class Cat(Mob):
                 self.disable_autonomous_movement = True
             
             sound_manager.play_sound(random.choice(["cat_purr1", "cat_purr2"]))
-            self.tame_bar_timer = self.tame_bar_display_time
+            if not was_tamed:
+                self.tame_bar_timer = self.tame_bar_display_time
         
         return tame_increase
     
@@ -452,7 +454,7 @@ class Cat(Mob):
     def level_up(self):
         self.level += 1
         self.unspent_stat_points += 1
-        self.next_level_exp = int(100 + (self.level * 120))
+        self.next_level_exp = int(100 + (self.level * 80))
         self.experience = 0
 
     def gain_experience(self, amount):

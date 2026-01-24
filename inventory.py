@@ -6206,6 +6206,11 @@ class Inventory():
         self.crafting_completion_slot = None
         self.crafting_completion_time = 0
         self.crafting_flash_duration = 0.3
+        self.crafting_amount_menu = None
+        self.crafting_amount_menu_x = 0
+        self.crafting_amount_menu_y = 0
+        self.custom_craft_input = ""
+        self.custom_craft_active = False
         self.last_item_click_time = 0
         self.last_item_click_slot = None
         self.last_item_click_type = None
@@ -7878,18 +7883,186 @@ class Inventory():
                         screen.blit(temp_surface, (col_x - 5, line_y - 5))
                         screen.blit(req_text, (col_x, line_y))
 
-    def craft_item(self, item):
-        if not self.has_materials_for_recipe(item["recipe"]):
+        if self.crafting_amount_menu is not None:
+            self._draw_craft_menu(screen)
+
+    def craft_item(self, item, amount=1):
+        if amount <= 0:
             return False
-        
-        self.remove_materials_from_inventory(item["recipe"])
-        
-        self.add({item["item_name"]: item["output_amount"]})
-        
-        # Play random hammer_wood sound
-        sound_manager.play_sound(random.choice([f"hammer_wood{i}" for i in range(1, 4)]))
-        
+
+        for _ in range(amount):
+            if not self.has_materials_for_recipe(item["recipe"]):
+                return False
+
+            self.remove_materials_from_inventory(item["recipe"])
+
+            if not self.add({item["item_name"]: item.get("output_amount", 1)}):
+                return False
+
+            # Play random hammer_wood sound
+            sound_manager.play_sound(random.choice([f"hammer_wood{i}" for i in range(1, 4)]))
+
         return True
+
+    def close_crafting_menu(self):
+        self.crafting_amount_menu = None
+        self.crafting_amount_menu_x = 0
+        self.crafting_amount_menu_y = 0
+        self.custom_craft_input = ""
+        self.custom_craft_active = False
+
+    def show_craft_menu(self, mouse_pos, recipe_idx):
+        self.crafting_amount_menu = recipe_idx
+        self.crafting_amount_menu_x = mouse_pos[0]
+        self.crafting_amount_menu_y = mouse_pos[1]
+
+    def _get_craft_menu_position(self):
+        menu_x = self.crafting_amount_menu_x + 45
+        menu_y = self.crafting_amount_menu_y
+        return (int(menu_x), int(menu_y))
+
+    def _is_in_craft_menu(self, mouse_pos):
+        if self.crafting_amount_menu is None:
+            return False
+        menu_x, menu_y = self._get_craft_menu_position()
+        menu_width = 180
+        menu_height = 110
+
+        if menu_x <= mouse_pos[0] <= menu_x + menu_width and menu_y <= mouse_pos[1] <= menu_y + menu_height:
+            return True
+
+        if self.custom_craft_active:
+            input_bg_y = menu_y - 35
+            if menu_x <= mouse_pos[0] <= menu_x + menu_width and input_bg_y <= mouse_pos[1] <= input_bg_y + 30:
+                return True
+
+        return False
+
+    def _get_craft_menu_option(self, mouse_pos):
+        menu_x, menu_y = self._get_craft_menu_position()
+        relative_y = mouse_pos[1] - menu_y
+        option_height = 30
+
+        if relative_y < option_height:
+            return 1
+        elif relative_y < option_height * 2:
+            return 2
+        elif relative_y < option_height * 3:
+            return 3
+        return None
+
+    def _get_max_craftable(self, item):
+        max_amount = float('inf')
+        required = item.get("recipe") or []
+
+        for req in required:
+            item_name = req.get("item")
+            item_tag = req.get("item_tag")
+            amount_needed = req.get("amount", 1)
+
+            if item_name:
+                total_amount = self.get_item_count(item_name)
+            elif item_tag:
+                total_amount = self.get_items_by_tag_count(item_tag)
+            else:
+                total_amount = 0
+
+            if amount_needed > 0:
+                max_amount = min(max_amount, total_amount // amount_needed)
+
+        return max(1, int(max_amount)) if max_amount != float('inf') else 1
+
+    def _get_crafting_menu_item(self):
+        if self.crafting_amount_menu is None:
+            return None
+        slot = self.crafting_slot_positions.get(self.crafting_amount_menu)
+        if slot:
+            return slot[2]
+        craftable_items = self.get_craftable_items()
+        if 0 <= self.crafting_amount_menu < len(craftable_items):
+            return craftable_items[self.crafting_amount_menu]
+        return None
+
+    def _get_crafting_slot_at_mouse(self, mouse_pos):
+        for idx, (x, y, item) in self.crafting_slot_positions.items():
+            if x <= mouse_pos[0] <= x + self.slot_size and y <= mouse_pos[1] <= y + self.slot_size:
+                return idx, x, y, item
+        return None, None, None, None
+
+    def _trigger_crafting_flash(self, recipe_idx):
+        slot = self.crafting_slot_positions.get(recipe_idx)
+        if not slot:
+            return
+        x, y = slot[0], slot[1]
+        self.crafting_completion_flash = True
+        self.crafting_completion_time = pygame.time.get_ticks() / 1000.0
+        self.crafting_completion_slot = (x, y)
+
+    def handle_crafting_key_event(self, event):
+        if not self.custom_craft_active or self.crafting_amount_menu is None:
+            return
+
+        if event.key == pygame.K_RETURN:
+            if self.custom_craft_input:
+                try:
+                    amount = int(self.custom_craft_input)
+                except ValueError:
+                    amount = 0
+                item = self._get_crafting_menu_item()
+                if item and amount > 0:
+                    max_craftable = self._get_max_craftable(item)
+                    amount = min(amount, max_craftable)
+                    amount = max(1, amount)
+                    if self.craft_item(item, amount):
+                        self._trigger_crafting_flash(self.crafting_amount_menu)
+            self.close_crafting_menu()
+        elif event.key == pygame.K_BACKSPACE:
+            self.custom_craft_input = self.custom_craft_input[:-1]
+        elif event.key == pygame.K_ESCAPE:
+            self.close_crafting_menu()
+        elif event.unicode.isdigit():
+            if len(self.custom_craft_input) < 5:
+                self.custom_craft_input += event.unicode
+
+    def _draw_craft_menu(self, screen):
+        if self.crafting_amount_menu is None:
+            return
+
+        item = self._get_crafting_menu_item()
+        if item is None:
+            self.crafting_amount_menu = None
+            return
+
+        menu_x, menu_y = self._get_craft_menu_position()
+        menu_width = 180
+        menu_height = 110
+        option_height = 30
+        font_small = pygame.font.Font(font_path, 14)
+
+        pygame.draw.rect(screen, (40, 40, 60), (menu_x, menu_y, menu_width, menu_height), border_radius=5)
+        pygame.draw.rect(screen, (200, 150, 100), (menu_x, menu_y, menu_width, menu_height), width=2, border_radius=5)
+
+        max_craftable = self._get_max_craftable(item)
+        option1_text = font_small.render("Craft 1", True, (255, 255, 200))
+        option2_text = font_small.render(f"Craft All ({max_craftable})", True, (255, 255, 200))
+        option3_text = font_small.render("Custom Amount", True, (255, 255, 200))
+
+        pygame.draw.rect(screen, (50, 50, 80), (menu_x, menu_y, menu_width, option_height))
+        pygame.draw.rect(screen, (80, 80, 120), (menu_x, menu_y + option_height, menu_width, option_height))
+        pygame.draw.rect(screen, (60, 60, 100), (menu_x, menu_y + option_height * 2, menu_width, option_height))
+
+        screen.blit(option1_text, (menu_x + 10, menu_y + 7))
+        screen.blit(option2_text, (menu_x + 10, menu_y + option_height + 5))
+        screen.blit(option3_text, (menu_x + 10, menu_y + option_height * 2 + 7))
+
+        if self.custom_craft_active:
+            input_bg_x = menu_x
+            input_bg_y = menu_y - 35
+            pygame.draw.rect(screen, (40, 40, 60), (input_bg_x, input_bg_y, menu_width, 30), border_radius=5)
+            pygame.draw.rect(screen, (200, 150, 100), (input_bg_x, input_bg_y, menu_width, 30), width=2, border_radius=5)
+
+            input_text = font_small.render(f"Amount: {self.custom_craft_input}_", True, (255, 255, 200))
+            screen.blit(input_text, (input_bg_x + 10, input_bg_y + 7))
 
     def add(self, resource):
         all_added = True
@@ -8003,29 +8176,63 @@ class Inventory():
         
         return (None, None)
     
-    def handle_crafting_click(self, mouse_pos, current_time):
-        import time
-        
-        for idx, (x, y, item) in self.crafting_slot_positions.items():
-            if x <= mouse_pos[0] <= x + self.slot_size and y <= mouse_pos[1] <= y + self.slot_size:
-                if self.last_click_slot == idx and (current_time - self.last_click_time) < 0.3:
-                    if self.has_materials_for_recipe(item["recipe"]):
-                        # Craft immediately and trigger flash
-                        self.craft_item(item)
-                        # Trigger completion flash
-                        self.crafting_completion_flash = True
-                        self.crafting_completion_time = pygame.time.get_ticks() / 1000.0
-                        self.crafting_completion_slot = (x, y)
-                        self.last_click_slot = None
-                        self.last_click_time = 0
-                        return True
+    def handle_crafting_click(self, mouse_pos, current_time, button=1):
+        if self.custom_craft_active:
+            if self.crafting_amount_menu is not None and not self._is_in_craft_menu(mouse_pos):
+                self.close_crafting_menu()
+            return True
+
+        if self.crafting_amount_menu is not None:
+            if self._is_in_craft_menu(mouse_pos):
+                menu_option = self._get_craft_menu_option(mouse_pos)
+                item = self._get_crafting_menu_item()
+                if menu_option == 1:
+                    if item and self.craft_item(item, 1):
+                        self._trigger_crafting_flash(self.crafting_amount_menu)
+                    self.close_crafting_menu()
+                elif menu_option == 2:
+                    if item:
+                        max_craftable = self._get_max_craftable(item)
+                        if self.craft_item(item, max_craftable):
+                            self._trigger_crafting_flash(self.crafting_amount_menu)
+                    self.close_crafting_menu()
+                elif menu_option == 3:
+                    self.custom_craft_active = True
+                    self.custom_craft_input = ""
                 else:
-                    self.selected_crafting_item = item
-                    self.last_click_slot = idx
-                    self.last_click_time = current_time
-                    return False
-        
-        return False
+                    self.close_crafting_menu()
+            else:
+                self.close_crafting_menu()
+            return True
+
+        if button == 3:
+            idx, x, y, item = self._get_crafting_slot_at_mouse(mouse_pos)
+            if idx is None:
+                return False
+            self.selected_crafting_item = item
+            self.show_craft_menu(mouse_pos, idx)
+            self.close_drop_menu()
+            return True
+
+        if button != 1:
+            return False
+
+        idx, x, y, item = self._get_crafting_slot_at_mouse(mouse_pos)
+        if idx is None:
+            return False
+
+        if self.last_click_slot == idx and (current_time - self.last_click_time) < 0.3:
+            if self.has_materials_for_recipe(item["recipe"]):
+                if self.craft_item(item, 1):
+                    self._trigger_crafting_flash(idx)
+            self.last_click_slot = None
+            self.last_click_time = 0
+            return True
+
+        self.selected_crafting_item = item
+        self.last_click_slot = idx
+        self.last_click_time = current_time
+        return True
 
     def update_flash(self, dt):
         """Update completion flash timer"""
@@ -8497,16 +8704,25 @@ class Inventory():
                 return True
         return False
 
+    def _clone_item_instance(self, value):
+        if isinstance(value, dict):
+            return {k: self._clone_item_instance(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [self._clone_item_instance(v) for v in value]
+        if isinstance(value, tuple):
+            return tuple(self._clone_item_instance(v) for v in value)
+        return value
+
     def _place_full_stack(self, stack_item):
         """Place a fully defined item stack into the first available slot."""
-        stack_copy = copy.deepcopy(stack_item)
+        stack_copy = self._clone_item_instance(stack_item)
         for i in range(self.hotbar_size):
             if self.hotbar_slots[i] is None:
-                self.hotbar_slots[i] = copy.deepcopy(stack_copy)
+                self.hotbar_slots[i] = self._clone_item_instance(stack_copy)
                 return True
         for i in range(self.capacity):
             if self.inventory_list[i] is None:
-                self.inventory_list[i] = copy.deepcopy(stack_copy)
+                self.inventory_list[i] = self._clone_item_instance(stack_copy)
                 return True
         return False
 
@@ -8514,7 +8730,7 @@ class Inventory():
         """Add a fully defined inventory item (preserving durability/metadata)."""
         if not item_instance:
             return False
-        instance_copy = copy.deepcopy(item_instance)
+        instance_copy = self._clone_item_instance(item_instance)
         item_name = instance_copy.get("item_name")
         if not item_name:
             return False
@@ -8543,7 +8759,7 @@ class Inventory():
 
         while quantity > 0:
             stack_amount = min(max_stack, quantity)
-            stack_copy = copy.deepcopy(instance_copy)
+            stack_copy = self._clone_item_instance(instance_copy)
             stack_copy["quantity"] = stack_amount
             placed = self._place_full_stack(stack_copy)
             if not placed:

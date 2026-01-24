@@ -1399,6 +1399,16 @@ class Mob(pygame.sprite.Sprite):
         self.lava_damage_timer = 0
         self.current_liquid = None
 
+    def take_damage(self, damage, play_sound=True):
+        if damage <= 0:
+            return
+        self.health -= damage
+        if self.health < 0:
+            self.health = 0
+        self.bar_timer = max(self.bar_timer, 5)
+        if self.health <= 0:
+            self.is_alive = False
+
     def register_attack(self, attacker):
         """Track eligible attackers for XP sharing, retaliation, and remember the last hitter."""
         if attacker is None:

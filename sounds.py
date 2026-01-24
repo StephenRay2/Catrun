@@ -14,19 +14,52 @@ class SoundManager:
         self.ambient_sounds = []
         self.playing_randomly = False
         self.ambient_running = False
+        self.master_volume = 1.0
+        self.music_volume = 1.0
+        self.sfx_volume = 1.0
+        self.music_base_volume = 0.3
 
     def _mixer_ready(self):
         return pygame.mixer.get_init() is not None
+
+    def _clamp_volume(self, value):
+        return max(0.0, min(1.0, float(value)))
+
+    def _effective_sfx_volume(self):
+        return self._clamp_volume(self.master_volume * self.sfx_volume)
+
+    def _effective_music_volume(self, base_volume=None):
+        base = self.music_base_volume if base_volume is None else self._clamp_volume(base_volume)
+        return self._clamp_volume(base * self.master_volume * self.music_volume)
+
+    def _apply_sound_volumes(self):
+        for sound in self.sounds.values():
+            sound.set_volume(1.0)
+
+    def _apply_music_volume(self):
+        if not self._mixer_ready():
+            return
+        pygame.mixer.music.set_volume(self._effective_music_volume())
+
+    def set_volume(self, master=None, music=None, sfx=None):
+        if master is not None:
+            self.master_volume = self._clamp_volume(master)
+        if music is not None:
+            self.music_volume = self._clamp_volume(music)
+        if sfx is not None:
+            self.sfx_volume = self._clamp_volume(sfx)
+        self._apply_sound_volumes()
+        self._apply_music_volume()
 
     def add_song(self, path):
         self.songs.append(path)
 
 
     def add_sound(self, name, path, volume=.15):
-        clamped_volume = max(0.0, min(1.0, volume))
+        clamped_volume = self._clamp_volume(volume)
         self.sounds[name] = pygame.mixer.Sound(path)
-        self.sounds[name].set_volume(clamped_volume)
         self.default_volumes[name] = clamped_volume
+        self.sounds[name].set_volume(1.0)
 
     def play_sound(self, name, volume_scale=None):
         if not self._mixer_ready():
@@ -37,22 +70,25 @@ class SoundManager:
         sound = self.sounds[name]
         channel = sound.play()
         if channel:
+            base_volume = self.default_volumes.get(name, 1.0)
+            scaled_volume = base_volume * self._effective_sfx_volume()
             if volume_scale is not None:
-                base_volume = self.default_volumes.get(name, sound.get_volume())
-                scaled_volume = max(0.0, min(1.0, base_volume * volume_scale))
-                channel.set_volume(scaled_volume)
-            elif name in self.default_volumes:
-                channel.set_volume(self.default_volumes[name])
+                scaled_volume *= volume_scale
+            channel.set_volume(self._clamp_volume(scaled_volume))
 
     def play_music(self, path, loop=True, volume=0.3, fade_in=0):
         if not self._mixer_ready():
             return
+        self.music_base_volume = self._clamp_volume(volume)
+        effective_volume = self._effective_music_volume()
         if path != self.current_music:
             pygame.mixer.music.stop()
             pygame.mixer.music.load(path)
-            pygame.mixer.music.set_volume(volume)
+            pygame.mixer.music.set_volume(effective_volume)
             pygame.mixer.music.play(-1 if loop else 0, fade_ms=fade_in)
             self.current_music = path
+        else:
+            pygame.mixer.music.set_volume(effective_volume)
 
     def stop_music(self, fade_out=0):
         self.playing_randomly = False
@@ -66,7 +102,7 @@ class SoundManager:
         else:
             pygame.mixer.music.stop()
 
-    def _random_music_loop(self, min_delay=5, max_delay=20, volume=0.6, start_delay=100, fade_in=0):
+    def _random_music_loop(self, min_delay=5, max_delay=20, volume=0.4, start_delay=100, fade_in=0):
         if start_delay > 0:
             time.sleep(start_delay)
         while self.playing_randomly:
@@ -76,7 +112,7 @@ class SoundManager:
             song = random.choice(self.songs)
             try:
                 pygame.mixer.music.load(song)
-                pygame.mixer.music.set_volume(volume)
+                pygame.mixer.music.set_volume(self._effective_music_volume(volume))
                 pygame.mixer.music.play(fade_ms=fade_in)
             except pygame.error:
                 self.playing_randomly = False
@@ -96,6 +132,7 @@ class SoundManager:
     def play_random_ambient_music(self, min_delay=5, max_delay=20, volume=0.4, start_delay=100, fade_in=1000):
         if not self._mixer_ready() or not self.songs or self.playing_randomly:
             return
+        self.music_base_volume = self._clamp_volume(volume)
         self.playing_randomly = True
         threading.Thread(
             target=self._random_music_loop,
@@ -110,7 +147,9 @@ class SoundManager:
                 break
             if self.ambient_sounds:
                 sound = random.choice(self.ambient_sounds)
-                sound.play()
+                channel = sound.play()
+                if channel:
+                    channel.set_volume(self._clamp_volume(self._effective_sfx_volume()))
             delay = random.uniform(min_delay, max_delay)
             time.sleep(delay)
 
@@ -124,7 +163,7 @@ class SoundManager:
         if not self._mixer_ready():
             return
         if name in self.sounds and random.random() < chance:
-            self.sounds[name].play()
+            self.play_sound(name)
 
     def shutdown(self):
         """Stop background audio threads and tear down the mixer safely."""
@@ -198,12 +237,12 @@ sound_manager.add_sound("footstep_dirt3", "assets/sounds/footstep_dirt3.wav")
 sound_manager.add_sound("footstep_dirt4", "assets/sounds/footstep_dirt4.wav")
 sound_manager.add_sound("footstep_dirt5", "assets/sounds/footstep_dirt5.wav")
 sound_manager.add_sound("footstep_dirt6", "assets/sounds/footstep_dirt6.wav")
-sound_manager.add_sound("footstep_grass1", "assets/sounds/footstep_grass1.wav")
-sound_manager.add_sound("footstep_grass2", "assets/sounds/footstep_grass2.wav")
-sound_manager.add_sound("footstep_grass3", "assets/sounds/footstep_grass3.wav")
-sound_manager.add_sound("footstep_grass4", "assets/sounds/footstep_grass4.wav")
-sound_manager.add_sound("footstep_grass5", "assets/sounds/footstep_grass5.wav")
-sound_manager.add_sound("footstep_grass6", "assets/sounds/footstep_grass6.wav")
+sound_manager.add_sound("footstep_grass1", "assets/sounds/footstep_grass1.wav", volume = .3)
+sound_manager.add_sound("footstep_grass2", "assets/sounds/footstep_grass2.wav", volume = .3)
+sound_manager.add_sound("footstep_grass3", "assets/sounds/footstep_grass3.wav", volume = .3)
+sound_manager.add_sound("footstep_grass4", "assets/sounds/footstep_grass4.wav", volume = .3)
+sound_manager.add_sound("footstep_grass5", "assets/sounds/footstep_grass5.wav", volume = .3)
+sound_manager.add_sound("footstep_grass6", "assets/sounds/footstep_grass6.wav", volume = .3)
 sound_manager.add_sound("footstep_sand1", "assets/sounds/footstep_sand1.wav")
 sound_manager.add_sound("footstep_sand2", "assets/sounds/footstep_sand2.wav")
 sound_manager.add_sound("footstep_sand3", "assets/sounds/footstep_sand3.wav")
@@ -241,9 +280,9 @@ sound_manager.add_sound("level_up", "assets/sounds/level_up_sound.wav")
 sound_manager.add_sound("chop_wood1", "assets/sounds/chop_wood1.wav")
 sound_manager.add_sound("chop_wood2", "assets/sounds/chop_wood2.wav")
 sound_manager.add_sound("chop_wood3", "assets/sounds/chop_wood3.wav")
-sound_manager.add_sound("hammer_wood1", "assets/sounds/hammer_wood1.wav", volume = .4)
-sound_manager.add_sound("hammer_wood2", "assets/sounds/hammer_wood2.wav", volume = .4)
-sound_manager.add_sound("hammer_wood3", "assets/sounds/hammer_wood3.wav", volume = .4)
+sound_manager.add_sound("hammer_wood1", "assets/sounds/hammer_wood1.wav", volume = .3)
+sound_manager.add_sound("hammer_wood2", "assets/sounds/hammer_wood2.wav", volume = .3)
+sound_manager.add_sound("hammer_wood3", "assets/sounds/hammer_wood3.wav", volume = .3)
 sound_manager.add_sound("pickup_grass1", "assets/sounds/pickup_grass1.wav")
 sound_manager.add_sound("pickup_grass2", "assets/sounds/pickup_grass2.wav")
 sound_manager.add_sound("pickup_grass3", "assets/sounds/pickup_grass3.wav")

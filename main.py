@@ -274,9 +274,9 @@ menu_settings_capture_action = None
 menu_settings_close_rect = None
 
 menu_settings_entries = [
-    {"id": "master_volume", "label": "Master Volume", "type": "slider", "min": 0.0, "max": 1.0, "value": 0.85},
-    {"id": "music_volume", "label": "Music Volume", "type": "slider", "min": 0.0, "max": 1.0, "value": 0.7},
-    {"id": "sfx_volume", "label": "SFX Volume", "type": "slider", "min": 0.0, "max": 1.0, "value": 0.8},
+    {"id": "master_volume", "label": "Master Volume", "type": "slider", "min": 0.0, "max": 1.0, "value": 0.5},
+    {"id": "music_volume", "label": "Music Volume", "type": "slider", "min": 0.0, "max": 1.0, "value": 0.5},
+    {"id": "sfx_volume", "label": "SFX Volume", "type": "slider", "min": 0.0, "max": 1.0, "value": 0.5},
     {"id": "brightness", "label": "Brightness", "type": "slider", "min": 0.6, "max": 1.4, "value": 1.0},
     {"id": "ui_scale", "label": "UI Scale", "type": "slider", "min": 0.85, "max": 1.15, "value": 1.0},
     {"id": "fullscreen", "label": "Fullscreen", "type": "toggle", "value": True},
@@ -285,6 +285,20 @@ menu_settings_entries = [
     {"id": "screen_shake", "label": "Screen Shake", "type": "toggle", "value": True},
     {"id": "tooltips", "label": "Tooltips", "type": "toggle", "value": True},
 ]
+
+def _get_menu_setting_value(setting_id, default=None):
+    for entry in menu_settings_entries:
+        if entry.get("id") == setting_id:
+            return entry.get("value", default)
+    return default
+
+def apply_volume_settings():
+    master = _get_menu_setting_value("master_volume", 1.0)
+    music = _get_menu_setting_value("music_volume", 1.0)
+    sfx = _get_menu_setting_value("sfx_volume", 1.0)
+    sound_manager.set_volume(master=master, music=music, sfx=sfx)
+
+apply_volume_settings()
 
 keybinds = {
     "move_up": pygame.K_w,
@@ -298,6 +312,40 @@ keybinds = {
     "rotate": pygame.K_r,
     "secondary_action": pygame.K_t,
     "placement_snap": pygame.K_SPACE,
+}
+
+CAT_FEED_ITEMS = {
+    "Fish",
+    "Raw Venison",
+    "Raw Lizard Meat",
+    "Raw Beef",
+    "Raw Chicken",
+    "Raw Small Meat",
+    "Raw Bear Meat",
+    "Cooked Fish",
+    "Cooked Venison",
+    "Cooked Lizard Meat",
+    "Cooked Beef",
+    "Cooked Chicken",
+    "Cooked Small Meat",
+    "Cooked Bear Meat",
+    "Small Milk",
+    "Medium Glass Milk",
+    "Large Metal Milk",
+    "Poisonous Mushroom",
+    "Apples",
+    "Oranges",
+    "Coconuts",
+    "Pineapple",
+    "Watermelon",
+    "Mushroom",
+    "Blood Berries",
+    "Dawn Berries",
+    "Dusk Berries",
+    "Sun Berries",
+    "Teal Berries",
+    "Twilight Drupes",
+    "Vio Berries",
 }
 
 menu_keybind_actions = [
@@ -432,6 +480,8 @@ def _update_slider_value(entry, track_rect, mouse_x):
     ratio = (mouse_x - track_rect.x) / track_rect.width
     ratio = max(0.0, min(1.0, ratio))
     entry["value"] = entry["min"] + ratio * span
+    if entry.get("id") in {"master_volume", "music_volume", "sfx_volume"}:
+        apply_volume_settings()
 
 def draw_menu_settings(screen):
     global menu_settings_close_rect
@@ -1265,6 +1315,90 @@ def build_cat_from_item(cat_data, x, y):
     cat.level = cat_data.get("cat_level", cat.level)
     cat.health = min(cat_data.get("cat_health", cat.health), cat.max_health)
     return cat
+
+
+def place_cat_from_slot(selected_slot, selected_index, slot_is_hotbar, player_world_x, player_world_y):
+    if not selected_slot:
+        return False
+    if "cat_object" not in selected_slot and "cat_type" not in selected_slot:
+        return False
+
+    cat_obj = selected_slot.get("cat_object")
+    if cat_obj is None and "cat_type" in selected_slot:
+        cat_obj = build_cat_from_item(selected_slot, player_world_x, player_world_y)
+        selected_slot["cat_object"] = cat_obj
+    if not cat_obj:
+        return False
+
+    placement_distance = 50
+    if player.last_direction == "right":
+        place_x = player_world_x + placement_distance
+        place_y = player_world_y
+    elif player.last_direction == "left":
+        place_x = player_world_x - placement_distance
+        place_y = player_world_y
+    elif player.last_direction == "up":
+        place_x = player_world_x
+        place_y = player_world_y - placement_distance
+    else:
+        place_x = player_world_x
+        place_y = player_world_y + placement_distance
+
+    cat_obj.rect.centerx = place_x
+    cat_obj.rect.centery = place_y
+    cat_obj.placement_time = pygame.time.get_ticks()
+    cat_obj.destroyed = False
+    if cat_obj not in cats:
+        cats.append(cat_obj)
+
+    if "quantity" in selected_slot:
+        selected_slot["quantity"] -= 1
+        if selected_slot["quantity"] <= 0:
+            if slot_is_hotbar:
+                inventory.hotbar_slots[selected_index] = None
+            else:
+                inventory.inventory_list[selected_index] = None
+    else:
+        if slot_is_hotbar:
+            inventory.hotbar_slots[selected_index] = None
+        else:
+            inventory.inventory_list[selected_index] = None
+    inventory.recalc_weight()
+    sound_manager.play_sound(random.choice(["cat_meow1", "cat_meow2", "cat_meow3"]))
+    return True
+
+
+def try_pickup_tamed_cat(player_world_x, player_world_y):
+    for cat in cats:
+        if not getattr(cat, "tamed", False):
+            continue
+        if getattr(cat, "destroyed", False) or not getattr(cat, "is_alive", True):
+            continue
+
+        cat_collision = cat.rect
+        horizontal_dist = abs(cat_collision.centerx - player_world_x)
+        vertical_dist = abs(cat_collision.centery - player_world_y)
+        pickup_reach = 40
+        horizontal_range = (cat_collision.width / 2) + pickup_reach
+        vertical_range = (cat_collision.height / 2) + pickup_reach
+
+        facing_cat = False
+        if player.last_direction == "right" and cat_collision.centerx > player_world_x - 10 and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+            facing_cat = True
+        elif player.last_direction == "left" and cat_collision.centerx < player_world_x + 10 and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+            facing_cat = True
+        elif player.last_direction == "up" and cat_collision.centery < player_world_y + 10 and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+            facing_cat = True
+        elif player.last_direction == "down" and cat_collision.centery > player_world_y - 10 and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+            facing_cat = True
+
+        if facing_cat:
+            cat_item = cat.get_item_data()
+            added = inventory.add([{"__full_item__": cat_item}])
+            if added and cat in cats:
+                cats.remove(cat)
+            return True
+    return False
 
 def resolve_item_icon_path(item_data):
     if not item_data:
@@ -3388,6 +3522,7 @@ while running:
                     inventory.selection_mode = "hotbar"
                     inventory.selected_inventory_slot = None
                     inventory.close_drop_menu()
+                    inventory.close_crafting_menu()
                     continue
                 if crafting_bench_in_use and crafting_bench.close_rect and crafting_bench.close_rect.collidepoint(event.pos):
                     crafting_bench.close()
@@ -3548,10 +3683,13 @@ while running:
                         inventory.selection_mode = "hotbar"
                         inventory.selected_inventory_slot = None
                         inventory.close_drop_menu()
+                        inventory.close_crafting_menu()
 
                 # Disable hotbar key switching while placing a structure
                 if not placement_mode:
                     inventory.handle_keydown_hotbar(event, screen=None, use_on_press=False)
+                if inventory_in_use and inventory.state == "crafting":
+                    inventory.handle_crafting_key_event(event)
                 
                 if crafting_bench_in_use:
                     crafting_bench.handle_key_event(event)
@@ -3683,18 +3821,22 @@ while running:
                     if inventory_tab_unused.is_clicked(event):
                         inventory.state = "inventory"
                         inventory.close_drop_menu()
+                        inventory.close_crafting_menu()
                         tab_clicked = True
                     elif crafting_tab_unused.is_clicked(event):
                         inventory.state = "crafting"
                         inventory.close_drop_menu()
+                        inventory.close_crafting_menu()
                         tab_clicked = True
                     elif level_up_tab_unused.is_clicked(event):
                         inventory.state = "level_up"
                         inventory.close_drop_menu()
+                        inventory.close_crafting_menu()
                         tab_clicked = True
                     elif cats_tab_unused.is_clicked(event):
                         inventory.state = "cats"
                         inventory.close_drop_menu()
+                        inventory.close_crafting_menu()
                         tab_clicked = True
                 if tab_clicked:
                     continue
@@ -3761,65 +3903,6 @@ while running:
                 if placement_mode and placement_item and placement_item.get("structure_type") == "StoneStairs":
                     placement_descending = not placement_descending
                     continue
-                
-                selected_slot = None
-                selected_index = None
-                slot_is_hotbar = False
-                if inventory.selection_mode == "hotbar":
-                    selected_index = inventory.selected_hotbar_slot
-                    selected_slot = inventory.hotbar_slots[selected_index]
-                    slot_is_hotbar = True
-                elif inventory.selection_mode == "inventory" and inventory.selected_inventory_slot is not None:
-                    selected_index = inventory.selected_inventory_slot
-                    selected_slot = inventory.inventory_list[selected_index]
-                
-                is_cat_slot = selected_slot is not None and ("cat_object" in selected_slot or "cat_type" in selected_slot)
-                if is_cat_slot and selected_index is not None:
-                    cat_obj = selected_slot.get("cat_object")
-                    if cat_obj is None and "cat_type" in selected_slot:
-                        cat_obj = build_cat_from_item(selected_slot, player_world_x, player_world_y)
-                        selected_slot["cat_object"] = cat_obj
-                    if cat_obj:
-                        placement_distance = 50
-                        if player.last_direction == "right":
-                            place_x = player_world_x + placement_distance
-                            place_y = player_world_y
-                        elif player.last_direction == "left":
-                            place_x = player_world_x - placement_distance
-                            place_y = player_world_y
-                        elif player.last_direction == "up":
-                            place_x = player_world_x
-                            place_y = player_world_y - placement_distance
-                        else:
-                            place_x = player_world_x
-                            place_y = player_world_y + placement_distance
-
-                            cat_obj.rect.centerx = place_x
-                            cat_obj.rect.centery = place_y
-                            cat_obj.placement_time = pygame.time.get_ticks()
-                            cat_obj.destroyed = False
-                            if cat_obj not in cats:
-                                cats.append(cat_obj)
-
-                            if "quantity" in selected_slot:
-                                selected_slot["quantity"] -= 1
-                                if selected_slot["quantity"] <= 0:
-                                    if slot_is_hotbar:
-                                        inventory.hotbar_slots[selected_index] = None
-                                    else:
-                                        inventory.inventory_list[selected_index] = None
-                            else:
-                                if slot_is_hotbar:
-                                    inventory.hotbar_slots[selected_index] = None
-                                else:
-                                    inventory.inventory_list[selected_index] = None
-                            inventory.recalc_weight()
-                            sound_manager.play_sound(random.choice(["cat_meow1", "cat_meow2", "cat_meow3"]))
-                    else:
-                        drop_result = inventory.remove_selected_quantity(1)
-                        if drop_result:
-                            process_drop_result(drop_result)
-                    inventory.close_drop_menu()
             
             if event.type == pygame.KEYDOWN and action_key_matches("placement_snap", event.key) and placement_mode and player.is_alive:
                 placement_snap_index += 1
@@ -3832,6 +3915,7 @@ while running:
                     inventory.selection_mode = "hotbar"
                     inventory.selected_inventory_slot = None
                     inventory.close_drop_menu()
+                    inventory.close_crafting_menu()
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and inventory.drop_menu_active:
                 drop_result = inventory.handle_drop_menu_click(pygame.mouse.get_pos())
@@ -3858,6 +3942,11 @@ while running:
                     mouse_pos = pygame.mouse.get_pos()
                     
                     if inventory_in_use:
+                        if inventory.state == "crafting":
+                            import time
+                            crafting_time = time.time()
+                            if inventory.handle_crafting_click(mouse_pos, crafting_time, button=3):
+                                continue
                         slot_index, is_hotbar = inventory.get_slot_at_mouse(mouse_pos, screen)
                         if slot_index is not None and inventory.handle_drop_right_click(mouse_pos, screen):
                             continue
@@ -3938,7 +4027,6 @@ while running:
             ):
                 right_collect_active = True
                 right_collect_requested = True
-                interact_requested = True
 
             if event.type == pygame.MOUSEBUTTONUP and event.button == 3:
                 right_collect_active = False
@@ -4161,7 +4249,7 @@ while running:
                     if inventory.state == "crafting":
                         import time
                         crafting_time = time.time()
-                        inventory.handle_crafting_click(mouse_pos, crafting_time)
+                        inventory.handle_crafting_click(mouse_pos, crafting_time, button=1)
                     else:
                         if slot_index is not None:
                             mouse_attack_blocked = True
@@ -4400,6 +4488,35 @@ while running:
                     tent_menu_active = False
                     tent_menu_tent = None
                 else:
+                    if not placement_mode and player.is_alive:
+                        selected_slot = None
+                        selected_index = None
+                        slot_is_hotbar = False
+                        if inventory.selection_mode == "hotbar":
+                            selected_index = inventory.selected_hotbar_slot
+                            selected_slot = inventory.hotbar_slots[selected_index]
+                            slot_is_hotbar = True
+                        elif inventory.selection_mode == "inventory" and inventory.selected_inventory_slot is not None:
+                            selected_index = inventory.selected_inventory_slot
+                            selected_slot = inventory.inventory_list[selected_index]
+
+                        is_cat_slot = selected_slot is not None and ("cat_object" in selected_slot or "cat_type" in selected_slot)
+                        if is_cat_slot and selected_index is not None:
+                            placed = place_cat_from_slot(
+                                selected_slot,
+                                selected_index,
+                                slot_is_hotbar,
+                                player_world_x,
+                                player_world_y,
+                            )
+                            if not placed:
+                                drop_result = inventory.remove_selected_quantity(1)
+                                if drop_result:
+                                    process_drop_result(drop_result)
+                            inventory.close_drop_menu()
+                            continue
+                    if try_pickup_tamed_cat(player_world_x, player_world_y):
+                        continue
                     if not enemy_inventory_in_use:
                         for mob in (globals().get("mobs") or []):
                             if not getattr(mob, "is_humanoid", False):
@@ -5370,6 +5487,20 @@ while running:
         poison_dragons[:] = [dragon for dragon in poison_dragons if not dragon.destroyed]
         dusk_dragons[:] = [dragon for dragon in dusk_dragons if not dragon.destroyed]
 
+        base_cam_x = cam_x
+        base_player_world_x = player_world_x
+        shake_offset_x = 0
+        shake_timer = getattr(player, "screen_shake_timer", 0.0)
+        if shake_timer > 0:
+            player.screen_shake_timer = max(0.0, shake_timer - dt)
+            if _get_menu_setting_value("screen_shake", True):
+                shake_duration = max(0.01, getattr(player, "screen_shake_duration", 0.0))
+                shake_intensity = getattr(player, "screen_shake_intensity", 0.0)
+                shake_strength = shake_intensity * (player.screen_shake_timer / shake_duration)
+                if shake_strength > 0:
+                    shake_offset_x = int(random.uniform(-shake_strength, shake_strength))
+        cam_x = base_cam_x + shake_offset_x
+
         for tile_x, tile_image in tiles:
             screen_x = tile_x - cam_x
             if -BACKGROUND_SIZE < screen_x < width:
@@ -5563,6 +5694,7 @@ while running:
         def draw_held_item():
             current_hotbar_slot = inventory.hotbar_slots[inventory.selected_hotbar_slot]
             if current_hotbar_slot is not None:
+                held_y_adjust = -5
                 def get_held_frame(image_entry, item_data):
                     """Return the current frame for a held item (supports animated lists)."""
                     if isinstance(image_entry, list):
@@ -5619,7 +5751,7 @@ while running:
                             rotated_image = pygame.transform.scale(rotated_image, scaled_size)
                             
                             held_x = int(player_pos.x - size - 28 + swing_offset[0])
-                            held_y = int(player_pos.y - size - 34 + swing_offset[1])
+                            held_y = int(player_pos.y - size - 34 + swing_offset[1] + held_y_adjust)
                             
                             screen.blit(rotated_image, (held_x, held_y))
                         elif held_image:
@@ -5663,7 +5795,7 @@ while running:
                             # Nudge up while moving, and slightly up when idle.
                             move_nudge = -3 if is_moving else -2
                             held_x = int(player_pos.x - size - 28 + offset[0])
-                            held_y = int(player_pos.y - size - 34 + offset[1] + move_nudge)
+                            held_y = int(player_pos.y - size - 34 + offset[1] + move_nudge + held_y_adjust)
                             
                             if player.last_direction == "left":
                                 held_image = pygame.transform.flip(held_image, True, False)
@@ -6227,6 +6359,8 @@ while running:
 
         screen.blit(day_night_overlay, (0, 0))
 
+        cam_x = base_cam_x
+        player_world_x = base_player_world_x
 
         inventory.draw_hotbar(screen)
 
@@ -6319,34 +6453,33 @@ while running:
                                 break
                 
                 # Try to feed cats
-                for mob in nearby_mobs:
-                    if mob.__class__.__name__ == "Cat" and not mob.is_alive:
-                        continue
-                    if mob.__class__.__name__ != "Cat":
-                        continue
-                    
-                    mob_collision = mob.rect
-                    horizontal_dist = abs(mob_collision.centerx - player_world_x)
-                    vertical_dist = abs(mob_collision.centery - player_world_y)
-                    feed_reach = 40
-                    horizontal_range = (mob_collision.width / 2) + feed_reach
-                    vertical_range = (mob_collision.height / 2) + feed_reach
-                    facing_mob = False
-                    
-                    if player.last_direction == "right" and mob_collision.centerx > player_world_x - 10 and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
-                        facing_mob = True
-                    elif player.last_direction == "left" and mob_collision.centerx < player_world_x + 10 and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
-                        facing_mob = True
-                    elif player.last_direction == "up" and mob_collision.centery < player_world_y + 10 and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
-                        facing_mob = True
-                    elif player.last_direction == "down" and mob_collision.centery > player_world_y - 10 and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
-                        facing_mob = True
-                    
-                    if facing_mob:
-                        # Get current hotbar item
-                        current_slot = inventory.hotbar_slots[inventory.selected_hotbar_slot]
-                        if current_slot is not None:
-                            item_name = current_slot["item_name"]
+                current_slot = inventory.hotbar_slots[inventory.selected_hotbar_slot]
+                item_name = current_slot["item_name"] if current_slot else None
+                if item_name in CAT_FEED_ITEMS:
+                    for mob in nearby_mobs:
+                        if mob.__class__.__name__ == "Cat" and not mob.is_alive:
+                            continue
+                        if mob.__class__.__name__ != "Cat":
+                            continue
+                        
+                        mob_collision = mob.rect
+                        horizontal_dist = abs(mob_collision.centerx - player_world_x)
+                        vertical_dist = abs(mob_collision.centery - player_world_y)
+                        feed_reach = 40
+                        horizontal_range = (mob_collision.width / 2) + feed_reach
+                        vertical_range = (mob_collision.height / 2) + feed_reach
+                        facing_mob = False
+                        
+                        if player.last_direction == "right" and mob_collision.centerx > player_world_x - 10 and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                            facing_mob = True
+                        elif player.last_direction == "left" and mob_collision.centerx < player_world_x + 10 and horizontal_dist < horizontal_range and vertical_dist < vertical_range:
+                            facing_mob = True
+                        elif player.last_direction == "up" and mob_collision.centery < player_world_y + 10 and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                            facing_mob = True
+                        elif player.last_direction == "down" and mob_collision.centery > player_world_y - 10 and vertical_dist < vertical_range and horizontal_dist < horizontal_range:
+                            facing_mob = True
+                        
+                        if facing_mob:
                             # Feed the cat
                             tame_increase = mob.feed_cat(item_name)
                             if tame_increase > 0 or item_name == "Poisonous Mushroom":
