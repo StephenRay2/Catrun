@@ -23,6 +23,7 @@ from mobs import hud_font, apply_wild_mob_level_scaling
 from player import *
 from cats import Cat, cat_types
 from structures import StructureManager, StoneFloor, StoneWall, StoneStairs, Structure
+from spatial_hash import SpatialHash
 
 clock = pygame.time.Clock()
 from inventory import *
@@ -53,6 +54,12 @@ player_world_y = player_pos.y
 prev_player_world_pos = pygame.Vector2(player_world_x, player_world_y)
 
 collection_messages = []
+
+SPATIAL_CELL_SIZE = 200
+object_spatial_grid = SpatialHash(SPATIAL_CELL_SIZE)
+mob_spatial_grid = SpatialHash(SPATIAL_CELL_SIZE)
+collision_object_grid = SpatialHash(SPATIAL_CELL_SIZE)
+collision_mob_grid = SpatialHash(SPATIAL_CELL_SIZE)
 
 # Menu scene visuals
 menu_decor = []
@@ -5228,6 +5235,16 @@ while running:
                             break
                     
         base_throw_attack = int(round(player.damage + (player.strength_leveler - 1) * player.strength_level_gain))
+        if thrown_items:
+            collision_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants + ponds + lavas + banks
+            collision_mobs = cats + squirrels + merchants + merchant_guards + cows + chickens + crawlers + ashhounds + wastedogs + wolves + pocks + deers + black_bears + brown_bears + polar_bears + pandas + gilas + salamanders + redmites + mudrustle_gorlins + slateback_gorlins + fluffy_gorlins + crows + glowbirds + duskwretches
+            collision_object_grid.clear()
+            for obj in collision_objects:
+                obj_rect = obj.get_collision_rect(0) if hasattr(obj, 'get_collision_rect') else obj.rect
+                collision_object_grid.insert(obj, obj_rect)
+            collision_mob_grid.clear()
+            for mob in collision_mobs:
+                collision_mob_grid.insert(mob, mob.rect)
         # Update thrown items physics - straight line movement with collision detection
         for thrown in thrown_items[:]:
             if not thrown["landed"]:
@@ -5244,10 +5261,7 @@ while running:
                                        thrown["sprite_size"], thrown["sprite_size"])
                 
                 collision_detected = False
-                collision_objects = rocks + trees + boulders + berry_bushes + dead_bushes + ferns + fruit_plants + ponds + lavas + banks
-                collision_mobs = cats + squirrels + merchants + merchant_guards + cows + chickens + crawlers + ashhounds + wastedogs + wolves + pocks + deers + black_bears + brown_bears + polar_bears + pandas + gilas + salamanders + redmites + mudrustle_gorlins + slateback_gorlins + fluffy_gorlins + crows + glowbirds + duskwretches
-                
-                for obj in collision_objects:
+                for obj in collision_object_grid.query_rect(item_rect):
                     obj_rect = obj.get_collision_rect(0) if hasattr(obj, 'get_collision_rect') else obj.rect
                     if item_rect.colliderect(obj_rect):
                         collision_detected = True
@@ -5256,7 +5270,7 @@ while running:
                 # Check for collisions with mobs
                 removed_due_to_hit = False
                 if not collision_detected:
-                    for mob in collision_mobs:
+                    for mob in collision_mob_grid.query_rect(item_rect):
                         if item_rect.colliderect(mob.rect):
                             if thrown.get("is_cat"):
                                 # Thrown cats deal damage using player base attack
@@ -5314,6 +5328,7 @@ while running:
                                 cat_obj.destroyed = False
                                 cat_obj.placement_time = pygame.time.get_ticks()
                                 cats.append(cat_obj)
+                                collision_mob_grid.insert(cat_obj, cat_obj.rect)
                         thrown_items.remove(thrown)
                     # For regular items, convert to world item
                     else:
@@ -6212,6 +6227,23 @@ while running:
                     if abs(mob.rect.x - mob_reference_x) < mob_reference_radius
                     and abs(mob.rect.y - player_pos.y) < 800]
 
+        def _spatial_rect(obj):
+            if isinstance(obj, dict):
+                return obj.get("rect")
+            if hasattr(obj, "rect"):
+                return obj.rect
+            return None
+
+        object_spatial_grid.clear()
+        for obj in nearby_objects:
+            rect = _spatial_rect(obj)
+            if rect:
+                object_spatial_grid.insert(obj, rect)
+
+        mob_spatial_grid.clear()
+        for mob in nearby_mobs:
+            mob_spatial_grid.insert(mob, mob.rect)
+
         def lerp(a, b, t):
             """Linear interpolation between a and b for t in [0,1]."""
             return a + (b - a) * max(0, min(1, t))
@@ -6521,7 +6553,14 @@ while running:
                     else:
                         return obj.rect
 
-                mob_nearby_objects = [obj for obj in nearby_objects
+                obj_query_rect = pygame.Rect(
+                    int(mob.rect.x - 100),
+                    int(mob.rect.y - 100),
+                    200,
+                    200,
+                )
+                candidate_objects = object_spatial_grid.query_rect(obj_query_rect)
+                mob_nearby_objects = [obj for obj in candidate_objects
                                     if abs(get_obj_rect(obj).x - mob.rect.x) < 100
                                     and abs(get_obj_rect(obj).y - mob.rect.y) < 100]
                 
@@ -6533,9 +6572,16 @@ while running:
                     mob_nearby_objects.append(temp_player)
                 
                 proximity = 900 if isinstance(mob, Gorlin) else 100
-                mob_nearby_mobs = [m for m in nearby_mobs 
-                                if m is not mob 
-                                and abs(m.rect.x - mob.rect.x) < proximity 
+                mob_query_rect = pygame.Rect(
+                    int(mob.rect.x - proximity),
+                    int(mob.rect.y - proximity),
+                    int(proximity * 2),
+                    int(proximity * 2),
+                )
+                candidate_mobs = mob_spatial_grid.query_rect(mob_query_rect)
+                mob_nearby_mobs = [m for m in candidate_mobs
+                                if m is not mob
+                                and abs(m.rect.x - mob.rect.x) < proximity
                                 and abs(m.rect.y - mob.rect.y) < proximity]
                 
             
