@@ -1,7 +1,9 @@
+import os
 import pygame
 import math
 import random
 pygame.init()
+os.chdir(os.path.dirname(__file__))
 import world
 from buttons import *
 from mob_placement import *
